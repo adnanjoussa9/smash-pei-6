@@ -6745,6 +6745,161 @@ COSMETICS.push(
 })();
 
 
+/* ===== 03h-newchars6.js ===== */
+/* ============================================================
+   SMASH PÉI — SIX NOUVEAUX COMBATTANTS
+
+   Six figures de La Réunion qui manquaient au casting, chacune
+   avec ses quatre spéciaux sur mesure et son super à elle. Les
+   styles de combat et les armes de prédilection leur sont
+   attribués automatiquement par 38-styles.js, comme au reste du
+   casting.
+   ============================================================ */
+
+/* ---------- LA BOUGIE — la petite flamme de la nuit ----------
+   Zoner lumineux : il pose des flammes qui restent, éclaire les
+   coins sombres et punit ceux qui traversent. */
+defChar('bougie', {
+  nFR: 'Ti Bougie', nEN: 'Little Candle', nCR: 'Ti Bouzi',
+  tagFR: 'Veilleuse tenace', tagEN: 'Stubborn nightlight',
+  arch: 'zoner', dmgMul: 0.98, rangeMul: 1.12,
+  stats: { weight: 86, walk: 1.5, run: 3.3, air: 1.45, jump: 16.8, djump: 15.6, grav: 0.62, fall: 15.2, size: 0.9 },
+  pal: { skin: '#f6e7c8', skin2: '#d9c39a', cloth: '#c9762f', accent: '#ffd166',
+         hand: '#f3d79a', shoe: '#8a5a2b', eye: '#2a1f14' },
+  build: { width: 0.84, height: 1.02, headScale: 1.04, shape: 'drop', limbW: 0.82 },
+  features: { head: 'drop', flame: true },
+  bio: { fr: 'On l\'allume au crépuscule, elle tient jusqu\'au matin.',
+         en: 'Lit at dusk, still burning at dawn.' },
+  specials: {
+    n: spProj({ total: 32, proj: { vx: 10.5, vy: -0.8, grav: 0.12, dmg: 5.5, ang: 55, bkb: 16, kbg: 50,
+        w: 22, h: 22, life: 78, kind: 'orb', color: '#ffd166', sfx: 'fire', trail: true, reflectable: true, burn: true } }),
+    s: spTrap({ total: 42, trap: { kind: 'mine', dmg: 11, radius: 84, life: 540, color: '#ffb03c' } }),
+    u: spUp({ riseV: -19.5, fxTrail: 'fire',
+      hits: [H({ s: 8, e: 22, x: 4, y: -102, w: 68, h: 98, dmg: 9.5, ang: 82, bkb: 38, kbg: 90, sfx: 'fire', fx: 'fireUp', burn: true })] }),
+    d: spCounter({ mul: 1.5, minDmg: 10 })
+  },
+  super: { nameFR: 'VEILLÉE DE FEU', nameEN: 'FIRE VIGIL', kind: 'veilleeFeu', color: '#ffb03c', dmg: 5.4, count: 14 }
+});
+
+/* ---------- LE CARI POULET — le lourd du kabar ----------
+   Il avance lentement mais chaque coup pèse une marmite. */
+defChar('cari', {
+  nFR: 'Cari Poulé', nEN: 'Chicken Curry', nCR: 'Kari Poulé',
+  tagFR: 'Marmite ambulante', tagEN: 'Walking cauldron',
+  arch: 'heavy', dmgMul: 1.12, rangeMul: 1.02,
+  stats: { weight: 124, walk: 1.25, run: 2.75, air: 1.05, jump: 15.2, djump: 14.2, grav: 0.78, fall: 18.4, size: 1.14 },
+  pal: { skin: '#c97a2c', skin2: '#95531a', cloth: '#7d3f1c', accent: '#f0b840',
+         hand: '#e0a24c', shoe: '#4a2711', eye: '#1d1208' },
+  build: { width: 1.16, height: 0.96, headScale: 0.96, shape: 'round', limbW: 1.2 },
+  features: { head: 'round', mouss: true },
+  bio: { fr: 'Mijoté trois heures : il ne s\'énerve jamais vite, mais il s\'énerve fort.',
+         en: 'Three hours simmering: slow to anger, terrible once angry.' },
+  specials: {
+    n: spCharge({ chargeMax: 96, proj: { vx: 13, vy: 0, grav: 0.06, dmg: 7, ang: 361, bkb: 26, kbg: 58,
+        w: 32, h: 32, life: 92, kind: 'orb', color: '#f0b840', sfx: 'fire', reflectable: true } }),
+    s: spCmdGrab({ dmg: 16, ang: 58, bkb: 76, kbg: 58 }),
+    u: spUp({ riseV: -17.5,
+      hits: [H({ s: 9, e: 24, x: 4, y: -96, w: 82, h: 96, dmg: 11.5, ang: 84, bkb: 42, kbg: 84, sfx: 'smashHit', fx: 'impact' })] }),
+    d: spSlam({ dropV: 24, landShock: { dmg: 13, w: 240, h: 66, ang: 68, bkb: 56, kbg: 72 } })
+  },
+  super: { nameFR: 'MARMITE DU DIMANCHE', nameEN: 'SUNDAY CAULDRON', kind: 'marmiteDimanche', color: '#f0b840', dmg: 26 }
+});
+
+/* ---------- LE PAILLE-EN-QUEUE DE NUIT — voltigeur ---------- */
+defChar('nuitoiseau', {
+  nFR: 'Zoizo Lanuit', nEN: 'Night Bird', nCR: 'Zoizo Lanwit',
+  tagFR: 'Voltigeur silencieux', tagEN: 'Silent flier',
+  arch: 'aerial', dmgMul: 0.9, rangeMul: 1.0,
+  stats: { weight: 76, walk: 1.7, run: 3.85, air: 1.85, jump: 18.4, djump: 17.6, grav: 0.55, fall: 13.6, size: 0.88, jumps: 3 },
+  pal: { skin: '#33384f', skin2: '#1d2033', cloth: '#5a6285', accent: '#a8c8ff',
+         hand: '#2a2e40', shoe: '#151827', eye: '#cfe0ff' },
+  build: { width: 0.82, height: 1.04, headScale: 1.0, shape: 'beak', limbW: 0.8 },
+  features: { head: 'beak', wings: true, tailf: true },
+  bio: { fr: 'Il traverse la nuit sans qu\'on l\'entende, et repart avant qu\'on le voie.',
+         en: 'Crosses the night unheard, gone before you look up.' },
+  specials: {
+    n: spProj({ total: 30, proj: { vx: 12.5, vy: -1, grav: 0.05, dmg: 5, ang: 361, bkb: 14, kbg: 48,
+        w: 20, h: 20, life: 84, kind: 'feather', color: '#a8c8ff', sfx: 'whoosh', trail: true, reflectable: true } }),
+    s: spDash({ dist: 268, at: 9 }),
+    u: spUp({ riseV: -22, driftMul: 0.95, helpless: false,
+      hits: [H({ s: 6, e: 20, x: 2, y: -108, w: 64, h: 104, dmg: 8, ang: 86, bkb: 32, kbg: 92, sfx: 'whoosh', fx: 'ringUp' })] }),
+    d: spSpin({ total: 42 })
+  },
+  super: { nameFR: 'NUÉE DE NUIT', nameEN: 'NIGHT SWARM', kind: 'nueeNuit', color: '#a8c8ff', dmg: 3.8, count: 20 }
+});
+
+/* ---------- LA CANNE À SUCRE — sabreur d'allonge ---------- */
+defChar('cannesucre', {
+  nFR: 'Kann Sucré', nEN: 'Sugar Cane', nCR: 'Kann Sikré',
+  tagFR: 'Allonge de champ', tagEN: 'Field reach',
+  arch: 'swordie', dmgMul: 1.0, rangeMul: 1.34,
+  stats: { weight: 92, walk: 1.5, run: 3.3, air: 1.35, jump: 16.9, djump: 15.8, grav: 0.66, fall: 16, size: 1.06 },
+  pal: { skin: '#9fd06a', skin2: '#6f9c40', cloth: '#c8b26a', accent: '#f2e2a0',
+         hand: '#b9de8c', shoe: '#5d7a34', eye: '#22301a' },
+  build: { width: 0.86, height: 1.12, headScale: 0.94, shape: 'leaf', limbW: 0.84 },
+  features: { head: 'leaf', leaf: true },
+  bio: { fr: 'Coupée au ras, elle repousse plus droite et plus dure.',
+         en: 'Cut to the ground, it grows back straighter and harder.' },
+  specials: {
+    n: spProj({ total: 34, proj: { vx: 11, vy: 0, grav: 0.1, dmg: 6.5, ang: 361, bkb: 18, kbg: 56,
+        w: 30, h: 18, life: 74, kind: 'blades', color: '#d9e88a', sfx: 'whoosh', reflectable: true } }),
+    s: spRush({ total: 46, moveX: { s: 10, e: 30, v: 15 },
+      hits: [H({ s: 10, e: 30, x: 40, y: -58, w: 96, h: 60, dmg: 11, ang: 42, bkb: 52, kbg: 70, sfx: 'hit', fx: 'bigSlash' })] }),
+    u: spUp({ riseV: -20,
+      hits: [H({ s: 7, e: 22, x: 6, y: -112, w: 76, h: 110, dmg: 10, ang: 84, bkb: 38, kbg: 90, sfx: 'hit', fx: 'bigSlashUp' })] }),
+    d: spReflect({ window: [4, 28] })
+  },
+  super: { nameFR: 'COUPE DE LA RÉCOLTE', nameEN: 'HARVEST CUT', kind: 'coupeRecolte', color: '#d9e88a', dmg: 23 }
+});
+
+/* ---------- LE GRAMOUN — équilibré, technique ---------- */
+defChar('gramoun', {
+  nFR: 'Gramoun Sagesse', nEN: 'Elder Sage', nCR: 'Gramoun Sazès',
+  tagFR: 'Patience et contre', tagEN: 'Patience and counters',
+  arch: 'balanced', dmgMul: 1.02, rangeMul: 1.06,
+  stats: { weight: 98, walk: 1.45, run: 3.15, air: 1.3, jump: 16.4, djump: 15.4, grav: 0.68, fall: 16.4, size: 1.0 },
+  pal: { skin: '#c8a179', skin2: '#9a7550', cloth: '#4a5b74', accent: '#e8e3d2',
+         hand: '#d6b391', shoe: '#33404f', eye: '#241b12' },
+  build: { width: 0.96, height: 1.0, headScale: 1.0, shape: 'round', limbW: 0.94 },
+  features: { head: 'round', mouss: true, hat: 'straw' },
+  bio: { fr: 'Il a vu passer trois cyclones : il sait exactement quand se baisser.',
+         en: 'Three cyclones behind him: he knows exactly when to duck.' },
+  specials: {
+    n: spReflect({ window: [3, 30] }),
+    s: spProj({ total: 36, proj: { vx: 9.5, vy: -2, grav: 0.2, dmg: 8, ang: 50, bkb: 22, kbg: 60,
+        w: 28, h: 28, life: 90, kind: 'pot', color: '#b98c58', sfx: 'hit', reflectable: true } }),
+    u: spUp({ riseV: -19,
+      hits: [H({ s: 8, e: 21, x: 4, y: -100, w: 70, h: 96, dmg: 9.5, ang: 82, bkb: 38, kbg: 88, sfx: 'hit', fx: 'ringUp' })] }),
+    d: spCounter({ mul: 1.75, minDmg: 12, window: [4, 30] })
+  },
+  super: { nameFR: 'LEÇON DE GRAMOUN', nameEN: 'ELDER LESSON', kind: 'leconGramoun', color: '#e8e3d2', dmg: 21 }
+});
+
+/* ---------- LE TEC-TEC — minuscule et fuyant ---------- */
+defChar('tectec', {
+  nFR: 'Tec-Tec', nEN: 'Sand Clam', nCR: 'Tek-Tek',
+  tagFR: 'Minuscule et pénible', tagEN: 'Tiny and pesky',
+  arch: 'rushdown', dmgMul: 0.9, rangeMul: 0.88,
+  stats: { weight: 72, walk: 1.85, run: 4.15, air: 1.6, jump: 17.8, djump: 16.8, grav: 0.7, fall: 16.8, size: 0.78 },
+  pal: { skin: '#f0e2d0', skin2: '#cbb59c', cloth: '#7fb6c9', accent: '#e88a6a',
+         hand: '#e6d3bd', shoe: '#5a8494', eye: '#2b2118' },
+  build: { width: 0.78, height: 0.82, headScale: 1.16, shape: 'round', limbW: 0.76 },
+  features: { head: 'round', shell: true },
+  bio: { fr: 'Il disparaît dans le sable avant que ta main touche le sol.',
+         en: 'Into the sand before your hand hits the beach.' },
+  specials: {
+    n: spProj({ total: 26, proj: { vx: 13.5, vy: 0, grav: 0.14, dmg: 4.5, ang: 361, bkb: 12, kbg: 46,
+        w: 18, h: 18, life: 62, kind: 'shuriken', color: '#e8d8c0', sfx: 'whoosh', reflectable: true } }),
+    s: spRush({ total: 36, moveX: { s: 8, e: 24, v: 19 },
+      hits: [H({ s: 8, e: 24, x: 22, y: -46, w: 62, h: 52, dmg: 8.5, ang: 46, bkb: 44, kbg: 66, sfx: 'hit', fx: 'dust' })] }),
+    u: spUp({ riseV: -21.5, driftMul: 0.85,
+      hits: [H({ s: 6, e: 19, x: 2, y: -92, w: 58, h: 88, dmg: 7.5, ang: 86, bkb: 32, kbg: 90, sfx: 'hit', fx: 'ringUp' })] }),
+    d: spDash({ dist: 210, at: 8 })
+  },
+  super: { nameFR: 'MARÉE DE TEC-TEC', nameEN: 'CLAM TIDE', kind: 'mareeTecTec', color: '#e8d8c0', dmg: 3.4, count: 24 }
+});
+
+
 /* ===== 03c-charfinal.js ===== */
 /* ---------- finalisation : construit les movesets ---------- */
 const CHAR_LIST = [];
@@ -6762,6 +6917,344 @@ for (const id in CHARS) {
 function charName(c, lang) {
   return lang === 'en' ? c.nEN : (lang === 'cr' ? c.nCR : c.nFR);
 }
+
+
+/* ===== 38-styles.js ===== */
+/* ============================================================
+   SMASH PÉI — STYLES DE COMBAT ET ARMES DE PRÉDILECTION
+
+   Jusqu'ici, tous les combattants d'un même archétype avaient
+   EXACTEMENT les mêmes coups : `makeMoveset()` produisait un jeu
+   identique, et seuls deux multiplicateurs changeaient. Dix
+   personnages « lourds » se jouaient donc de la même façon.
+
+   Ce module donne à chacun sa main :
+
+   1. UN STYLE — une façon de frapper. Le coup avant d'un sabreur
+      part loin et lentement ; celui d'un boxeur part court et
+      vite, deux fois de suite. Le style retouche les images de
+      démarrage, la portée, l'angle d'éjection et le nombre de
+      touches de chaque coup.
+
+   2. UNE ARME DE PRÉDILECTION — l'objet que le personnage tient
+      naturellement. Elle allonge sa portée sur les coups avant,
+      change l'effet visuel et le son, et s'affiche sur sa fiche.
+      Personne n'a la même.
+
+   3. UNE SIGNATURE — un petit plus propre au personnage : un
+      coup qui pique vers le bas, un jab qui touche deux fois,
+      un smash qui laisse une traînée…
+
+   Tout est appliqué APRÈS la construction des movesets, donc
+   aucune donnée d'origine n'est perdue, et tout reste
+   déterministe : aucune valeur ne dépend d'un tirage au sort.
+   ============================================================ */
+
+/* ---------- les huit familles de style ----------
+   `f` : facteur sur les images de démarrage (petit = plus rapide)
+   `p` : facteur de portée
+   `d` : facteur de dégâts
+   `a` : décalage d'angle d'éjection, en degrés
+   `sig` : signature appliquée au moveset */
+const STYLES = {
+
+  sabre: {
+    fr: 'SABRE', cr: 'SAB', en: 'BLADE',
+    dFR: 'Coups longs et nets, lents à sortir mais durs à contester.',
+    f: 1.14, p: 1.26, d: 1.06, a: 4, fx: 'bigSlash', sfx: 'smashHit',
+    sig: mv => { agrandir(mv.ftilt, 1.18); agrandir(mv.fair, 1.12); }
+  },
+
+  poings: {
+    fr: 'POINGS', cr: 'PWIN', en: 'FISTS',
+    dFR: 'Rafales courtes : on colle l\'adversaire et on ne le lâche plus.',
+    f: 0.82, p: 0.86, d: 0.92, a: -3, fx: 'punch', sfx: 'hitLight',
+    sig: mv => { doubler(mv.jab1); doubler(mv.jab2); }
+  },
+
+  masse: {
+    fr: 'MASSE', cr: 'MAS', en: 'HAMMER',
+    dFR: 'Peu de coups, mais chacun renvoie loin.',
+    f: 1.3, p: 1.1, d: 1.22, a: 6, fx: 'impact', sfx: 'smashHit',
+    sig: mv => { for (const k of ['fsmash', 'dsmash']) if (mv[k]) mv[k].hits.forEach(h => { h.bkb += 8; h.hitlag = (h.hitlag || 1) * 1.25; }); }
+  },
+
+  fouet: {
+    fr: 'FOUET', cr: 'FWÈT', en: 'WHIP',
+    dFR: 'Allonge exceptionnelle, mais la pointe seule fait mal.',
+    f: 1.06, p: 1.42, d: 0.9, a: 2, fx: 'slash', sfx: 'whoosh',
+    sig: mv => { agrandir(mv.ftilt, 1.3); agrandir(mv.dtilt, 1.25); }
+  },
+
+  griffes: {
+    fr: 'GRIFFES', cr: 'GRIF', en: 'CLAWS',
+    dFR: 'Coups multiples qui déchirent la garde.',
+    f: 0.88, p: 0.92, d: 0.95, a: -2, fx: 'slash', sfx: 'hit',
+    sig: mv => { doubler(mv.ftilt); doubler(mv.nair); }
+  },
+
+  souffle: {
+    fr: 'SOUFFLE', cr: 'SOUF', en: 'GUST',
+    dFR: 'Frappes aériennes larges, redoutables hors de la scène.',
+    f: 0.94, p: 1.08, d: 0.94, a: 8, fx: 'ring', sfx: 'whoosh',
+    sig: mv => { for (const k of ['fair', 'bair', 'uair']) if (mv[k]) mv[k].hits.forEach(h => { h.kbg += 8; h.h *= 1.14; }); }
+  },
+
+  roche: {
+    fr: 'ROCHE', cr: 'ROSH', en: 'STONE',
+    dFR: 'Lent, encaisse, et brise les défenses.',
+    f: 1.24, p: 1.02, d: 1.16, a: 3, fx: 'shock', sfx: 'smashHit',
+    sig: mv => { for (const k in mv) if (mv[k] && mv[k].hits) mv[k].hits.forEach(h => { h.shieldMul = (h.shieldMul || 1) * 1.35; }); }
+  },
+
+  vif: {
+    fr: 'VIF', cr: 'VIF', en: 'SWIFT',
+    dFR: 'Tout sort vite : on enchaîne avant que l\'autre respire.',
+    f: 0.76, p: 0.94, d: 0.88, a: -4, fx: 'punch', sfx: 'hitLight',
+    sig: mv => { for (const k in mv) if (mv[k] && mv[k].total) mv[k].total = Math.max(8, Math.round(mv[k].total * 0.9)); }
+  }
+};
+
+/* ---------- outils de retouche ---------- */
+
+/* Agrandit la boîte de frappe d'un coup sans toucher au reste */
+function agrandir(m, k) {
+  if (!m || !m.hits) return;
+  m.hits.forEach(h => { h.w *= k; h.x *= (1 + (k - 1) * 0.5); });
+}
+
+/* Ajoute une seconde touche, plus faible, juste après la première :
+   le coup « accroche » deux fois au lieu d'une. */
+function doubler(m) {
+  if (!m || !m.hits || !m.hits.length || m.__double) return;
+  const a = m.hits[0];
+  const b = Object.assign({}, a, {
+    s: a.e, e: a.e + 3,
+    dmg: a.dmg * 0.55, bkb: a.bkb * 0.7, kbg: a.kbg * 0.8,
+    sfx: 'hitLight', id: (a.id || 'h') + '_2'
+  });
+  m.hits.push(b);
+  m.total = Math.max(m.total, b.e + 6);
+  m.__double = true;
+}
+
+/* ---------- les armes de prédilection ----------
+   Chacune n'appartient qu'à un seul combattant. Elle agit sur les
+   coups « avant » (ftilt, fsmash, attaque en course) : portée,
+   dégâts, effet et son. */
+const ARMES = {
+  sabreCanne:  { fr: 'Sabre à canne',      cr: 'Sab kann',     en: 'Cane sabre',    ic: '🗡️', p: 1.24, d: 1.05, fx: 'bigSlash' },
+  kayamb:      { fr: 'Kayamb',             cr: 'Kayamb',       en: 'Kayamb',        ic: '🪘', p: 1.06, d: 0.98, fx: 'ring' },
+  roular:      { fr: 'Roulèr',             cr: 'Roulèr',       en: 'Roulèr drum',   ic: '🥁', p: 1.10, d: 1.08, fx: 'shock' },
+  louche:      { fr: 'Louche à rougail',   cr: 'Lous',         en: 'Ladle',         ic: '🥄', p: 1.14, d: 1.02, fx: 'impact' },
+  gaulette:    { fr: 'Gaulette',           cr: 'Golèt',        en: 'Bamboo stick',  ic: '🎋', p: 1.32, d: 0.92, fx: 'slash' },
+  planche:     { fr: 'Planche de surf',    cr: 'Plans',        en: 'Surfboard',     ic: '🏄', p: 1.20, d: 1.00, fx: 'bigSlash' },
+  filet:       { fr: 'Filet de pêche',     cr: 'Filé',         en: 'Fishing net',   ic: '🕸️', p: 1.28, d: 0.88, fx: 'ring' },
+  sabreBoucan: { fr: 'Coutelas',           cr: 'Koutla',       en: 'Machete',       ic: '🔪', p: 1.18, d: 1.10, fx: 'slash' },
+  torche:      { fr: 'Torche de lave',     cr: 'Tors',         en: 'Lava torch',    ic: '🔥', p: 1.08, d: 1.12, fx: 'fire' },
+  parapluie:   { fr: 'Parapluie péi',      cr: 'Paraplui',     en: 'Island brolly', ic: '☂️', p: 1.22, d: 0.94, fx: 'ring' },
+  marmite:     { fr: 'Marmite en fonte',   cr: 'Marmit',       en: 'Iron pot',      ic: '🍲', p: 1.02, d: 1.20, fx: 'impact' },
+  rame:        { fr: 'Rame de pirogue',    cr: 'Ram',          en: 'Canoe paddle',  ic: '🛶', p: 1.30, d: 0.96, fx: 'slash' },
+  balai:       { fr: 'Balai coco',         cr: 'Balié koko',   en: 'Coco broom',    ic: '🧹', p: 1.26, d: 0.90, fx: 'dust' },
+  serpe:       { fr: 'Serpe à cannes',     cr: 'Sèrp',         en: 'Cane billhook', ic: '⚒️', p: 1.12, d: 1.14, fx: 'bigSlash' },
+  eventail:    { fr: 'Éventail de vacoa',  cr: 'Évantay',      en: 'Vacoa fan',     ic: '🪭', p: 1.16, d: 0.90, fx: 'ring' },
+  lampe:       { fr: 'Lampe tempête',      cr: 'Lanp',         en: 'Storm lamp',    ic: '🏮', p: 1.06, d: 1.04, fx: 'shock' },
+  pilon:       { fr: 'Pilon à massalé',    cr: 'Pilon',        en: 'Spice pestle',  ic: '🧂', p: 1.00, d: 1.18, fx: 'impact' },
+  harpon:      { fr: 'Harpon',             cr: 'Arpon',        en: 'Harpoon',       ic: '🔱', p: 1.36, d: 1.02, fx: 'slash' },
+  fouetPeau:   { fr: 'Fouet en cuir',      cr: 'Fwèt',         en: 'Leather whip',  ic: '➰', p: 1.40, d: 0.86, fx: 'slash' },
+  bertel:      { fr: 'Bertel chargé',      cr: 'Bertel',       en: 'Loaded bag',    ic: '🎒', p: 1.04, d: 1.16, fx: 'impact' },
+  branche:     { fr: 'Branche de vacoa',   cr: 'Bransh',       en: 'Vacoa branch',  ic: '🌿', p: 1.22, d: 0.96, fx: 'slash' },
+  conque:      { fr: 'Conque marine',      cr: 'Konk',         en: 'Sea conch',     ic: '🐚', p: 1.10, d: 1.00, fx: 'ring' },
+  pioche:      { fr: 'Pioche de laveur',   cr: 'Pyosh',        en: 'Miner pick',    ic: '⛏️', p: 1.14, d: 1.16, fx: 'shock' },
+  cerf:        { fr: 'Cerf-volant',        cr: 'Sèrvolan',     en: 'Kite',          ic: '🪁', p: 1.24, d: 0.86, fx: 'ring' },
+  bouteille:   { fr: 'Bouteille de rhum',  cr: 'Boutèy',       en: 'Rum bottle',    ic: '🍾', p: 1.02, d: 1.10, fx: 'impact' },
+  tamarin:     { fr: 'Gourdin de tamarin', cr: 'Gourdin',      en: 'Tamarind club', ic: '🪵', p: 1.08, d: 1.15, fx: 'impact' },
+  epuisette:   { fr: 'Épuisette à bichik', cr: 'Épuizèt',      en: 'Bichique net',  ic: '🥅', p: 1.30, d: 0.86, fx: 'ring' },
+  pikan:       { fr: 'Branche à piquants', cr: 'Bwa pikan',    en: 'Thorn branch',  ic: '🌵', p: 1.18, d: 1.04, fx: 'slash' },
+  cocotier:    { fr: 'Noix de coco',       cr: 'Koko',         en: 'Coconut',       ic: '🥥', p: 0.98, d: 1.22, fx: 'impact' },
+  cordage:     { fr: 'Cordage de pirogue', cr: 'Kord',         en: 'Boat rope',     ic: '🪢', p: 1.38, d: 0.88, fx: 'slash' },
+  ancre:       { fr: 'Petite ancre',       cr: 'Lank',         en: 'Small anchor',  ic: '⚓', p: 1.04, d: 1.24, fx: 'shock' },
+  tambour:     { fr: 'Tambour malbar',     cr: 'Tanbour',      en: 'Malbar drum',   ic: '🪘', p: 1.08, d: 1.02, fx: 'ring' },
+  fourche:     { fr: 'Fourche à cannes',   cr: 'Foursh',       en: 'Cane fork',     ic: '🍴', p: 1.26, d: 1.06, fx: 'slash' },
+  boussole:    { fr: 'Boussole de marin',  cr: 'Bousol',       en: 'Sailor compass',ic: '🧭', p: 1.00, d: 1.06, fx: 'shock' },
+  cloche:      { fr: 'Cloche de kabar',    cr: 'Klosh',        en: 'Kabar bell',    ic: '🔔', p: 1.06, d: 1.10, fx: 'ring' },
+  panier:      { fr: 'Panier de letchis',  cr: 'Panyé',        en: 'Lychee basket', ic: '🧺', p: 1.10, d: 1.00, fx: 'dust' },
+  bambou:      { fr: 'Canne de bambou',    cr: 'Banbou',       en: 'Bamboo cane',   ic: '🎍', p: 1.34, d: 0.90, fx: 'slash' },
+  faucille:    { fr: 'Faucille',           cr: 'Fosiy',        en: 'Sickle',        ic: '🌾', p: 1.16, d: 1.08, fx: 'bigSlash' },
+  masque:      { fr: 'Masque de granmoun', cr: 'Mask',         en: 'Elder mask',    ic: '🎭', p: 1.02, d: 1.08, fx: 'shock' },
+  bouclierPei: { fr: 'Bouclier de vacoa',  cr: 'Boukliyé',     en: 'Vacoa shield',  ic: '🛡️', p: 1.00, d: 1.14, fx: 'impact' },
+  plume:       { fr: 'Plume de paille',    cr: 'Plim',         en: 'Tropicbird quill', ic: '🪶', p: 1.20, d: 0.84, fx: 'ring' },
+  cerfvolant2: { fr: 'Long ruban',         cr: 'Riban',        en: 'Long ribbon',   ic: '🎀', p: 1.36, d: 0.84, fx: 'ring' },
+  galet:       { fr: 'Galet de rivière',   cr: 'Galé',         en: 'River pebble',  ic: '🪨', p: 0.96, d: 1.26, fx: 'shock' },
+  vielle:      { fr: 'Triangle de séga',   cr: 'Triang',       en: 'Sega triangle', ic: '📐', p: 1.12, d: 0.96, fx: 'ring' },
+  cassePierre: { fr: 'Masse de carrier',   cr: 'Mas',          en: 'Quarry sledge', ic: '🔨', p: 1.06, d: 1.28, fx: 'impact' }
+};
+
+/* ============================================================
+   ATTRIBUTION
+
+   Le style et l'arme sont tirés du NOM du personnage, pas du
+   hasard : deux lancements donnent toujours le même résultat, et
+   un même personnage garde son identité d'une partie à l'autre.
+   L'archétype oriente le tirage pour que le résultat reste
+   cohérent — un lourd n'hérite pas d'un style de voltigeur.
+   ============================================================ */
+
+/* Numéro stable dérivé d'une chaîne */
+function empreinte(txt) {
+  let h = 0;
+  const s = String(txt || '');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+/* Styles plausibles pour chaque archétype */
+const STYLES_PAR_ARCH = {
+  balanced: ['sabre', 'poings', 'griffes', 'vif'],
+  rushdown: ['poings', 'vif', 'griffes'],
+  heavy:    ['masse', 'roche', 'pilonSubstitut'],
+  swordie:  ['sabre', 'fouet', 'griffes'],
+  zoner:    ['fouet', 'souffle', 'sabre'],
+  aerial:   ['souffle', 'vif', 'griffes']
+};
+/* `pilonSubstitut` n'existe pas : on le remplace par « masse ». */
+STYLES_PAR_ARCH.heavy = ['masse', 'roche', 'masse'];
+
+/* ============================================================
+   ÉQUILIBRAGE DE BASE
+
+   Avant : un lourd frappait 58 % plus fort qu'un voltigeur, et
+   pesait deux fois plus. L'écart de départ écrasait tout ce que le
+   joueur pouvait construire ensuite — inutile de monter un
+   personnage en maîtrise si le voisin part avec 50 % d'avance.
+
+   On resserre donc les écarts SANS effacer les identités : on
+   rapproche chaque valeur de la moyenne du casting d'une fraction
+   fixe. Un lourd reste le plus lourd, un rapide reste le plus
+   rapide, mais l'écart passe de « décisif » à « caractériel ».
+   Ce qui fait la différence devient la maîtrise (jusqu'à +16 %) et
+   l'équipement.
+   ============================================================ */
+(function equilibrer() {
+  if (!CHAR_LIST.length) return;
+
+  /* Part de l'écart à la moyenne que l'on conserve. 1 = rien ne
+     change, 0 = tout le monde identique. */
+  const GARDE = {
+    dmgMul: 0.58, rangeMul: 0.62,
+    weight: 0.62, run: 0.68, walk: 0.68,
+    jump: 0.72, djump: 0.72, air: 0.7, fall: 0.75
+  };
+
+  const moyenne = (lire) => {
+    let t = 0, n = 0;
+    for (const c of CHAR_LIST) { const v = lire(c); if (isFinite(v)) { t += v; n++; } }
+    return n ? t / n : 1;
+  };
+
+  const mDmg = moyenne(c => c.dmgMul || 1);
+  const mRange = moyenne(c => c.rangeMul || 1);
+  const mStat = {};
+  for (const k of ['weight', 'run', 'walk', 'jump', 'djump', 'air', 'fall'])
+    mStat[k] = moyenne(c => c.stats[k]);
+
+  for (const c of CHAR_LIST) {
+    c.__baseDmgMul = c.dmgMul; c.__baseRangeMul = c.rangeMul;
+    c.dmgMul = mDmg + ((c.dmgMul || 1) - mDmg) * GARDE.dmgMul;
+    c.rangeMul = mRange + ((c.rangeMul || 1) - mRange) * GARDE.rangeMul;
+    for (const k of ['weight', 'run', 'walk', 'jump', 'djump', 'air', 'fall']) {
+      if (!isFinite(c.stats[k])) continue;
+      c.stats[k] = mStat[k] + (c.stats[k] - mStat[k]) * GARDE[k];
+    }
+    /* Les movesets ont été bâtis avec les anciens multiplicateurs :
+       on les reconstruit avec les nouveaux, sinon l'équilibrage ne
+       toucherait que l'affichage. */
+    const anciens = { nB: c.moves.nB, sB: c.moves.sB, uB: c.moves.uB, dB: c.moves.dB };
+    c.moves = makeMoveset(c.arch, c.dmgMul, c.rangeMul);
+    Object.assign(c.moves, anciens);
+  }
+})();
+
+(function appliquerStyles() {
+  const cles = Object.keys(ARMES);
+  /* On distribue les armes sans doublon : chaque combattant a la
+     sienne, dans un ordre stable. */
+  const libres = cles.slice();
+
+  CHAR_LIST.forEach((c, idx) => {
+    const h = empreinte(c.id);
+
+    /* --- style --- */
+    const dispo = STYLES_PAR_ARCH[c.arch] || ['poings'];
+    const cle = dispo[h % dispo.length];
+    const st = STYLES[cle] || STYLES.poings;
+    c.style = cle;
+    c.styleInfo = st;
+
+    /* --- arme --- */
+    const armeCle = libres.length ? libres.splice(h % libres.length, 1)[0] : cles[h % cles.length];
+    c.arme = armeCle;
+    c.armeInfo = ARMES[armeCle];
+
+    /* --- application au moveset --- */
+    const mv = c.moves;
+    if (!mv) return;
+
+    /* variation propre au personnage : ±6 % autour de son style, pour
+       que deux combattants du même style ne soient pas identiques */
+    const v = 1 + (((h >> 3) % 13) - 6) / 100;
+
+    for (const k in mv) {
+      const m = mv[k];
+      if (!m || !m.hits || m.special || m.grab) continue;
+
+      const avant = k.indexOf('f') === 0 || k === 'dashAtk' || k.indexOf('jab') === 0;
+
+      m.hits.forEach(hh => {
+        /* portée : le style pour tous les coups, l'arme en plus
+           pour les coups vers l'avant */
+        let p = st.p * v;
+        let d = st.d;
+        if (avant && c.armeInfo) { p *= c.armeInfo.p; d *= c.armeInfo.d; }
+        hh.w *= p;
+        hh.x *= (1 + (p - 1) * 0.55);
+        hh.dmg *= d;
+        /* angle : chaque style envoie un peu différemment */
+        if (hh.ang !== 361 && hh.ang !== -84) hh.ang = clamp(hh.ang + st.a, -90, 180);
+        /* effet et son : c'est ce qu'on voit et entend en premier */
+        if (avant && c.armeInfo) hh.fx = c.armeInfo.fx;
+        else if (st.fx && hh.fx !== 'spike') hh.fx = st.fx;
+        if (st.sfx && hh.sfx === 'hit') hh.sfx = st.sfx;
+      });
+
+      /* rapidité de sortie : on décale le début des touches */
+      if (Math.abs(st.f - 1) > 0.02) {
+        const dec = Math.round((st.f - 1) * 4);
+        m.hits.forEach(hh => { hh.s = Math.max(1, hh.s + dec); hh.e = Math.max(hh.s + 1, hh.e + dec); });
+        m.total = Math.max(10, m.total + dec);
+      }
+    }
+
+    /* --- signature du style --- */
+    try { if (st.sig) st.sig(mv); } catch (e) { /* jamais bloquant */ }
+  });
+})();
+
+/* ---------- lecture dans l'interface ---------- */
+function styleName(c, lang) {
+  const s = c && c.styleInfo;
+  if (!s) return '';
+  return s[lang] || s.fr;
+}
+function armeName(c, lang) {
+  const a = c && c.armeInfo;
+  if (!a) return '';
+  return a[lang] || a.fr;
+}
+
+/* Les textes d'interface sont posés plus tard : ce fichier s'exécute
+   avant que la table I18N existe (il doit suivre immédiatement la
+   construction des movesets). Voir 37-nouveau.js. */
 
 
 /* ===== 04-stages.js ===== */
@@ -10641,6 +11134,345 @@ STAGES.chantiernrl = makeStage({
 });
 
 
+/* ===== 04g-newstages6.js ===== */
+/* ============================================================
+   SMASH PÉI — TROIS NOUVELLES ARÈNES
+
+   · LE MARCHÉ DE SAINT-PAUL — étals, bâches et cageots. Une
+     grande scène plate bordée de deux plateformes d'auvent.
+   · LE TUNNEL DE LAVE — souterrain étroit, plafond bas, coulée
+     de lave qui pulse au fond. Combats serrés.
+   · LA PLAGE DE L'ERMITAGE AU COUCHANT — vaste, ouverte, avec
+     des filaos et une marée qui monte au fond.
+
+   Elles suivent le même contrat que les autres : `plats`,
+   `bounds`, `spawns`, et les couches de dessin sky / far / mid /
+   ground / fore.
+   ============================================================ */
+
+/* ============================================================
+   1. LE MARCHÉ DE SAINT-PAUL
+   ============================================================ */
+STAGES.marchepaul = makeStage({
+  id: 'marchepaul', nFR: 'Marché de Saint-Paul', nEN: 'Saint-Paul Market', nCR: 'Marshé Sin-Pol',
+  tagFR: 'Étals & bâches', tagEN: 'Stalls & tarps', music: 'kabar',
+  tint: '#f0b840', night: false,
+  plats: [
+    { x: -520, y: 0, w: 1040, h: 150 },
+    { x: -520, y: -230, w: 300, h: 22, pass: true },
+    { x: 220, y: -230, w: 300, h: 22, pass: true },
+    { x: -150, y: -400, w: 300, h: 22, pass: true }
+  ],
+  bounds: { left: -1280, right: 1280, top: -1020, bottom: 780 },
+  spawns: [{ x: -280, y: -320 }, { x: 280, y: -320 }, { x: -110, y: -480 }, { x: 110, y: -480 }],
+
+  sky(ctx, t) {
+    Paint.sky(ctx, [[0, '#1a3b5c'], [0.34, '#3d76a8'], [0.7, '#8fc3d8'], [1, '#f2dfae']],
+              -2600, -1500, 5200, 2600);
+    for (let i = 0; i < 7; i++)
+      Paint.cloud(ctx, -1500 + ((i * 560 + t * 0.16) % 3400), -820 + (i % 3) * 110, 1.7, '#ffffff', 0.42);
+  },
+
+  far(ctx, t) {
+    Paint.ridge(ctx, 741, -2600, 2600, 120, 340, '#3d5a4a', '#1d3128', 50);
+    Paint.ridge(ctx, 757, -2600, 2600, 280, 210, '#4d6a56', '#243a2f', 44);
+    /* la mer, au loin */
+    const g = ctx.createLinearGradient(0, 300, 0, 520);
+    g.addColorStop(0, '#3f86a8'); g.addColorStop(1, '#2a5f7d');
+    ctx.fillStyle = g; ctx.fillRect(-2600, 300, 5200, 240);
+  },
+
+  mid(ctx, t) {
+    /* rangée d'étals sous leurs bâches, en enfilade */
+    const rng = makeRng(7411);
+    for (let i = 0; i < 12; i++) {
+      const x = -1500 + i * 260 + rng() * 40;
+      const y = 130;
+      const col = ['#d94f3d', '#f0b840', '#3f86a8', '#7ab648'][i % 4];
+      /* pieds */
+      ctx.fillStyle = '#6b4a2a';
+      ctx.fillRect(x, y - 120, 8, 120);
+      ctx.fillRect(x + 160, y - 120, 8, 120);
+      /* bâche ondulante */
+      ctx.fillStyle = col;
+      ctx.beginPath();
+      ctx.moveTo(x - 14, y - 120);
+      for (let k = 0; k <= 8; k++) {
+        const px = x - 14 + (196 / 8) * k;
+        const py = y - 120 + Math.sin(k * 0.9 + t * 0.02 + i) * 6;
+        ctx.lineTo(px, py);
+      }
+      ctx.lineTo(x + 182, y - 104); ctx.lineTo(x - 14, y - 104);
+      ctx.closePath(); ctx.fill();
+      /* cageots de fruits */
+      for (let k = 0; k < 3; k++) {
+        ctx.fillStyle = '#8a5f34';
+        ctx.fillRect(x + 16 + k * 46, y - 44, 38, 30);
+        ctx.fillStyle = ['#e8573f', '#f2c14e', '#7ab648'][k % 3];
+        for (let q = 0; q < 4; q++)
+          Paint.disc(ctx, x + 24 + k * 46 + (q % 2) * 16, y - 50 + Math.floor(q / 2) * 9, 6,
+                     ['#e8573f', '#f2c14e', '#7ab648'][(k + q) % 3]);
+      }
+    }
+  },
+
+  ground(ctx, t) {
+    /* le quai principal, en planches */
+    Paint.rockPlatform(ctx, { x: -520, y: 0, w: 1040, h: 150 }, '#c9a86a', '#f0d9a0');
+    ctx.save();
+    ctx.globalAlpha = 0.22; ctx.strokeStyle = '#6b4a2a'; ctx.lineWidth = 2;
+    for (let x = -500; x < 520; x += 52) {
+      ctx.beginPath(); ctx.moveTo(x, 4); ctx.lineTo(x, 146); ctx.stroke();
+    }
+    ctx.restore();
+    /* les deux auvents-plateformes et la passerelle du haut */
+    for (const p of this.plats) {
+      if (!p.pass) continue;
+      Paint.rockPlatform(ctx, p, '#b8763a', '#f0b840');
+      ctx.save();
+      ctx.globalAlpha = 0.5; ctx.fillStyle = '#d94f3d';
+      for (let k = 0; k < Math.floor(p.w / 40); k++)
+        ctx.fillRect(p.x + k * 40 + 6, p.y + p.h, 26, 10);
+      ctx.restore();
+    }
+  },
+
+  fore(ctx, t) {
+    /* guirlandes de fanions au premier plan */
+    ctx.save();
+    ctx.globalAlpha = 0.9;
+    const cols = ['#e8573f', '#f2c14e', '#3f86a8', '#7ab648', '#a463f2'];
+    for (let i = 0; i < 26; i++) {
+      const x = -1300 + i * 104;
+      const y = -560 + Math.sin(i * 0.55 + t * 0.014) * 22;
+      ctx.fillStyle = cols[i % cols.length];
+      ctx.beginPath();
+      ctx.moveTo(x, y); ctx.lineTo(x + 26, y); ctx.lineTo(x + 13, y + 34);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 3;
+    ctx.beginPath();
+    for (let i = 0; i <= 26; i++) {
+      const x = -1300 + i * 104;
+      const y = -560 + Math.sin(i * 0.55 + t * 0.014) * 22;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  },
+
+  ambient(ctx, t) {
+    /* poussière dorée dans la lumière du marché */
+    if (t % 7 === 0) FX.spark(rnd(-900, 900), rnd(-300, 100), rnd(-0.4, 0.4), rnd(-0.6, -0.1),
+                              '#ffe9b0', rndi(60, 120), rnd(2, 4));
+  }
+});
+
+/* ============================================================
+   2. LE TUNNEL DE LAVE
+   ============================================================ */
+STAGES.tunnellave = makeStage({
+  id: 'tunnellave', nFR: 'Tunnel de Lave', nEN: 'Lava Tube', nCR: 'Tinèl Lav',
+  tagFR: 'Souterrain brûlant', tagEN: 'Burning underground', music: 'volcan',
+  tint: '#ff6b2c', night: true,
+  plats: [
+    { x: -420, y: 0, w: 840, h: 160 },
+    { x: -600, y: -190, w: 210, h: 20, pass: true },
+    { x: 390, y: -190, w: 210, h: 20, pass: true },
+    { x: -120, y: -330, w: 240, h: 20, pass: true }
+  ],
+  bounds: { left: -1080, right: 1080, top: -900, bottom: 700 },
+  spawns: [{ x: -230, y: -300 }, { x: 230, y: -300 }, { x: -90, y: -420 }, { x: 90, y: -420 }],
+
+  sky(ctx, t) {
+    /* pas de ciel : de la roche, et une lueur au fond */
+    Paint.sky(ctx, [[0, '#0a0508'], [0.5, '#1a0b0c'], [1, '#3d130c']], -2400, -1400, 4800, 2400);
+    const g = ctx.createRadialGradient(0, 120, 40, 0, 120, 900);
+    g.addColorStop(0, 'rgba(255,120,40,.34)'); g.addColorStop(1, 'rgba(255,80,20,0)');
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0, 120, 900, 0, Math.PI * 2); ctx.fill();
+  },
+
+  far(ctx, t) {
+    /* voûte du tunnel : deux courbes de roche */
+    ctx.save();
+    ctx.fillStyle = '#241014';
+    ctx.beginPath();
+    ctx.moveTo(-2400, -1400); ctx.lineTo(2400, -1400);
+    ctx.lineTo(2400, -700);
+    for (let x = 2400; x >= -2400; x -= 120)
+      ctx.lineTo(x, -700 + Math.sin(x * 0.0022 + 1.3) * 90 - 60);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+    Paint.ridge(ctx, 913, -2400, 2400, 340, 190, '#3a181a', '#1b0b0d', 40);
+  },
+
+  mid(ctx, t) {
+    /* coulée de lave au fond, qui respire */
+    const pulse = 0.65 + Math.sin(t * 0.03) * 0.2;
+    const g = ctx.createLinearGradient(0, 300, 0, 520);
+    g.addColorStop(0, 'rgba(255,150,50,' + pulse.toFixed(2) + ')');
+    g.addColorStop(1, 'rgba(180,40,10,.9)');
+    ctx.fillStyle = g; ctx.fillRect(-2400, 300, 4800, 260);
+    /* stalactites */
+    const rng = makeRng(9137);
+    ctx.fillStyle = '#2c1216';
+    for (let i = 0; i < 26; i++) {
+      const x = -1400 + i * 112 + rng() * 30;
+      const h = 60 + rng() * 130;
+      ctx.beginPath();
+      ctx.moveTo(x - 20, -660); ctx.lineTo(x + 20, -660); ctx.lineTo(x, -660 + h);
+      ctx.closePath(); ctx.fill();
+    }
+  },
+
+  ground(ctx, t) {
+    Paint.rockPlatform(ctx, { x: -420, y: 0, w: 840, h: 160 }, '#3a1a18', '#8a3a22');
+    /* veines incandescentes dans la roche */
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = 'rgba(255,120,40,' + (0.3 + Math.sin(t * 0.05) * 0.14).toFixed(2) + ')';
+    ctx.lineWidth = 3;
+    for (let i = 0; i < 6; i++) {
+      ctx.beginPath();
+      ctx.moveTo(-400 + i * 140, 10);
+      ctx.lineTo(-370 + i * 140, 60);
+      ctx.lineTo(-400 + i * 140, 110);
+      ctx.stroke();
+    }
+    ctx.restore();
+    for (const p of this.plats) {
+      if (!p.pass) continue;
+      Paint.rockPlatform(ctx, p, '#4a221e', '#c9522a');
+    }
+  },
+
+  fore(ctx, t) {
+    /* bord du tunnel en avant-plan, pour l'enfermement */
+    ctx.save();
+    ctx.fillStyle = 'rgba(10,4,6,.85)';
+    ctx.beginPath();
+    ctx.moveTo(-2400, 700); ctx.lineTo(2400, 700); ctx.lineTo(2400, 560);
+    for (let x = 2400; x >= -2400; x -= 140)
+      ctx.lineTo(x, 560 + Math.sin(x * 0.003) * 40);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  },
+
+  ambient(ctx, t) {
+    if (t % 4 === 0) FX.spark(rnd(-800, 800), 320, rnd(-0.8, 0.8), rnd(-4, -1.2),
+                              '#ff9a3c', rndi(40, 90), rnd(3, 6));
+  }
+});
+
+/* ============================================================
+   3. L'ERMITAGE AU COUCHANT
+   ============================================================ */
+STAGES.ermitage = makeStage({
+  id: 'ermitage', nFR: 'Ermitage au couchant', nEN: 'Ermitage Sunset', nCR: 'Lèrmitaz o kousan',
+  tagFR: 'Lagon & filaos', tagEN: 'Lagoon & casuarinas', music: 'lagon',
+  tint: '#ff9a5c', night: false,
+  plats: [
+    { x: -700, y: 0, w: 1400, h: 140 },
+    { x: -680, y: -250, w: 260, h: 20, pass: true },
+    { x: 420, y: -250, w: 260, h: 20, pass: true },
+    { x: -170, y: -420, w: 340, h: 22, pass: true },
+    { x: -90, y: -600, w: 180, h: 20, pass: true }
+  ],
+  bounds: { left: -1620, right: 1620, top: -1180, bottom: 820 },
+  spawns: [{ x: -340, y: -340 }, { x: 340, y: -340 }, { x: -120, y: -520 }, { x: 120, y: -520 }],
+
+  sky(ctx, t) {
+    Paint.sky(ctx, [[0, '#2a1a4a'], [0.3, '#7a3a68'], [0.6, '#d9634a'], [0.82, '#f2a45c'], [1, '#ffd9a0']],
+              -3000, -1600, 6000, 2800);
+    /* le soleil qui touche l'eau */
+    Paint.disc(ctx, 260, 210, 120, '#fff0c0', '#ffb347', 2.6);
+    for (let i = 0; i < 5; i++)
+      Paint.cloud(ctx, -1400 + ((i * 700 + t * 0.1) % 3800), -700 + (i % 2) * 130, 2.1, '#ffc7a0', 0.5);
+  },
+
+  far(ctx, t) {
+    Paint.ridge(ctx, 611, -3000, 3000, 150, 300, '#3a2d4a', '#1e1729', 46);
+    /* lagon : bandes qui glissent */
+    const g = ctx.createLinearGradient(0, 240, 0, 620);
+    g.addColorStop(0, '#5fc7c4'); g.addColorStop(0.5, '#2f9aa8'); g.addColorStop(1, '#1d6a80');
+    ctx.fillStyle = g; ctx.fillRect(-3000, 240, 6000, 400);
+    ctx.save();
+    ctx.globalAlpha = 0.3; ctx.strokeStyle = '#ffe9c0'; ctx.lineWidth = 3;
+    for (let i = 0; i < 10; i++) {
+      const y = 270 + i * 34;
+      ctx.beginPath();
+      for (let x = -3000; x <= 3000; x += 90)
+        ctx.lineTo(x, y + Math.sin(x * 0.004 + t * 0.03 + i) * 5);
+      ctx.stroke();
+    }
+    ctx.restore();
+  },
+
+  mid(ctx, t) {
+    /* filaos : troncs fins, houppier ébouriffé */
+    const rng = makeRng(6231);
+    for (let i = 0; i < 9; i++) {
+      const x = -1500 + i * 380 + rng() * 60;
+      const h = 300 + rng() * 160;
+      ctx.strokeStyle = '#5a4330'; ctx.lineWidth = 12;
+      ctx.beginPath();
+      ctx.moveTo(x, 140);
+      ctx.quadraticCurveTo(x + 18, 140 - h * 0.6, x + 6, 140 - h);
+      ctx.stroke();
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      for (let k = 0; k < 14; k++) {
+        const a = -Math.PI / 2 + (k / 14 - 0.5) * 2.6;
+        const l = 90 + (k % 3) * 34;
+        ctx.strokeStyle = k % 2 ? '#2f6b3c' : '#3f8a4a';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(x + 6, 140 - h);
+        ctx.quadraticCurveTo(x + 6 + Math.cos(a) * l * 0.6, 140 - h + Math.sin(a) * l * 0.5 + 20,
+                             x + 6 + Math.cos(a) * l, 140 - h + Math.sin(a) * l + 46);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  },
+
+  ground(ctx, t) {
+    Paint.rockPlatform(ctx, { x: -700, y: 0, w: 1400, h: 140 }, '#e8cfa0', '#fff0cc');
+    /* écume qui lèche le sable, aux deux bouts */
+    ctx.save();
+    ctx.globalAlpha = 0.35; ctx.fillStyle = '#ffffff';
+    const w = 20 + Math.sin(t * 0.04) * 10;
+    ctx.fillRect(-700, -6, w + 40, 12);
+    ctx.fillRect(700 - w - 40, -6, w + 40, 12);
+    ctx.restore();
+    for (const p of this.plats) {
+      if (!p.pass) continue;
+      Paint.rockPlatform(ctx, p, '#8a6a44', '#d9b273');
+    }
+  },
+
+  fore(ctx, t) {
+    /* palmes floues au premier plan */
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    for (let i = 0; i < 4; i++) {
+      const x = -1200 + i * 820;
+      ctx.strokeStyle = '#1d3a24'; ctx.lineWidth = 16;
+      ctx.beginPath();
+      ctx.moveTo(x, 900);
+      ctx.quadraticCurveTo(x + 60, 400, x + 20 + Math.sin(t * 0.02 + i) * 20, 60);
+      ctx.stroke();
+    }
+    ctx.restore();
+  },
+
+  ambient(ctx, t) {
+    if (t % 11 === 0) FX.spark(rnd(-1200, 1200), rnd(-500, 0), rnd(-0.3, 0.3), rnd(-0.5, -0.1),
+                               '#ffd9a0', rndi(70, 140), rnd(2, 4));
+  }
+});
+
+
 /* ===== 04d-stagefinal.js ===== */
 /* ---------- liste finale des arènes ---------- */
 const STAGE_LIST = Object.values(STAGES);
@@ -13276,6 +14108,7 @@ class Fighter {
   }
 
   grabLedge(l) {
+    this.ledgeT = 0;
     this.setState(ST.LEDGE);
     this.ledgeGrabbed = l;
     this.x = l.x - l.dir * this.w * 0.3;
@@ -13299,6 +14132,23 @@ class Fighter {
   ledgeControl(inp) {
     const l = this.ledgeGrabbed;
     if (!l) { this.setState(ST.AIR); return; }
+
+    /* LIMITE D'ACCROCHAGE (regle du vrai Smash).
+       Rester suspendu au rebord ne doit pas etre une cachette : au
+       bout de six secondes l'invincibilite tombe, puis le combattant
+       lache prise. Sans ca, on pouvait laisser expirer le chrono
+       accroche dans le vide. */
+    this.ledgeT = (this.ledgeT || 0) + 1;
+    if (this.ledgeT > 300) this.inv = 0;
+    if (this.ledgeT > 360) {
+      this.ledgeCd = PHYS.ledgeCooldown;
+      this.ledgeGrabbed = null;
+      this.setState(ST.AIR);
+      this.vy = 1.5;
+      FX.dust(this.x, this.cy, 4);
+      return;
+    }
+
     if (this.sf < 6) return;
     const IN = l.dir;                                          // vers la scène
     if (inp.ay < -0.5 || this.buf.consume('jump')) {           // remontée par saut
@@ -13348,6 +14198,7 @@ class Fighter {
     }
     this.vx = 0; this.vy = 0;
     if (k >= 1) {
+      this.ledgeT = 0;
       this.grounded = true; this.platform = this.ledgePlat || null;
       this.jumps = 0; this.upUsed = false;
       if (this.ledgeAttack) { this.ledgeAttack = false; this.startMove('ftilt'); }
@@ -15602,7 +16453,13 @@ class Match {
   }
 
   /* ---------- effets globaux ---------- */
-  hitstop(f) { this.hitstopF = Math.max(this.hitstopF, Math.round(f * (Save.data ? Save.data.opts.hitstop : 1))); }
+  /* Le gel d'impact donne du poids aux coups, mais au-dela d'une
+     dizaine d'images il ne se lit plus comme un impact : il se lit
+     comme un jeu qui plante. On le borne donc. */
+  hitstop(f) {
+    const v = Math.round(f * (Save.data ? Save.data.opts.hitstop : 1));
+    this.hitstopF = Math.min(12, Math.max(this.hitstopF, v));
+  }
   shake(v) { this.cam.shake = Math.max(this.cam.shake, v * (Save.data ? Save.data.opts.shake : 1)); }
   zoomPunch(v) { this.cam.punch = Math.max(this.cam.punch, v); }
   flash(a) { this.flashA = Math.max(this.flashA, a); }
@@ -15613,8 +16470,10 @@ class Match {
   ticker(txt, color) { this.tickText = txt; this.tickColor = color || '#fff'; this.tickT = 100; }
   warn(x, y, frames) { this.warns.push({ x, y, f: frames, max: frames }); }
   superCut(f) {
-    this.hitstop(24); this.flash(0.5); this.shake(10);
-    this.cutIn = { f, t: 60 };
+    /* La vignette du super reste, mais le jeu ne s'arrete plus une
+       demi-seconde : on garde juste l'a-coup qui marque le coup. */
+    this.hitstop(10); this.flash(0.5); this.shake(10);
+    this.cutIn = { f, t: 46 };
   }
 
   /* ============================================================
@@ -15942,7 +16801,7 @@ class Match {
       const S = this.survival;
       if (S && f.team === 1) { S.kos++; S.score += 100 + S.wave * 25; }
       const hero = this.fighters.find(x => x.team === 0);
-      if (hero && hero.stocks <= 0) { this.slowmo(60, 0.3); this.finish(null); return; }
+      if (hero && hero.stocks <= 0) { this.slowmo(40, 0.42); this.finish(null); return; }
       const foes = this.fighters.filter(x => x.team === 1 && x.stocks > 0);
       if (S && foes.length === 0 && !S.pending && !S.queued) {
         S.queued = true;
@@ -15953,7 +16812,9 @@ class Match {
 
     const alive = this.fighters.filter(x => x.stocks > 0);
     const teams = new Set(alive.map(x => this.rules.teams ? x.team : x.id));
-    if (teams.size <= 1) { this.slowmo(70, 0.28); this.finish(alive[0] || null); }
+    /* Ralenti final : assez pour savourer le KO decisif, pas au point
+       de croire que le jeu s'est fige. */
+    if (teams.size <= 1) { this.slowmo(42, 0.42); this.finish(alive[0] || null); }
   }
 
   endByTime() {
@@ -21334,6 +22195,10 @@ Object.assign(UI, {
         this.dataChar = c;
         if (typeof Audio2 !== 'undefined' && Audio2.ui) Audio2.ui('move');
         this.buildDataList(); this.buildDataMain();
+        /* Sur telephone, la liste et la fiche ne tiennent pas cote a
+           cote : choisir un combattant bascule directement sur sa
+           fiche, comme dans n'importe quelle application mobile. */
+        if (typeof Mobile !== 'undefined' && Mobile.on) Mobile.showStep('sc-data', 1);
       };
     }
   },
@@ -25137,6 +26002,248 @@ Object.assign(UI, {
     Editor.open();
   }
 });
+
+
+/* ===== 39-editeur-plus.js ===== */
+/* ============================================================
+   SMASH PÉI — CRÉATEUR D'ARÈNE : EXTENSIONS
+
+   Le créateur savait déjà poser des plateformes, les rendre
+   traversantes ou mobiles, choisir un décor, une musique, une
+   teinte et les limites de KO. Il lui manquait trois choses pour
+   qu'on puisse vraiment DESSINER une arène :
+
+   1. L'INCLINAISON — une plateforme en pente. Le moteur de
+      collision sait déjà gérer `p.rot`, il suffisait de l'exposer.
+
+   2. LES DANGERS — lave, pointes et souffle d'air. On les attache
+      à une plateforme : elle devient brûlante, piquante ou
+      soufflante, avec sa propre force et son propre rythme.
+
+   3. LE DOIGT — l'éditeur écoutait déjà les événements
+      « pointer », mais la palette et les champs étaient trop
+      petits pour un pouce. On les agrandit et on empêche le
+      défilement parasite pendant qu'on déplace un élément.
+
+   Rien n'est retiré : le format d'arène ne fait que gagner des
+   champs FACULTATIFS (`rot`, `danger`), et une arène enregistrée
+   avant cette version s'ouvre et se joue exactement comme avant.
+   ============================================================ */
+
+(function editeurPlus() {
+  if (typeof Editor === 'undefined') return;
+
+  /* ---------- les trois dangers posables ---------- */
+  const DANGERS = {
+    lave:    { fr: 'LAVE', cr: 'LAV', en: 'LAVA', ic: '🌋', col: '#ff6b2c',
+               dmg: 14, ang: 88, bkb: 46, kbg: 62, periode: 90, duree: 34 },
+    pointes: { fr: 'POINTES', cr: 'PIK', en: 'SPIKES', ic: '🔺', col: '#c9d1e0',
+               dmg: 9, ang: 70, bkb: 34, kbg: 54, periode: 70, duree: 26 },
+    vent:    { fr: 'SOUFFLE', cr: 'SOUF', en: 'GUST', ic: '💨', col: '#a8e0ff',
+               dmg: 3, ang: 92, bkb: 52, kbg: 20, periode: 120, duree: 46 }
+  };
+
+  /* ============================================================
+     1) CONSERVATION DES NOUVEAUX CHAMPS
+     On enveloppe buildStage : les plateformes gardent leur
+     inclinaison et leur danger, et l'arène reçoit une boucle qui
+     déclenche les dangers à intervalle régulier.
+     ============================================================ */
+  const buildStageOrig = Editor.buildStage.bind(Editor);
+
+  Editor.buildStage = function (d, id, name) {
+    const st = buildStageOrig(d, id, name);
+
+    /* on recopie les champs que l'ancienne conversion ignorait */
+    (d.plats || []).forEach((p, i) => {
+      const q = st.plats[i];
+      if (!q) return;
+      if (p.rot) q.rot = p.rot;
+      if (p.danger && DANGERS[p.danger]) q.danger = p.danger;
+    });
+
+    /* limites recalculées : une plateforme inclinée peut dépasser */
+    const updateOrig = st.update;
+    st.update = function (M, t) {
+      if (updateOrig) updateOrig.call(this, M, t);
+
+      for (const p of this.plats) {
+        if (!p.danger) continue;
+        const D = DANGERS[p.danger];
+        if (!D) continue;
+        /* Chaque plateforme dangereuse a son propre décalage, tiré de
+           sa position : elles ne se déclenchent pas toutes ensemble. */
+        const dec = Math.abs(Math.round(p.x + p.y)) % D.periode;
+        const phase = (t + dec) % D.periode;
+
+        if (phase === 0) M.warn(p.x + p.w / 2, p.y, 18);
+        if (phase === 18) {
+          M.hazards.push(new Hazard({
+            kind: p.danger === 'vent' ? 'wave' : 'geyser',
+            x: p.x + (p.dx || 0),
+            y: p.y + (p.dy || 0) - (p.danger === 'vent' ? 260 : 120),
+            w: p.w, h: p.danger === 'vent' ? 300 : 140,
+            dmg: D.dmg, ang: D.ang, bkb: D.bkb, kbg: D.kbg,
+            life: D.duree, color: D.col
+          }));
+          try { Audio2.play(p.danger === 'lave' ? 'fire' : 'whooshBig'); } catch (e) {}
+        }
+      }
+    };
+    return st;
+  };
+
+  /* ============================================================
+     2) DESSIN DES NOUVEAUX ATTRIBUTS DANS L'ÉDITEUR
+     ============================================================ */
+  const paintOrig = Editor.paintPlats ? Editor.paintPlats.bind(Editor) : null;
+  if (paintOrig) {
+    Editor.paintPlats = function (ctx, plats, t, stage) {
+      paintOrig(ctx, plats, t, stage);
+      /* une plateforme dangereuse porte sa marque : on doit la
+         reconnaître d'un coup d'œil, en jeu comme à l'édition */
+      for (const p of plats) {
+        if (!p.danger) continue;
+        const D = DANGERS[p.danger];
+        if (!D) continue;
+        const x = p.x + (p.dx || 0), y = p.y + (p.dy || 0);
+        ctx.save();
+        ctx.globalAlpha = 0.45 + Math.sin(t * 0.06 + x * 0.01) * 0.2;
+        ctx.fillStyle = D.col;
+        ctx.fillRect(x, y - 8, p.w, 8);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = D.col;
+        for (let k = 0; k * 46 < p.w; k++) {
+          const px = x + k * 46 + 10;
+          ctx.beginPath();
+          ctx.moveTo(px, y - 8);
+          ctx.lineTo(px + 12, y - 26);
+          ctx.lineTo(px + 24, y - 8);
+          ctx.closePath(); ctx.fill();
+        }
+        ctx.restore();
+      }
+    };
+  }
+
+  /* ============================================================
+     3) NOUVEAUX RÉGLAGES DANS LE PANNEAU
+     On greffe après buildPanel plutôt que de le réécrire : le
+     panneau d'origine reste intact, on lui ajoute une section.
+     ============================================================ */
+  const panelOrig = Editor.buildPanel.bind(Editor);
+
+  Editor.buildPanel = function () {
+    panelOrig();
+    const boite = document.getElementById('ed-platbox');
+    if (!boite || document.getElementById('ed-plus')) return;
+
+    const lang = UI.lang;
+    const T = k => UI.t(k);
+
+    const bloc = document.createElement('div');
+    bloc.id = 'ed-plus';
+    bloc.innerHTML =
+      '<div class="ed-row" style="margin-top:.5vh">' +
+        '<label class="ed-fld" style="flex:1">' +
+          '<span class="ed-lab">' + T('edRot') + ' <b id="ed-rotv">0°</b></span>' +
+          '<input class="ed-rng" id="ed-rot" type="range" min="-24" max="24" step="1">' +
+        '</label>' +
+      '</div>' +
+      '<div class="ed-lab" style="margin-top:.5vh">' + T('edDanger') + '</div>' +
+      '<div class="ed-row" id="ed-dangers">' +
+        '<button type="button" class="btn sm ed-tog" data-dg="">' + T('edNoDanger') + '</button>' +
+        Object.keys(DANGERS).map(k =>
+          '<button type="button" class="btn sm ed-tog" data-dg="' + k + '">' +
+          DANGERS[k].ic + ' ' + (DANGERS[k][lang] || DANGERS[k].fr) + '</button>').join('') +
+      '</div>';
+    boite.appendChild(bloc);
+
+    const rot = document.getElementById('ed-rot');
+    const rotv = document.getElementById('ed-rotv');
+    rot.oninput = () => {
+      const p = this.platSel();
+      if (!p) return;
+      const deg = +rot.value;
+      p.rot = deg === 0 ? 0 : deg * Math.PI / 180;
+      rotv.textContent = deg + '\u00b0';
+    };
+    rot.onchange = () => { if (this.pushUndo) this.pushUndo(); };
+
+    bloc.querySelectorAll('#ed-dangers .btn').forEach(b => {
+      b.onclick = () => {
+        const p = this.platSel();
+        if (!p) return;
+        if (this.pushUndo) this.pushUndo();
+        p.danger = b.dataset.dg || null;
+        try { Audio2.ui('move'); } catch (e) {}
+        this.refreshPlus();
+      };
+    });
+
+    this.refreshPlus();
+  };
+
+  /* Remet les nouveaux réglages en accord avec la sélection */
+  Editor.refreshPlus = function () {
+    const rot = document.getElementById('ed-rot');
+    const rotv = document.getElementById('ed-rotv');
+    if (!rot) return;
+    const p = this.platSel();
+    const deg = p && p.rot ? Math.round(p.rot * 180 / Math.PI) : 0;
+    rot.value = deg;
+    if (rotv) rotv.textContent = deg + '°';
+    document.querySelectorAll('#ed-dangers .btn').forEach(b =>
+      b.classList.toggle('on', (b.dataset.dg || null) === ((p && p.danger) || null)));
+  };
+
+  /* `sel` est un INDICE dans `cur.plats`, pas un objet : ce raccourci
+     evite de se tromper partout ailleurs. */
+  Editor.platSel = function () {
+    if (!this.cur || !this.cur.plats) return null;
+    return this.cur.plats[this.sel] || null;
+  };
+
+  /* Quand la selection change, les nouveaux reglages suivent. */
+  if (typeof Editor.syncPanel === 'function') {
+    const syncOrig = Editor.syncPanel.bind(Editor);
+    Editor.syncPanel = function () { syncOrig(); this.refreshPlus(); };
+  }
+
+  /* ============================================================
+     4) CONFORT AU DOIGT
+     ============================================================ */
+  const s = document.createElement('style');
+  s.id = 'ed-plus-style';
+  s.textContent = `
+/* Palette et champs assez grands pour un pouce, et une barre
+   d'outils qui défile au lieu de déborder. */
+#app.mob .ed-panel { padding-bottom: 60px; }
+#app.mob .ed-panel .btn.sm { min-height: 40px; padding: .45em .8em; font-size: 11px; }
+#app.mob .ed-num, #app.mob .ed-txt, #app.mob .ed-sel { min-height: 40px; font-size: 13px; }
+#app.mob .ed-rng { height: 30px; }
+#app.mob .ed-row { flex-wrap: wrap; gap: 6px; }
+#app.mob .ed-decors { grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); }
+#app.mob .ed-canvas { touch-action: none; }
+#ed-dangers .btn.on { background: linear-gradient(160deg, var(--gold), #ffb03c); color: #0b0d12; }
+`;
+  document.head.appendChild(s);
+
+  /* Pendant qu'on déplace un élément, la page ne doit pas défiler. */
+  const zone = document.querySelector('.ed-canvas') || document.getElementById('sc-editor');
+  if (zone) zone.style.touchAction = 'none';
+
+  /* ---------- textes ---------- */
+  Object.assign(I18N.fr, {
+    edRot: 'INCLINAISON', edDanger: 'DANGER SUR CETTE PLATEFORME', edNoDanger: 'AUCUN'
+  });
+  Object.assign(I18N.cr, {
+    edRot: 'PANSHÉ', edDanger: 'DANZÉ DSI SÉT PLATFORM', edNoDanger: 'NYABOU'
+  });
+  Object.assign(I18N.en, {
+    edRot: 'SLOPE', edDanger: 'HAZARD ON THIS PLATFORM', edNoDanger: 'NONE'
+  });
+})();
 
 
 /* ===== 19-zistoir.js ===== */
@@ -29169,6 +30276,10 @@ const Mobile = {
       { ic: '👕', fr: 'TENUE', cr: 'LINZ', en: 'OUTFIT', sel: '#locker-items' },
       { ic: '👀', fr: 'APERÇU', cr: 'GARD', en: 'PREVIEW', sel: '#locker-preview' }
     ],
+    'sc-data': [
+      { ic: '📜', fr: 'LISTE', cr: 'LIS', en: 'LIST', sel: '#data-side' },
+      { ic: '📊', fr: 'FICHE', cr: 'FISH', en: 'SHEET', sel: '#data-main' }
+    ],
     'sc-achv': [
       { ic: '🏆', fr: 'DÉFIS', cr: 'DÉFI', en: 'CHALLENGES', sel: '#achv-list' },
       { ic: '📊', fr: 'STATS', cr: 'STAT', en: 'STATS', sel: '#achv-stats' }
@@ -29292,7 +30403,11 @@ const Mobile = {
     }
   },
 
-  /* ---------- barre du haut : un simple rond « retour » ---------- */
+  /* ---------- barre du haut : le retour fait partie de la ligne ----------
+     Le rond etait pose PAR-DESSUS l'en-tete, en position absolue : il
+     recouvrait le titre de tous les ecrans. Il est desormais le premier
+     element de la ligne de titre, donc la mise en page lui reserve sa
+     place et plus rien ne se chevauche, quelle que soit la largeur. */
   buildTop(el, scId) {
     if (el.querySelector('.mob-back')) return;
     const real = el.querySelector('[id^="btn-"][id$="-back"], [id$="-quit"]');
@@ -29303,7 +30418,9 @@ const Mobile = {
     b.setAttribute('aria-label', 'Retour');
     b.textContent = '‹';
     b.onclick = () => { try { Audio2.ui('back'); } catch (e) {} real.click(); };
-    el.appendChild(b);
+    const ligne = el.querySelector('.title-row');
+    if (ligne) ligne.insertBefore(b, ligne.firstChild);
+    else el.appendChild(b);                       // ecran sans en-tete : ancien placement
   },
 
   /* ---------- barre du bas : pastilles + action principale ---------- */
@@ -29394,8 +30511,10 @@ const Mobile = {
 #app.mob .mob-off { display: none !important; }
 
 /* barre du haut : titre seul, actions secondaires repliées */
-#app.mob .title-row { width: 100%; margin: 0 0 6px; gap: 8px; align-items: center; flex-wrap: nowrap; }
-#app.mob .title-row h2 { font-size: clamp(17px, 4.6vw, 26px); margin: 0; padding-left: 56px;
+#app.mob .title-row { width: 100%; margin: 0 0 6px; gap: 8px; align-items: center;
+                      flex-wrap: nowrap; display: flex; min-height: 48px; }
+#app.mob .title-row h2 { font-size: clamp(15px, 4vw, 24px); margin: 0; padding-left: 0;
+                         min-width: 0; flex: 1 1 auto;
                          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #app.mob .title-row .row { margin-left: auto; gap: 6px; overflow-x: auto; overflow-y: hidden;
                            flex: 0 1 auto; max-width: 58%; scrollbar-width: none; }
@@ -29404,21 +30523,26 @@ const Mobile = {
 #app.mob .btn.mob-proxied { display: none; }
 #app.mob .title-row [id$="-back"], #app.mob .title-row [id$="-quit"] { display: none; }
 
-/* rond retour, toujours au même endroit : le pouce le trouve seul */
+/* Rond retour : premier element de la ligne de titre, donc jamais
+   par-dessus quoi que ce soit. La zone de contact deborde le rond. */
 #app.mob .mob-back {
-  position: absolute; z-index: 6;
-  left: calc(env(safe-area-inset-left,0px) + 8px);
-  top: calc(env(safe-area-inset-top,0px) + 6px);
-  width: 50px; height: 50px; border-radius: 50%;
+  position: relative; z-index: 6; flex: 0 0 auto;
+  width: 46px; height: 46px; border-radius: 50%;
   border: 1.5px solid rgba(255,255,255,.26);
   background: rgba(14,17,26,.94); color: var(--txt);
-  font: 400 34px/1 'Bangers', Impact, sans-serif;
+  font: 400 32px/1 'Bangers', Impact, sans-serif;
   display: flex; align-items: center; justify-content: center;
-  padding-bottom: 5px; cursor: pointer;
+  padding: 0 0 5px 0; cursor: pointer;
   box-shadow: 0 4px 14px rgba(0,0,0,.45);
 }
-/* zone de contact élargie : le doigt vise large, le rond reste fin */
-#app.mob .mob-back::after { content: ''; position: absolute; inset: -10px; border-radius: 50%; }
+#app.mob .mob-back::after { content: ''; position: absolute; inset: -8px; border-radius: 50%; }
+#app.mob .mob-back:active { transform: scale(.92); background: rgba(255,107,44,.34); }
+/* Les ecrans sans ligne de titre gardent un rond flottant. */
+#app.mob .screen > .mob-back {
+  position: absolute;
+  left: calc(env(safe-area-inset-left,0px) + 8px);
+  top: calc(env(safe-area-inset-top,0px) + 6px);
+}
 #app.mob .mob-back:active { transform: scale(.92); background: rgba(255,107,44,.3); }
 
 /* barre du bas : navigation entre panneaux + action principale */
@@ -29483,7 +30607,15 @@ const Mobile = {
 #app.mob .grow { flex: 1 1 auto; min-height: 0; }
 
 /* cibles tactiles : plus jamais en dessous de 44 px */
-#app.mob .btn, #app.mob .chip, #app.mob .sf-tab, #app.mob .stepper button { min-height: 40px; }
+/* Aucune cible tactile en dessous de 40 px : l'audit en trouvait a
+   16, 22 et 25 px, impossible a viser au pouce. */
+#app.mob .btn, #app.mob .chip, #app.mob .sf-tab, #app.mob .stepper button,
+#app.mob .mtab, #app.mob .acc-av, #app.mob .rs-arch,
+#app.mob button, #app.mob .opt-tg { min-height: 40px; }
+#app.mob .mtab { padding: 0 .85em; display: inline-flex; align-items: center; }
+#app.mob .acc-av { min-width: 44px; font-size: 20px; }
+#app.mob .opt-tg { min-width: 62px; }
+#app.mob .rs-star { width: 30px; height: 30px; min-height: 30px; font-size: 16px; }
 #app.mob .stepper button { min-width: 40px; }
 #app.mob .rule { padding: 6px 0; }
 
@@ -29517,6 +30649,35 @@ const Mobile = {
 #app.mob .mt-perks { display: block !important; }
 #app.mob .mt-perks { display: flex !important; flex-wrap: wrap; gap: 4px; }
 #app.mob .detail canvas#detailcv { width: 84px !important; height: 84px !important; }
+/* Fiches techniques : sur telephone, une seule colonne de chiffres,
+   des libelles qui tiennent, et le radar en pleine largeur. */
+#app.mob .data-wrap { display: block !important; }
+#app.mob #data-side, #app.mob #data-main { width: 100% !important; height: 100%; }
+#app.mob .data-tabs { display: flex; gap: 5px; }
+#app.mob .data-tabs .btn { padding: .4em .7em; font-size: 10.5px; }
+/* Les barres chiffrees se lisent en une seconde, le radar demande un
+   temps d'arret : on met donc les barres en premier, et on borne le
+   radar pour qu'il ne mange pas tout l'ecran. */
+#app.mob .dgrid { display: flex !important; flex-direction: column; gap: 6px; }
+#app.mob .dgrid .dstats { order: 1; }
+#app.mob .dgrid > canvas { order: 2; max-width: min(300px, 62vw);
+  max-height: 46vh; margin: 0 auto; }
+/* Telephone tenu a l'horizontale : la largeur est la ressource
+   abondante, la hauteur la ressource rare. On met donc les chiffres a
+   gauche et le radar a droite, tout tient sans defiler. */
+@media (orientation: landscape) {
+  #app.mob .dgrid { flex-direction: row; align-items: flex-start; gap: 12px; }
+  #app.mob .dgrid .dstats { flex: 1 1 auto; min-width: 0; }
+  #app.mob .dgrid > canvas { flex: 0 0 auto; max-width: 40%; max-height: 62vh; margin: 0; }
+  #app.mob .dstat { grid-template-columns: 8.6em 1fr 5em !important; }
+}
+#app.mob .dstats { grid-template-columns: 1fr !important; gap: 2px 0 !important; }
+#app.mob .dstat { grid-template-columns: 7.6em 1fr 4.6em !important; padding: 4px 0; }
+#app.mob .dspecs { grid-template-columns: 1fr !important; }
+#app.mob .dhead canvas { width: 62px !important; height: 62px !important; }
+#app.mob .dhead h3 { font-size: 19px; }
+#app.mob #data-main { padding-bottom: 58px; }
+#app.mob .data-search { min-height: 40px; font-size: 13px; }
 #app.mob .statrow { grid-template-columns: 8.2em 1fr; }
 #app.mob .stats { gap: 5px; margin-top: 4px; }
 #app.mob #detailradar { display: block !important; grid-column: 1 / -1;
@@ -30987,7 +32148,10 @@ Object.assign(UI, {
 })();
 
 /* ---------- textes ---------- */
+/* Textes des styles et armes : poses ici parce que 38-styles.js
+   s'execute avant que la table I18N existe. */
 Object.assign(I18N.fr, {
+  stStyle: 'STYLE', stArme: 'ARME DE PRÉDILECTION',
   rsFind: 'Chercher un combattant…', rsNone: 'Aucun combattant ne correspond.',
   defi: 'DÉFI DU JOUR', defiD: 'Une règle différente chaque jour, la même pour tout le monde',
   defiSerie: 'Jours d\'affilée', defiFait: 'Défi du jour réussi !',
@@ -30995,6 +32159,7 @@ Object.assign(I18N.fr, {
   nvTexte: 'Dix minutes pour comprendre les déplacements, les coups et les éjections. On te guide pas à pas.'
 });
 Object.assign(I18N.cr, {
+  stStyle: 'STIL', stArme: 'ZARM PRÉFÉRÉ',
   rsFind: 'Rod in konbatan…', rsNone: 'Pwin konbatan konm sa.',
   defi: 'DÉFI LO ZOUR', defiD: 'In règ diféran shak zour, parèy pou tout domoun',
   defiSerie: 'Zour d\'afilé', defiFait: 'Défi lo zour gagné !',
@@ -31002,6 +32167,7 @@ Object.assign(I18N.cr, {
   nvTexte: 'Dis minit pou konprann déplasman, kou ek éjeksyon. Nou gid aou pa a pa.'
 });
 Object.assign(I18N.en, {
+  stStyle: 'STYLE', stArme: 'SIGNATURE WEAPON',
   rsFind: 'Search a fighter…', rsNone: 'No fighter matches.',
   defi: 'DAILY CHALLENGE', defiD: 'A different rule every day, the same for everyone',
   defiSerie: 'Day streak', defiFait: 'Daily challenge cleared!',
