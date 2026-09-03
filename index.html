@@ -7224,6 +7224,433 @@ defChar('tectec', {
 });
 
 
+/* ===== 03i-newchars7.js ===== */
+/* ============================================================
+   SMASH PÉI — SIX COMBATTANTS DE PLUS
+
+   Le casting comptait quarante-huit noms, mais il lui manquait
+   encore six FAÇONS de jouer qu'on ne trouvait nulle part :
+
+     · quelqu'un qui gagne du terrain en posant des obstacles ;
+     · quelqu'un qui vole l'élan de l'adversaire au lieu de le
+       frapper ;
+     · un poids lourd qui se déplace en roulant plutôt qu'en
+       marchant ;
+     · un tireur qui n'a qu'une seule balle et doit la récupérer ;
+     · un danseur qui gagne en puissance tant qu'il bouge ;
+     · un pêcheur qui attrape à distance.
+
+   Chacun a ses quatre spéciaux composés à partir de fabriques
+   DIFFÉRENTES — on ne retrouvera pas le même « projectile droit
+   devant » six fois de suite. Leur manière de remonter et leur
+   manière de tirer leur sont ensuite attribuées par 51-signature.js,
+   comme au reste du casting.
+   ============================================================ */
+
+/* ---------- LE TANGUE — le hérisson des Hauts ----------
+   Poids moyen qui joue en boule : sa ruée tourne, son bas pose des
+   piquants au sol. Il gagne du terrain sans jamais avancer droit. */
+defChar('tangue', {
+  nFR: 'Tangue Piké', nEN: 'Spiky Tenrec', nCR: 'Tang Piké',
+  tagFR: 'Boule de piquants', tagEN: 'Ball of spines',
+  arch: 'balanced', dmgMul: 1.0, rangeMul: 0.96,
+  stats: { weight: 104, walk: 1.38, run: 3.15, air: 1.25, jump: 16.2, djump: 15.0, grav: 0.7, fall: 16.4, size: 0.96 },
+  pal: { skin: '#8a6f4e', skin2: '#5f4b32', cloth: '#4a3b28', accent: '#d9b26a',
+         hand: '#a3865e', shoe: '#33281a', eye: '#160f07' },
+  build: { width: 1.06, height: 0.94, headScale: 1.0, shape: 'oval', limbW: 1.0 },
+  features: { head: 'oval', spikes: true, snout: true },
+  bio: { fr: 'On le croise la nuit sur les chemins de Salazie. On ne le ramasse jamais deux fois.',
+         en: 'You meet him at night on the Salazie tracks. Nobody picks him up twice.' },
+  specials: {
+    /* Neutre : un piquant tiré à plat, court mais qui reste planté —
+       une menace qui occupe le sol au lieu de traverser l'écran. */
+    n: spProj({ total: 30, spawn: 10, proj: { vx: 11, vy: 0, grav: 0.22, dmg: 6, ang: 40, bkb: 18, kbg: 54,
+        w: 20, h: 14, life: 70, kind: 'feather', color: '#d9b26a', sfx: 'hit', ground: true, reflectable: true } }),
+    /* Avant : la mise en boule. Elle traverse, elle râpe, et elle ne
+       s'arrête que contre un mur ou un bouclier. */
+    s: spRush({ total: 44, moveX: { s: 9, e: 30, v: 15 }, chargeable: true,
+        hits: [H({ s: 10, e: 30, x: 22, y: -48, w: 78, h: 66, dmg: 9, ang: 50, bkb: 40, kbg: 62, sfx: 'hit', fx: 'impact' })] }),
+    u: spUp({ riseV: -18.8, total: 46,
+        hits: [H({ s: 8, e: 22, x: 4, y: -98, w: 74, h: 96, dmg: 9.5, ang: 82, bkb: 38, kbg: 88, sfx: 'hit', fx: 'ringUp' })] }),
+    /* Bas : on sème. Trois piquants restent au sol et découpent
+       l'espace — c'est le seul personnage du jeu qui construit un
+       terrain à lui. */
+    d: spTrap({ total: 40, spawn: 12, trap: { kind: 'thorn', dmg: 8, radius: 62, life: 620, color: '#d9b26a' } })
+  },
+  super: { nameFR: 'ROULÉ DES HAUTS', nameEN: 'HIGHLAND ROLL', kind: 'rouleHauts', color: '#d9b26a', dmg: 4.2, count: 12 }
+});
+
+/* ---------- LE CAMÉLÉON — celui qui prend ce qu'on lui donne ----------
+   Zoner atypique : il ne cherche pas à toucher, il cherche à
+   RENVOYER. Reflet, contre, et une langue qui tire de loin. */
+defChar('cameleon', {
+  nFR: 'Endormi Vèr', nEN: 'Green Chameleon', nCR: 'Andormi Vèr',
+  tagFR: 'Patience verte', tagEN: 'Green patience',
+  arch: 'zoner', dmgMul: 0.94, rangeMul: 1.26,
+  stats: { weight: 88, walk: 1.32, run: 2.95, air: 1.3, jump: 16.0, djump: 14.8, grav: 0.62, fall: 15.0, size: 0.98 },
+  pal: { skin: '#5f9a52', skin2: '#3f6c37', cloth: '#2f5a3a', accent: '#c8e86a',
+         hand: '#74ad64', shoe: '#26402a', eye: '#f2e46a' },
+  build: { width: 0.92, height: 1.02, headScale: 1.04, shape: 'long', limbW: 0.88 },
+  features: { head: 'long', crest: true, tail: 'curl' },
+  bio: { fr: 'Il ne court jamais après personne : il attend que ça passe à portée de langue.',
+         en: 'He never chases anyone: he waits for you to walk into tongue range.' },
+  specials: {
+    /* Neutre : la langue. Une saisie à distance, pas un projectile —
+       elle ramène l'adversaire au lieu de l'éloigner. */
+    n: spProj({ total: 40, spawn: 12, special: 'tether',
+        proj: { vx: 15, vy: 0, grav: 0, dmg: 5, ang: 180, bkb: 12, kbg: 30, w: 26, h: 12, life: 26,
+                kind: 'orb', color: '#c8e86a', sfx: 'whoosh', pull: true, reflectable: false } }),
+    /* Avant : il disparaît sur place. Le camouflage n'est pas une
+       fuite, c'est une préparation : on ne sait plus d'où le coup
+       part. */
+    s: spDash({ total: 34, at: 9, dist: 210, ghost: true,
+        hitAfter: { dmg: 8, ang: 55, bkb: 42, kbg: 66, w: 88, h: 76 } }),
+    u: spUp({ riseV: -19, total: 48, tether: true,
+        hits: [H({ s: 8, e: 22, x: 4, y: -104, w: 70, h: 100, dmg: 8.5, ang: 84, bkb: 34, kbg: 88, sfx: 'whoosh', fx: 'ringUp' })] }),
+    /* Bas : le miroir. Contre les projectiles, il les renvoie plus
+       forts ; contre un corps, il encaisse. */
+    d: spReflect({ total: 42, window: [4, 28], armor: true })
+  },
+  super: { nameFR: 'ŒIL QUI TOURNE', nameEN: 'SWIVEL EYE', kind: 'oeilTourne', color: '#c8e86a', dmg: 22 }
+});
+
+/* ---------- LA BENNE — le poids lourd du Port ----------
+   Le plus lourd du casting. Il ne saute presque pas, mais rien ne
+   le fait reculer et son bas écrase tout. */
+defChar('benne', {
+  nFR: 'Benn Kréol', nEN: 'Dock Skip', nCR: 'Benn Kréol',
+  tagFR: 'Tonne et demie', tagEN: 'Ton and a half',
+  arch: 'heavy', dmgMul: 1.24, rangeMul: 1.06,
+  stats: { weight: 132, walk: 1.12, run: 2.5, air: 0.95, jump: 14.4, djump: 13.2, grav: 0.86, fall: 19.6, size: 1.18 },
+  pal: { skin: '#8d949c', skin2: '#5d646c', cloth: '#c8562a', accent: '#ffb03c',
+         hand: '#9aa2aa', shoe: '#33383e', eye: '#1a1d21' },
+  build: { width: 1.24, height: 0.92, headScale: 0.9, shape: 'wide', limbW: 1.3 },
+  features: { head: 'wide', shell: true },
+  bio: { fr: 'Elle descend du Port chargée à ras bord. Personne ne lui demande de freiner.',
+         en: 'It rolls down from the harbour loaded to the brim. Nobody asks it to brake.' },
+  specials: {
+    /* Neutre : elle se charge, puis lâche un bloc. Le seul tir du
+       jeu qui pèse assez pour traverser un projectile adverse. */
+    n: spCharge({ total: 44, spawn: 16, chargeMax: 100,
+        proj: { vx: 10, vy: -1.5, grav: 0.3, dmg: 9, ang: 45, bkb: 32, kbg: 62, w: 38, h: 38, life: 100,
+                kind: 'pot', color: '#8d949c', sfx: 'hit', bounce: 1, reflectable: true } }),
+    /* Avant : la saisie de chargement. Elle empoigne et jette. */
+    s: spCmdGrab({ total: 48, window: [11, 20], dmg: 18, ang: 62, bkb: 82, kbg: 56 }),
+    u: spUp({ riseV: -16.8, total: 52,
+        hits: [H({ s: 10, e: 26, x: 4, y: -92, w: 92, h: 94, dmg: 13, ang: 80, bkb: 46, kbg: 78, sfx: 'smashHit', fx: 'impact' })] }),
+    /* Bas : le déversement. Le plus gros choc au sol du jeu. */
+    d: spSlam({ total: 52, dropF: 11, dropV: 27,
+        landShock: { dmg: 16, w: 300, h: 76, ang: 70, bkb: 64, kbg: 76 } })
+  },
+  super: { nameFR: 'DÉVERSEMENT', nameEN: 'FULL TIP', kind: 'deversement', color: '#ffb03c', dmg: 30 }
+});
+
+/* ---------- LE PÊCHEUR DE BICHIQUES — la portée pure ----------
+   Épéiste à l'épuisette : très longue allonge, dégâts modestes, et
+   un bas qui immobilise. Il joue le tempo, pas la vitesse. */
+defChar('pesheur', {
+  nFR: 'Pésèr Bichik', nEN: 'Bichique Fisher', nCR: 'Pésèr Bishik',
+  tagFR: 'Allonge de rivière', tagEN: 'River reach',
+  arch: 'swordie', dmgMul: 1.0, rangeMul: 1.44,
+  stats: { weight: 98, walk: 1.45, run: 3.25, air: 1.35, jump: 16.6, djump: 15.4, grav: 0.66, fall: 16.0, size: 1.04 },
+  pal: { skin: '#c99a6a', skin2: '#9a704a', cloth: '#4a6f7a', accent: '#9fe0f5',
+         hand: '#dbb287', shoe: '#2c4048', eye: '#1c2a30' },
+  build: { width: 0.98, height: 1.06, headScale: 0.98, shape: 'round', limbW: 0.94 },
+  features: { head: 'round', hat: 'straw', prop: 'stick' },
+  bio: { fr: 'Trois heures dans l\'eau froide pour une poignée d\'alevins. Il sait attendre.',
+         en: 'Three hours in cold water for a handful of fry. He knows how to wait.' },
+  specials: {
+    /* Neutre : un jet d'eau qui pousse sans blesser beaucoup. Sert à
+       déséquilibrer une remontée, pas à faire des dégâts. */
+    n: spProj({ total: 34, spawn: 11,
+        proj: { vx: 12, vy: 0, grav: 0.1, dmg: 4.5, ang: 361, bkb: 30, kbg: 22, w: 30, h: 22, life: 60,
+                kind: 'orb', color: '#9fe0f5', sfx: 'water', trail: true, reflectable: true } }),
+    /* Avant : le lancer d'épuisette, qui ramène. */
+    s: spProj({ total: 44, spawn: 12, special: 'tether',
+        proj: { vx: 14, vy: -1, grav: 0.04, dmg: 7, ang: 200, bkb: 16, kbg: 34, w: 30, h: 26, life: 30,
+                kind: 'orb', color: '#4a6f7a', sfx: 'whoosh', pull: true, reflectable: false } }),
+    u: spUp({ riseV: -19.2, total: 50, tether: true,
+        hits: [H({ s: 9, e: 24, x: 6, y: -110, w: 84, h: 108, dmg: 10, ang: 84, bkb: 36, kbg: 86, sfx: 'water', fx: 'splashUp' })] }),
+    /* Bas : la nasse. Elle ne blesse pas, elle CLOUE — l'adversaire
+       perd deux secondes, et deux secondes suffisent. */
+    d: spTrap({ total: 44, spawn: 14, trap: { kind: 'net', dmg: 4, radius: 76, life: 520, color: '#4a6f7a' } })
+  },
+  super: { nameFR: 'MONTÉE DES BICHIQUES', nameEN: 'THE RUN', kind: 'monteeBichiques', color: '#9fe0f5', dmg: 3.4, count: 18 }
+});
+
+/* ---------- LE SÉGATIER — plus il bouge, plus il frappe ----------
+   Rushdown à récompense : chaque coup porté sans s'arrêter monte sa
+   cadence. S'il se fait toucher, il repart de zéro. */
+defChar('segatier', {
+  nFR: 'Ségatié', nEN: 'Sega Dancer', nCR: 'Ségatyé',
+  tagFR: 'Pas qui monte', tagEN: 'Rising step',
+  arch: 'rushdown', dmgMul: 0.88, rangeMul: 0.96,
+  stats: { weight: 82, walk: 1.85, run: 4.15, air: 1.6, jump: 17.4, djump: 16.4, grav: 0.6, fall: 14.6, size: 0.94 },
+  pal: { skin: '#7a4a2c', skin2: '#57331d', cloth: '#e04f4f', accent: '#ffd166',
+         hand: '#93603b', shoe: '#3a1f10', eye: '#150c05' },
+  build: { width: 0.9, height: 1.04, headScale: 1.0, shape: 'round', limbW: 0.86 },
+  features: { head: 'round', hair: true, scarf: true },
+  bio: { fr: 'Il ne compte pas les coups, il compte les mesures.',
+         en: 'He does not count hits, he counts bars.' },
+  specials: {
+    /* Neutre : deux frappes de kayamb qui poussent l'air. Très
+       courte portée, mais elles enchaînent sur tout. */
+    n: spProj({ total: 26, spawn: 8,
+        proj: { vx: 9.5, vy: -0.4, grav: 0, dmg: 4, ang: 366, bkb: 10, kbg: 46, w: 26, h: 22, life: 26,
+                kind: 'orb', color: '#ffd166', sfx: 'tempo', trail: true, reflectable: true } }),
+    /* Avant : le pas chassé. Une ruée qui frappe trois fois. */
+    s: spRush({ total: 40, moveX: { s: 8, e: 26, v: 16 },
+        hits: [H({ s: 9, e: 26, x: 26, y: -56, w: 70, h: 70, dmg: 3.4, ang: 366, bkb: 14, kbg: 34, sfx: 'hitLight', fx: 'punch' })] }),
+    u: spUp({ riseV: -20.4, total: 44, driftMul: 1.0,
+        hits: [H({ s: 7, e: 21, x: 4, y: -104, w: 68, h: 100, dmg: 8.5, ang: 86, bkb: 32, kbg: 92, sfx: 'hit', fx: 'ringUp' })] }),
+    /* Bas : la toupie du séga. Multi-coups, et elle relance la
+       cadence. */
+    d: spSpin({ total: 40 })
+  },
+  super: { nameFR: 'KABAR SANS FIN', nameEN: 'ENDLESS KABAR', kind: 'kabarSansFin', color: '#e04f4f', dmg: 2.8, count: 24 }
+});
+
+/* ---------- LE PAILLE-EN-QUEUE BLANC — le voltigeur de falaise ----------
+   Aérien pur : trois sauts, une dérive énorme, presque aucun poids.
+   Il vit au-dessus de la scène et punit les remontées. */
+defChar('pailleblanc', {
+  nFR: 'Payanké Blan', nEN: 'White Tropicbird', nCR: 'Payanké Blan',
+  tagFR: 'Fil blanc du ciel', tagEN: 'White thread of sky',
+  arch: 'aerial', dmgMul: 0.86, rangeMul: 1.08,
+  stats: { weight: 72, walk: 1.6, run: 3.7, air: 1.95, jump: 18.6, djump: 17.8, grav: 0.5, fall: 12.8, size: 0.9, jumps: 3 },
+  pal: { skin: '#f4f6fa', skin2: '#ccd6e4', cloth: '#e8eef6', accent: '#ff8a3c',
+         hand: '#e4eaf2', shoe: '#c07030', eye: '#22303e' },
+  build: { width: 0.84, height: 1.06, headScale: 1.0, shape: 'beak', limbW: 0.8 },
+  features: { head: 'beak', beak: true, wings: true, tailf: true },
+  bio: { fr: 'Deux plumes rouges derrière lui, et toute la falaise pour terrain.',
+         en: 'Two red streamers behind him, and the whole cliff for a field.' },
+  specials: {
+    /* Neutre : un piqué. Ce n'est pas un projectile, c'est LUI qui
+       part — l'oiseau attaque avec son corps. */
+    n: spRush({ total: 38, moveX: { s: 8, e: 22, v: 17 },
+        hits: [H({ s: 9, e: 22, x: 30, y: -60, w: 74, h: 62, dmg: 8.5, ang: 42, bkb: 34, kbg: 70, sfx: 'whoosh', fx: 'slash' })] }),
+    /* Avant : le vol plané forcé, qui traverse. */
+    s: spDash({ total: 32, at: 8, dist: 280,
+        hitAfter: { dmg: 7.5, ang: 361, bkb: 30, kbg: 64, w: 96, h: 72 } }),
+    u: spUp({ riseV: -21.5, total: 46, driftMul: 1.15, helpless: false,
+        hits: [H({ s: 6, e: 20, x: 2, y: -110, w: 66, h: 106, dmg: 7.5, ang: 88, bkb: 30, kbg: 94, sfx: 'whoosh', fx: 'ringUp' })] }),
+    /* Bas : le coup de bec vers le bas. Un des rares vrais météores
+       du casting — mais il faut oser descendre le chercher. */
+    d: spSlam({ total: 46, dropF: 9, dropV: 21,
+        landShock: { dmg: 9, w: 200, h: 60, ang: 66, bkb: 44, kbg: 66 } })
+  },
+  super: { nameFR: 'PIQUÉ DE FALAISE', nameEN: 'CLIFF DIVE', kind: 'piqueFalaise', color: '#ff8a3c', dmg: 26 }
+});
+
+/* ============================================================
+   LES SIX SUPERS
+
+   `06-fighter.js` ne connaît évidemment pas ces mises en scène, et
+   ce fichier est chargé bien AVANT lui : on ne peut donc pas
+   envelopper `Fighter.prototype.runSuper` ici et maintenant. On
+   dépose l'installation dans une file d'attente qu'un module de fin
+   de chargement vide au bon moment.
+
+   Règle intangible reprise du moteur : rien de ce qui touche une
+   hitbox ne dépend d'un tirage aléatoire — le jeu tourne en réseau
+   et doit rester synchronisé image par image. `rnd()` et compagnie
+   ne servent QUE aux particules.
+   ============================================================ */
+window.__SUPERS_TARDIFS = window.__SUPERS_TARDIFS || [];
+window.__SUPERS_TARDIFS.push(function () {
+  const MIENS = {
+    rouleHauts: 1, oeilTourne: 1, deversement: 1,
+    monteeBichiques: 1, kabarSansFin: 1, piqueFalaise: 1
+  };
+  const orig = Fighter.prototype.runSuper;
+
+  Fighter.prototype.runSuper = function () {
+    const s = this.char.super;
+    if (!s || !MIENS[s.kind]) return orig.call(this);
+
+    const f = this.mf;
+    if (f === 18) {
+      this.M.banner(this.M.lang === 'en' ? s.nameEN : s.nameFR, s.color);
+      Audio2.play('super');
+      this.M.shake(18);
+    }
+    if (f < 18 || f > 62) return;
+
+    const t = f - 18;                       // image locale : 0 → 44
+    const dir = this.facing;
+    const plat = this.M.mainPlat();
+    const solY = plat ? plat.y : this.y;
+    const B = this.M.stage.bounds;
+
+    switch (s.kind) {
+
+      /* ---- TANGUE : douze passages en boule, aller-retour ----
+         Le sol devient infréquentable pendant deux secondes. */
+      case 'rouleHauts': {
+        if (t % 4 === 0 && t <= 44) {
+          const n = t / 4;                                  // 0 → 11
+          const sens = (n % 2 === 0) ? 1 : -1;
+          const px = B.left + 120 + ((n * 173) % Math.max(1, (B.right - B.left - 240)));
+          this.M.spawnHitbox(this, {
+            x: px - 66, y: solY - 92, w: 132, h: 92,
+            dmg: s.dmg, ang: 58, bkb: 26, kbg: 58, life: 5,
+            fx: 'impact', color: s.color, id: 'roul' + n
+          });
+          FX.ring(px, solY - 40, 74, s.color, 16, 6, 2.2, 0.42, n * 0.6);
+          FX.dust(px, solY, 8, '#cdbf9e');
+          for (let i = 0; i < 6; i++)
+            FX.streak(px, solY - 40, sens * rnd(3, 9), rnd(-5, 1), s.color, rndi(10, 20), 4);
+          Audio2.play('hit', { pan: clamp(px / 900, -1, 1), power: 0.7 });
+        }
+        break;
+      }
+
+      /* ---- CAMÉLÉON : l'œil tourne, et tout ce qu'il voit revient ----
+         Une onde circulaire qui aspire, puis un renvoi sec. */
+      case 'oeilTourne': {
+        if (t < 26) {
+          if (t % 3 === 0) {
+            const r = 120 + t * 9;
+            FX.ring(this.cx, this.cy, r, s.color, 14, 4, 1.2, 1, t * 0.3);
+          }
+          /* l'aspiration : on rapproche, on ne blesse pas encore */
+          for (const g of this.M.fighters) {
+            if (g === this || g.team === this.team || g.state === ST.DEAD) continue;
+            const d = Math.hypot(g.cx - this.cx, g.cy - this.cy);
+            if (d < 460 && d > 24) {
+              g.x += (this.cx - g.cx) * 0.035;
+              g.y += (this.cy - g.cy) * 0.02;
+            }
+          }
+        } else if (t === 26) {
+          this.M.spawnHitbox(this, {
+            x: this.cx - 250, y: this.cy - 190, w: 500, h: 380,
+            dmg: s.dmg, ang: 45, bkb: 62, kbg: 92, life: 8,
+            fx: 'ring', color: s.color, id: 'oeil'
+          });
+          FX.burst(this.cx, this.cy, 150, s.color, 28);
+          FX.ring(this.cx, this.cy, 300, '#ffffff', 26, 12, 2.4);
+          this.M.shake(20);
+          Audio2.play('explode');
+        }
+        break;
+      }
+
+      /* ---- BENNE : elle bascule et déverse ----
+         Une avalanche de blocs qui roule dans le sens du regard. */
+      case 'deversement': {
+        if (t === 4) { this.M.shake(10); Audio2.play('whooshBig', { pan: this.sfxPan }); }
+        if (t >= 6 && t <= 40 && t % 3 === 0) {
+          const n = (t - 6) / 3;                            // 0 → 11
+          const px = this.x + dir * (80 + n * 96);
+          this.M.spawnProjectile(this, {
+            x: px, y: solY - 420 - n * 22, vx: dir * 2.4, vy: 9,
+            dmg: s.dmg / 3, ang: 62, bkb: 30, kbg: 66, w: 46, h: 46,
+            life: 120, kind: 'pot', color: '#8d949c', sfx: 'hit',
+            grav: 0.5, bounce: 1, reflectable: false
+          });
+        }
+        if (t === 42) {
+          this.M.spawnHitbox(this, {
+            x: this.x + (dir > 0 ? 0 : -640), y: solY - 110, w: 640, h: 110,
+            dmg: s.dmg * 0.5, ang: 68, bkb: 70, kbg: 78, life: 8,
+            fx: 'impact', color: s.color, id: 'dev'
+          });
+          FX.dust(this.x + dir * 300, solY, 26, '#b6ac9c');
+          this.M.shake(22);
+          Audio2.play('explode');
+        }
+        break;
+      }
+
+      /* ---- PÊCHEUR : la montée des bichiques ----
+         Un banc remonte la rivière et emporte tout sur son passage. */
+      case 'monteeBichiques': {
+        if (t % 2 === 0 && t <= 40) {
+          const n = t / 2;                                  // 0 → 20
+          const px = B.left + 60 + n * ((B.right - B.left - 120) / 20);
+          const py = solY - 60 - ((n * 37) % 130);
+          this.M.spawnHitbox(this, {
+            x: px - 46, y: py - 40, w: 92, h: 80,
+            dmg: s.dmg, ang: 74, bkb: 14, kbg: 44, life: 4,
+            fx: 'splash', color: s.color, id: 'bich' + n
+          });
+          for (let i = 0; i < 4; i++)
+            FX.spark(px + rnd(-24, 24), py + rnd(-20, 20), rnd(1, 4), rnd(-2, 1),
+                     pick(['#9fe0f5', '#ffffff', '#cfeff9']), rndi(16, 30), rnd(3, 6));
+          if (n % 4 === 0) Audio2.play('water', { pan: clamp(px / 900, -1, 1), power: 0.6 });
+        }
+        break;
+      }
+
+      /* ---- SÉGATIER : le kabar qui ne s'arrête pas ----
+         Vingt-quatre frappes autour de soi, sur la mesure. */
+      case 'kabarSansFin': {
+        if (t % 2 === 0 && t <= 44) {
+          const n = t / 2;                                  // 0 → 22
+          const a = n * 0.83;                               // le pas tourne
+          const rr = 90 + (n % 5) * 26;
+          const px = this.cx + Math.cos(a) * rr, py = this.cy + Math.sin(a) * rr * 0.6;
+          this.M.spawnHitbox(this, {
+            x: px - 52, y: py - 44, w: 104, h: 88,
+            dmg: s.dmg, ang: 366, bkb: 10, kbg: 38, life: 4,
+            fx: 'punch', color: s.color, id: 'kab' + n
+          });
+          FX.ring(px, py, 46, s.color, 10, 3, 1.5, 0.6, a);
+          if (n % 3 === 0) Audio2.play('tempo', { pan: this.sfxPan });
+        }
+        if (t === 44) {
+          this.M.spawnHitbox(this, {
+            x: this.cx - 180, y: this.cy - 150, w: 360, h: 300,
+            dmg: s.dmg * 3, ang: 55, bkb: 66, kbg: 92, life: 8,
+            fx: 'impact', color: s.color, id: 'kabfin'
+          });
+          FX.burst(this.cx, this.cy, 130, s.color, 26);
+          this.M.shake(18);
+          Audio2.play('smashHit', { pan: this.sfxPan, power: 1 });
+        }
+        break;
+      }
+
+      /* ---- PAILLE-EN-QUEUE : le piqué de falaise ----
+         Il monte hors de l'écran, puis redescend en flèche. */
+      case 'piqueFalaise': {
+        if (t < 14) {
+          this.vy = -22; this.vx = dir * 3;
+          if (t % 2 === 0) FX.streak(this.cx, this.cy + 30, rnd(-2, 2), 7, '#ffffff', 14, 4);
+        } else if (t === 14) {
+          this.x = clamp(this.x + dir * 180, B.left + 90, B.right - 90);
+          Audio2.play('whooshBig', { pan: this.sfxPan });
+        } else if (t < 38) {
+          this.vy = 26; this.vx = -dir * 5;
+          this.M.spawnHitbox(this, {
+            x: this.cx - 58, y: this.cy - 40, w: 116, h: 110,
+            dmg: s.dmg / 6, ang: -80, bkb: 22, kbg: 40, life: 3,
+            fx: 'spike', color: s.color, spike: true, id: 'piq' + t
+          });
+          if (t % 2 === 0) {
+            FX.streak(this.cx, this.cy - 40, rnd(-3, 3), -9, s.color, 14, 5);
+            FX.spark(this.cx + rnd(-20, 20), this.cy, rnd(-2, 2), -4, '#ffffff', 16, 4);
+          }
+        } else if (t === 38) {
+          this.vy = -6;
+          this.M.spawnHitbox(this, {
+            x: this.cx - 190, y: this.cy - 80, w: 380, h: 150,
+            dmg: s.dmg * 0.6, ang: 60, bkb: 68, kbg: 88, life: 8,
+            fx: 'impact', color: s.color, id: 'piqfin'
+          });
+          FX.burst(this.cx, this.cy, 120, s.color, 24);
+          FX.dust(this.x, this.y, 18, '#e0d8c8');
+          this.M.shake(20);
+          Audio2.play('explode');
+        }
+        break;
+      }
+    }
+  };
+});
+
+
 /* ===== 03c-charfinal.js ===== */
 /* ---------- finalisation : construit les movesets ---------- */
 const CHAR_LIST = [];
@@ -12433,6 +12860,669 @@ STAGES.benare = makeStage({
           M.spawnFalling({ x, y: -1300, r: 20, dmg: 7, ang: 84, bkb: 26, kbg: 48, color: '#dff0ff', kind: 'hail' });
         } });
       }
+    }
+  }
+});
+
+
+/* ===== 04i-newstages8.js ===== */
+/* ============================================================
+   SMASH PÉI — TROIS ARÈNES DE PLUS, PLUS GRANDES ENCORE
+
+   Les trois précédentes avaient posé le principe : une scène doit
+   se jouer, pas seulement se regarder. Ces trois-là poussent le
+   raisonnement plus loin en changeant la GÉOMÉTRIE du combat, pas
+   seulement son décor.
+
+   · LE GRAND ÉTANG — une arène VERTICALE. Le sol est au fond d'un
+     cirque fermé, l'action monte le long des vires, et un radeau de
+     basalte fait l'ascenseur. On y meurt beaucoup plus par le haut
+     que par les côtés : les combattants légers y sont enfin
+     dangereux.
+
+   · FORMICA LEO — l'arène la plus LARGE du jeu, presque plate, sans
+     plafond de plateformes. On y court, on y espace, on y campe.
+     Les tourbillons de cendre la traversent lentement et
+     redistribuent tout le monde, ce qui empêche le camping de
+     durer.
+
+   · LE PORT, QUAI OUEST — le front de mer, la nuit. Terrain à trois
+     niveaux avec une barque qui monte et descend au rythme de la
+     houle, et les vieux canons du quai qui tirent le long du
+     parapet en s'annonçant longtemps à l'avance.
+
+   Les dangers sont volontairement ESPACÉS et TÉLÉGRAPHIÉS : le
+   joueur avait explicitement demandé qu'on cesse de se faire tuer
+   par le décor. Chaque menace s'annonce au moins quarante images
+   avant de frapper, et aucune ne dépasse la centaine de dégâts par
+   minute mesurée sur l'ensemble d'un combat.
+   ============================================================ */
+
+/* Pousser les combattants posés sur une plateforme mobile. Le même
+   utilitaire existe déjà pour les tapis roulants ; on n'en refait un
+   ici que s'il n'a pas été chargé avant nous. */
+if (typeof entrainePlat !== 'function') {
+  window.entrainePlat = function (M, p, ax, ay) {
+    for (const f of M.fighters) {
+      if (!f.alive || !f.grounded || f.platform !== p) continue;
+      f.x += ax || 0;
+      if (ay) f.y += ay;
+      f.vx += (ax || 0) * 0.06;
+    }
+  };
+}
+
+/* ============================================================
+   1. LE GRAND ÉTANG — le cirque vertical
+   ============================================================ */
+STAGES.grandetang = makeStage({
+  id: 'grandetang', nFR: 'Grand Étang', nEN: 'Great Pond', nCR: 'Gran Létan',
+  tagFR: 'Falaises & cascades', tagEN: 'Cliffs & falls', music: 'lontan',
+  tint: '#3e6b53', night: false,
+  plats: [
+    /* le fond du canyon : étroit, c'est voulu — on n'y reste pas */
+    { x: -420, y: 0, w: 840, h: 150 },
+    /* les vires de la paroi gauche, en escalier */
+    { x: -1180, y: -210, w: 300, h: 26, pass: true },
+    { x: -900, y: -430, w: 260, h: 26, pass: true },
+    { x: -1160, y: -650, w: 280, h: 26, pass: true },
+    /* les vires de la paroi droite */
+    { x: 880, y: -210, w: 300, h: 26, pass: true },
+    { x: 640, y: -430, w: 260, h: 26, pass: true },
+    { x: 880, y: -650, w: 280, h: 26, pass: true },
+    /* le pont naturel qui coupe le canyon en deux */
+    { x: -300, y: -560, w: 600, h: 30, pass: true },
+    /* la corniche sommitale, très haut : le vrai terrain de jeu */
+    { x: -520, y: -880, w: 300, h: 26, pass: true },
+    { x: 220, y: -880, w: 300, h: 26, pass: true },
+    /* LE RADEAU DE BASALTE : ascenseur, position pilotée par update() */
+    { x: -130, y: -300, w: 260, h: 28, pass: false, radeau: true }
+  ],
+  bounds: { left: -1750, right: 1750, top: -2000, bottom: 900 },
+  spawns: [{ x: -260, y: -700 }, { x: 260, y: -700 }, { x: -400, y: -1000 }, { x: 400, y: -1000 }],
+  respawn: { x: 0, y: -1000 },
+
+  sky(ctx, t) {
+    /* Le ciel d'un cirque fermé n'est pas un ciel ouvert : on ne voit
+       qu'une bande de jour tout en haut, et le vert profond de la
+       végétation reprend très vite. Un dégradé qui finissait presque
+       blanc noyait toute l'arène dans une brume laiteuse. */
+    /* Dans un cirque fermé on ne voit PAS le ciel : on voit la paroi
+       d'en face. Un dégradé clair au fond donnait un grand aplat vert
+       sans profondeur, sur lequel les combattants se détachaient
+       mal. Le fond descend donc vers le sombre, et c'est la lumière
+       du haut qui indique où est la sortie. */
+    Paint.sky(ctx, [[0, '#5f8a6c'], [0.2, '#2a4c39'], [0.5, '#14291e'], [1, '#0a1712']],
+              -3500, -2600, 7000, 3800);
+    for (let i = 0; i < 7; i++)
+      Paint.cloud(ctx, -2200 + ((i * 640 + t * 0.08) % 4800), -1900 + (i % 3) * 150, 2.4, '#ffffff', 0.26);
+  },
+
+  far(ctx, t) {
+    /* LES DEUX PAROIS. Elles enferment le champ : c'est ce qui donne
+       à cette arène sa lecture verticale — l'œil n'a nulle part où
+       aller sinon en haut. */
+    for (const cote of [-1, 1]) {
+      const g = ctx.createLinearGradient(0, -2000, 0, 300);
+      g.addColorStop(0, '#20372b'); g.addColorStop(0.5, '#15281f'); g.addColorStop(1, '#0b1712');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      /* Les parois se tiennent nettement en retrait du terrain de jeu :
+         quand elles mordaient dessus, elles remplissaient l'écran d'un
+         seul vert plat et on ne lisait plus rien. */
+      const bord = cote * 820;
+      ctx.moveTo(cote * 3400, 320);
+      ctx.lineTo(cote * 3400, -2100);
+      const rng = makeRng(cote > 0 ? 7731 : 4417);
+      let y = -2100;
+      let x = bord + cote * 620;
+      while (y < 320) {
+        const dy = 90 + rng() * 130;
+        x = bord + cote * (140 + rng() * 380) * Math.min(1, (y + 2100) / 1700);
+        ctx.lineTo(x, y + dy);
+        y += dy;
+      }
+      ctx.lineTo(bord, 320);
+      ctx.closePath(); ctx.fill();
+    }
+    /* Les strates de la paroi d'en face. Ce sont elles qui donnent
+       de la matière au fond : sans elles, tout le centre de l'écran
+       était une surface unie où l'œil n'avait rien à quoi se
+       raccrocher. Ce ne sont que des rectangles — le coût est nul. */
+    ctx.save();
+    const rs = makeRng(4242);
+    for (let i = 0; i < 26; i++) {
+      const y = -2100 + i * 92 + rs() * 26;
+      ctx.globalAlpha = 0.05 + rs() * 0.06;
+      ctx.fillStyle = i % 3 ? '#8fbf9f' : '#06110c';
+      ctx.fillRect(-3200, y, 6400, 10 + rs() * 22);
+    }
+    /* et quelques éperons rocheux, plus francs */
+    ctx.globalAlpha = 0.3;
+    ctx.fillStyle = '#0b1a13';
+    for (let i = 0; i < 7; i++) {
+      const x = -2200 + i * 640 + rs() * 180;
+      const h = 400 + rs() * 900;
+      ctx.beginPath();
+      ctx.moveTo(x - 130, 320);
+      ctx.lineTo(x, 320 - h);
+      ctx.lineTo(x + 150, 320);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+
+    /* la végétation accrochée : de simples touffes, mises en cache
+       par leur position fixe — on ne recalcule rien par image */
+    ctx.save();
+    /* Discrètes, et SERRÉES CONTRE LES PAROIS : dispersées au milieu
+       et bien opaques, elles ressemblaient à des bulles flottant dans
+       le vide au lieu de buissons accrochés à la roche. */
+    ctx.globalAlpha = 0.26;
+    const r2 = makeRng(2211);
+    for (let i = 0; i < 44; i++) {
+      const cote = i % 2 ? 1 : -1;
+      const y = -2000 + r2() * 2200;
+      const x = cote * (760 + r2() * 620);
+      Paint.disc(ctx, x, y, 24 + r2() * 34, '#437a53', '#1d3d29');
+    }
+    ctx.restore();
+  },
+
+  mid(ctx, t) {
+    /* LES CASCADES. Sept filets d'eau qui tombent des deux parois :
+       ce sont elles qui donnent l'échelle du lieu. Tracé au trait,
+       pas au dégradé — sept dégradés par image coûteraient cher. */
+    ctx.save();
+    ctx.lineCap = 'round';
+    const rng = makeRng(6605);
+    for (let i = 0; i < 7; i++) {
+      const cote = i % 2 ? 1 : -1;
+      const x = cote * (560 + rng() * 420);
+      const y0 = -1900 + rng() * 500;
+      const larg = 14 + rng() * 22;
+      ctx.globalAlpha = 0.32;
+      ctx.strokeStyle = '#dff0f6'; ctx.lineWidth = larg;
+      ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x + cote * 40, 120); ctx.stroke();
+      ctx.globalAlpha = 0.5;
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = larg * 0.32;
+      const on = (t * 3 + i * 40) % 400;
+      ctx.beginPath();
+      ctx.moveTo(x + cote * (on / 400) * 40, y0 + on * 4);
+      ctx.lineTo(x + cote * (on / 400) * 40 + 4, y0 + on * 4 + 170);
+      ctx.stroke();
+    }
+    ctx.restore();
+    /* La brume du fond. Elle ne monte que d'un mètre ou deux : six
+       grands disques blancs à mi-hauteur repeignaient toute l'arène
+       en vert laiteux et faisaient disparaître les combattants. */
+    ctx.save();
+    ctx.globalAlpha = 0.07 + Math.sin(t * 0.012) * 0.03;
+    ctx.fillStyle = '#dff0e6';
+    for (let i = 0; i < 5; i++) {
+      /* aplaties : un disque se lit comme une bulle, une nappe se lit
+         comme de la brume */
+      ctx.beginPath();
+      ctx.ellipse(-720 + i * 360, 120 + Math.sin(t * 0.02 + i) * 14, 260, 34, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  },
+
+  ground(ctx, t) {
+    Paint.rockPlatform(ctx, { x: -420, y: 0, w: 840, h: 150 }, '#2b4034', '#4a6a55');
+    for (const p of this.plats) {
+      if (p.radeau || p.y === 0) continue;
+      Paint.rockPlatform(ctx, p, '#33503f', '#547a62', '#9fc3ac');
+    }
+    /* LE RADEAU DE BASALTE */
+    const r = this.plats.find(p => p.radeau);
+    if (r) {
+      const x = r.x + (r.dx || 0), y = r.y + (r.dy || 0);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.fillStyle = '#2a2f33';
+      ctx.beginPath(); ctx.roundRect(0, 0, 260, 30, 6); ctx.fill();
+      /* les orgues basaltiques sous le radeau */
+      ctx.fillStyle = '#1c2124';
+      for (let i = 0; i < 9; i++) ctx.fillRect(10 + i * 28, 28, 20, 26 + (i % 3) * 12);
+      ctx.fillStyle = '#556b5c';
+      ctx.fillRect(0, 0, 260, 6);
+      /* la corde et l'anneau, en haut : on comprend que ça monte */
+      ctx.strokeStyle = 'rgba(200,190,160,.6)'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(130, -4); ctx.lineTo(130, -240); ctx.stroke();
+      ctx.restore();
+    }
+  },
+
+  fore(ctx, t) {
+    /* les fougères du premier plan, silhouettes sombres */
+    ctx.save();
+    ctx.globalAlpha = 0.55; ctx.fillStyle = '#101d16';
+    const rng = makeRng(8812);
+    for (let i = 0; i < 9; i++) {
+      const x = -1600 + i * 400 + rng() * 140;
+      const y = 340 + rng() * 60;
+      for (let k = -3; k <= 3; k++) {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(k * 0.24 + Math.sin(t * 0.01 + i) * 0.03);
+        ctx.beginPath(); ctx.ellipse(0, -110, 16, 120, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+      }
+    }
+    ctx.restore();
+  },
+
+  update(M, t) {
+    /* L'ASCENSEUR. Une course lente et régulière du bas du canyon
+       jusqu'au pont naturel : c'est le seul moyen commode de remonter
+       quand on s'est fait envoyer au fond. */
+    const r = this.plats.find(p => p.radeau);
+    if (r) {
+      const cycle = 620;
+      const k = (t % cycle) / cycle;
+      /* un aller-retour doux, sans à-coup aux extrémités */
+      const u = 0.5 - Math.cos(k * Math.PI * 2) * 0.5;
+      const cible = -110 - u * 620;
+      const av = cible - r.y;
+      r.y = cible;
+      entrainePlat(M, r, 0, av);
+    }
+  },
+
+  ambient(fx, t) {
+    /* les embruns des cascades */
+    if (Math.random() < 0.5) fx.spark(rnd(-1300, 1300), rnd(60, 200), rnd(-1, 1), rnd(-3, -1), '#e8fbff', rnd(26, 60), 3);
+    if (Math.random() < 0.06) fx.leaf(rnd(-1500, 1500), -1400, 0.9);
+    if (Math.random() < 0.02) fx.bird(rnd(-1400, 1400), rnd(-1600, -900));
+  },
+
+  hazard(M, t) {
+    /* LA CRUE. Une des sept cascades gonfle. On l'entend d'abord, on
+       la voit ensuite, et seulement après elle tombe : le joueur a
+       toujours le temps de dégager la vire visée. */
+    if (t % 760 === 200) {
+      const cote = ((t / 760) | 0) % 2 ? 1 : -1;
+      const x = cote * 900;
+      M.banner(M.lang === 'en' ? 'THE FALLS SWELL !' : 'LA CASCADE GONFLE !', '#bfe9ff');
+      M.warn(x, -430, 56);
+      try { Audio2.play('water', { power: 0.9 }); } catch (e) {}
+      M.timers.push({ f: 56, run: () => {
+        M.spawnHazard({ x, y: -1500, w: 190, h: 420, vx: 0, vy: 15, life: 120,
+          dmg: 7, ang: 272, bkb: 26, kbg: 22, kind: 'wave', color: '#bfe9ff' });
+      } });
+    }
+    /* LA PIERRE QUI SE DÉTACHE. Une seule, annoncée, et jamais sur le
+       radeau : on ne punit pas quelqu'un qui n'a pas le choix. */
+    if (t % 900 === 520) {
+      const x = ((t / 900) | 0) % 2 ? 620 : -620;
+      M.warn(x, 0, 48);
+      M.timers.push({ f: 48, run: () => {
+        M.spawnFalling({ x, y: -1800, r: 36, dmg: 11, ang: 76, bkb: 38, kbg: 62, color: '#3d564a' });
+      } });
+    }
+  }
+});
+
+/* ============================================================
+   2. FORMICA LEO — la plus large
+   ============================================================ */
+STAGES.formicaleo = makeStage({
+  id: 'formicaleo', nFR: 'Formica Leo', nEN: 'Formica Leo', nCR: 'Formika Léo',
+  tagFR: 'Cendres & tourbillons', tagEN: 'Cinders & dust devils', music: 'lontan',
+  tint: '#a8552e', night: false,
+  plats: [
+    /* la plaine : une seule dalle immense. On peut vraiment courir. */
+    { x: -1400, y: 0, w: 2800, h: 160 },
+    /* les deux mesas, basses et larges */
+    { x: -1120, y: -260, w: 420, h: 40, pass: true },
+    { x: 700, y: -260, w: 420, h: 40, pass: true },
+    /* les blocs erratiques du centre */
+    { x: -320, y: -230, w: 240, h: 26, pass: true },
+    { x: 80, y: -230, w: 240, h: 26, pass: true },
+    { x: -170, y: -450, w: 340, h: 26, pass: true },
+    /* LA COULÉE : une dalle de lave refroidie qui glisse lentement */
+    { x: -260, y: -640, w: 300, h: 28, pass: true, coulee: true }
+  ],
+  bounds: { left: -2100, right: 2100, top: -1500, bottom: 900 },
+  spawns: [{ x: -560, y: -420 }, { x: 560, y: -420 }, { x: -180, y: -620 }, { x: 180, y: -620 }],
+
+  sky(ctx, t) {
+    Paint.sky(ctx, [[0, '#2a1a24'], [0.32, '#7a3320'], [0.68, '#c96b34'], [1, '#e8b878']],
+              -4200, -2000, 8400, 3200);
+    Paint.disc(ctx, 900, -1000, 90, '#ffe6a8', '#ffb04c', 4);
+  },
+
+  far(ctx, t) {
+    /* Les remparts au fond : c'est ce qui fait comprendre qu'on est
+       dans une caldeira et pas sur une plage.
+
+       Ils sont volontairement tracés sur 5 000 px et non sur toute la
+       largeur du monde : une crête est mise en cache dans une image
+       hors-écran, et une image de huit mille pixels de large coûtait
+       treize millisecondes par frame rien qu'à la recopier. Cinq
+       mille suffisent largement à couvrir le champ de la caméra la
+       plus reculée. */
+    /* Les remparts se posent SUR L'HORIZON, pas au-dessus de la tête
+       des combattants : placés trop haut et trop amples, ils
+       remplissaient tout le cadre de colonnes brunes et il ne restait
+       plus un pixel de ciel pour situer le regard. */
+    Paint.ridge(ctx, 3311, -2500, 2500, -110, 300, '#4a2317', '#2a1008', 40);
+    Paint.ridge(ctx, 8842, -2500, 2500, -30, 165, '#65301c', '#3d180e', 36);
+  },
+
+  mid(ctx, t) {
+    /* Trois cônes de scories tout près : ce sont eux qui donnent
+       l'échelle du lieu et qui séparent le sol du fond. */
+    const cones = [[-980, 1], [-140, 0.7], [860, 1.15]];
+    for (const [cx, k] of cones) {
+      ctx.fillStyle = '#3a1a10';
+      ctx.beginPath();
+      ctx.moveTo(cx - 210 * k, 20);
+      ctx.lineTo(cx, 20 - 180 * k);
+      ctx.lineTo(cx + 210 * k, 20);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#57291a';
+      ctx.beginPath();
+      ctx.moveTo(cx - 210 * k, 20);
+      ctx.lineTo(cx, 20 - 180 * k);
+      ctx.lineTo(cx + 30 * k, 20);
+      ctx.closePath(); ctx.fill();
+    }
+
+    /* les traînées de scories, en bandes horizontales : elles disent
+       le vent dominant sans rien coûter */
+    ctx.save();
+    ctx.globalAlpha = 0.2;
+    const rng = makeRng(4419);
+    for (let i = 0; i < 26; i++) {
+      const y = -180 + rng() * 240;
+      const x = -2100 + rng() * 4200;
+      ctx.fillStyle = i % 3 ? '#7a3b22' : '#3f1d10';
+      ctx.fillRect(x, y, 120 + rng() * 260, 5 + rng() * 7);
+    }
+    ctx.restore();
+  },
+
+  ground(ctx, t) {
+    /* la plaine : un sol de sable rouge, pas de la roche */
+    const g = ctx.createLinearGradient(0, -10, 0, 160);
+    g.addColorStop(0, '#b8613a'); g.addColorStop(0.4, '#8f4526'); g.addColorStop(1, '#4e2312');
+    ctx.fillStyle = g;
+    ctx.fillRect(-1400, 0, 2800, 160);
+    ctx.save();
+    ctx.globalAlpha = 0.22; ctx.fillStyle = '#2a1109';
+    const rng = makeRng(1919);
+    for (let i = 0; i < 90; i++)
+      ctx.fillRect(-1400 + rng() * 2800, 8 + rng() * 120, 6 + rng() * 22, 3 + rng() * 5);
+    ctx.restore();
+
+    for (const p of this.plats) {
+      if (p.y === 0) continue;
+      Paint.rockPlatform(ctx, p, p.coulee ? '#2c2124' : '#6b3320',
+                                 p.coulee ? '#4c3c40' : '#a05a34', '#d8a070');
+    }
+  },
+
+  fore(ctx, t) {
+    /* le sable qui rampe au premier plan */
+    ctx.save();
+    ctx.globalAlpha = 0.24; ctx.fillStyle = '#d09a62';
+    for (let i = 0; i < 12; i++) {
+      const x = -2100 + ((i * 380 + t * 1.6) % 4200);
+      ctx.beginPath();
+      ctx.ellipse(x, 300 + (i % 3) * 40, 130, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  },
+
+  update(M, t) {
+    /* LA COULÉE. Elle traverse tout l'étage haut, très lentement.
+       C'est la seule plateforme haute de la scène : la tenir vaut
+       quelque chose, et il faut la suivre pour la garder. */
+    const c = this.plats.find(p => p.coulee);
+    if (c) {
+      const cycle = 1400;
+      const k = (t % cycle) / cycle;
+      const u = 0.5 - Math.cos(k * Math.PI * 2) * 0.5;
+      const cible = -900 + u * 1500;
+      const av = cible - c.x;
+      c.x = cible;
+      entrainePlat(M, c, av, 0);
+    }
+  },
+
+  ambient(fx, t) {
+    if (Math.random() < 0.6) fx.ash(rnd(-2000, 2000), rnd(-900, 200), rnd(-2.5, -0.4), rnd(-0.4, 0.6));
+    if (Math.random() < 0.08) fx.dust(rnd(-1300, 1300), 0, 3, '#c08050');
+  },
+
+  hazard(M, t) {
+    /* LE TOURBILLON DE SABLE. Il traverse la plaine à vitesse
+       constante, en s'annonçant vingt pixels avant d'entrer dans le
+       champ. Il fait peu de dégâts : son rôle est de DÉPLACER, pas
+       de tuer. C'est ce qui empêche de camper aux deux bouts d'une
+       arène aussi large. */
+    if (t % 640 === 120) {
+      const dir = ((t / 640) | 0) % 2 ? -1 : 1;
+      M.banner(M.lang === 'en' ? 'DUST DEVIL' : 'TOURBILLON', '#e0a870');
+      M.timers.push({ f: 46, run: () => {
+        M.spawnHazard({ x: dir > 0 ? -2000 : 2000, y: -200, w: 170, h: 340,
+          vx: dir * 7, life: 260, dmg: 5, ang: 88, bkb: 22, kbg: 18,
+          kind: 'geyser', color: '#e0a870' });
+      } });
+    }
+    /* LA RAFALE D'ALTITUDE. Sur une plaine sans abri, le vent est la
+       vraie menace : il ne blesse pas, il vous met dehors. On le
+       tient court et bien annoncé. */
+    if (t % 900 === 500) {
+      const dir = ((t / 900) | 0) % 2 ? -1 : 1;
+      M.ticker(M.lang === 'en' ? 'GUST' : 'RAFALE', '#e8c898');
+      M.timers.push({ f: 44, run: () => { M.wind = { dir, frames: 150, power: 0.26 }; } });
+    }
+  }
+});
+
+/* ============================================================
+   3. LE PORT, QUAI OUEST — le front de mer la nuit
+   ============================================================ */
+STAGES.portouest = makeStage({
+  id: 'portouest', nFR: 'Le Port — Quai Ouest', nEN: 'West Quay', nCR: 'Lo Por — Ké Wès',
+  tagFR: 'Canons & houle', tagEN: 'Cannons & swell', music: 'kabar',
+  tint: '#2f6f8f', night: true,
+  plats: [
+    /* l'esplanade */
+    { x: -820, y: 0, w: 1640, h: 150 },
+    /* le parapet, où sont plantés les canons */
+    { x: -1180, y: -170, w: 340, h: 30, pass: true },
+    { x: 840, y: -170, w: 340, h: 30, pass: true },
+    /* le kiosque à musique : deux niveaux au centre */
+    { x: -280, y: -300, w: 560, h: 26, pass: true },
+    { x: -170, y: -520, w: 340, h: 24, pass: true },
+    /* les deux lampadaires hauts */
+    { x: -760, y: -560, w: 240, h: 22, pass: true },
+    { x: 520, y: -560, w: 240, h: 22, pass: true },
+    /* LA BARQUE : elle monte et descend avec la houle */
+    { x: 1180, y: -60, w: 240, h: 26, pass: false, barque: true }
+  ],
+  bounds: { left: -1750, right: 1750, top: -1500, bottom: 900 },
+  spawns: [{ x: -360, y: -440 }, { x: 360, y: -440 }, { x: -120, y: -660 }, { x: 120, y: -660 }],
+
+  sky(ctx, t) {
+    Paint.sky(ctx, [[0, '#050a18'], [0.34, '#122748'], [0.7, '#2c4f74'], [1, '#5c86a4']],
+              -3600, -2200, 7200, 3400);
+    /* les étoiles : positions fixes, aucune allocation par image */
+    const rng = makeRng(3003);
+    ctx.save();
+    for (let i = 0; i < 70; i++) {
+      const x = -3000 + rng() * 6000, y = -2100 + rng() * 1300;
+      ctx.globalAlpha = 0.28 + 0.5 * Math.abs(Math.sin(t * 0.02 + i));
+      ctx.fillStyle = '#eaf2ff';
+      ctx.fillRect(x, y, 2.6, 2.6);
+    }
+    ctx.restore();
+    Paint.disc(ctx, -880, -1180, 62, '#f4f0d8', '#cfc8a8', 3);
+  },
+
+  far(ctx, t) {
+    /* la ville derrière : une ligne de fenêtres allumées, dessinée au
+       rectangle — c'est ce qui donne la chaleur du lieu la nuit */
+    ctx.fillStyle = '#0d1626';
+    ctx.fillRect(-3400, -520, 6800, 560);
+    const rng = makeRng(5150);
+    for (let i = 0; i < 34; i++) {
+      const x = -1900 + i * 118 + rng() * 30;
+      const h = 120 + rng() * 240;
+      ctx.fillStyle = '#131f33';
+      ctx.fillRect(x, -520 - h, 92, h);
+      ctx.fillStyle = 'rgba(255,206,120,.75)';
+      for (let k = 0; k < 5; k++) {
+        if (rng() < 0.42) continue;
+        ctx.fillRect(x + 12 + (k % 3) * 26, -510 - h + 18 + ((k / 3) | 0) * 40, 14, 18);
+      }
+    }
+    /* la mer, au fond à droite */
+    Paint.waterBand(ctx, 180, 460, t, '#123a54', '#081f2e', 900, 3400);
+  },
+
+  mid(ctx, t) {
+    /* la houle qui vient battre le quai */
+    const h = 30 + Math.sin(t * 0.022) * 26;
+    ctx.save();
+    ctx.globalAlpha = 0.45; ctx.fillStyle = '#9fd0e6';
+    for (let i = 0; i < 7; i++) {
+      const x = 940 + i * 130;
+      ctx.beginPath();
+      ctx.ellipse(x, 30 - h, 66 + Math.sin(t * 0.05 + i) * 20, h * 0.75, 0, Math.PI, 0);
+      ctx.fill();
+    }
+    ctx.restore();
+    /* les guirlandes du kiosque */
+    ctx.save();
+    ctx.strokeStyle = 'rgba(220,210,180,.45)'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-300, -330); ctx.quadraticCurveTo(0, -250, 300, -330); ctx.stroke();
+    for (let i = 0; i <= 10; i++) {
+      const u = i / 10;
+      const x = -300 + u * 600;
+      const y = -330 + Math.sin(u * Math.PI) * 78;
+      Paint.disc(ctx, x, y, 6, ['#ffd166', '#ff8a3c', '#7ee8fa'][i % 3], null, 3.2);
+    }
+    ctx.restore();
+  },
+
+  ground(ctx, t) {
+    Paint.rockPlatform(ctx, { x: -820, y: 0, w: 1640, h: 150 }, '#3c4650', '#5f6d79');
+    /* le pavage de l'esplanade */
+    ctx.save();
+    ctx.globalAlpha = 0.2; ctx.strokeStyle = '#0e141a'; ctx.lineWidth = 2;
+    for (let x = -820; x < 820; x += 60) { ctx.beginPath(); ctx.moveTo(x, 8); ctx.lineTo(x, 148); ctx.stroke(); }
+    for (let y = 20; y < 150; y += 44) { ctx.beginPath(); ctx.moveTo(-820, y); ctx.lineTo(820, y); ctx.stroke(); }
+    ctx.restore();
+
+    for (const p of this.plats) {
+      if (p.barque || p.y === 0) continue;
+      Paint.rockPlatform(ctx, p, '#46525e', '#6f7f8c', '#c3cfd9');
+    }
+
+    /* LES CANONS, plantés sur les deux parapets. Ils regardent la mer
+       et se tournent avant de tirer : c'est l'avertissement. */
+    for (const cote of [-1, 1]) {
+      const bx = cote * 1010, by = -172;
+      ctx.save();
+      ctx.translate(bx, by);
+      ctx.fillStyle = '#2b3138';
+      ctx.beginPath(); ctx.arc(0, 0, 20, 0, Math.PI * 2); ctx.fill();
+      ctx.rotate(-cote * (0.5 + Math.sin(t * 0.012) * 0.12));
+      ctx.fillStyle = '#39414a';
+      ctx.beginPath(); ctx.roundRect(0, -11, 92, 22, 6); ctx.fill();
+      ctx.fillStyle = '#586471';
+      ctx.fillRect(70, -13, 14, 26);
+      ctx.restore();
+    }
+
+    /* LA BARQUE */
+    const b = this.plats.find(p => p.barque);
+    if (b) {
+      const x = b.x + (b.dx || 0), y = b.y + (b.dy || 0);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.fillStyle = '#7a4a28';
+      ctx.beginPath();
+      ctx.moveTo(0, 0); ctx.lineTo(240, 0); ctx.lineTo(214, 52); ctx.lineTo(26, 52);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#9a6438';
+      ctx.fillRect(0, -8, 240, 12);
+      ctx.strokeStyle = '#c8b070'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(120, -10); ctx.lineTo(120, -140); ctx.stroke();
+      ctx.fillStyle = 'rgba(240,235,215,.85)';
+      ctx.beginPath();
+      ctx.moveTo(122, -136); ctx.lineTo(196, -30); ctx.lineTo(122, -30);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    }
+  },
+
+  fore(ctx, t) {
+    /* les silhouettes de la foule sur le muret, tout devant */
+    if (Paint.crowd) { try { Paint.crowd(ctx, 330, -1600, 1600, t, 7007); return; } catch (e) {} }
+    ctx.save();
+    ctx.globalAlpha = 0.6; ctx.fillStyle = '#050b12';
+    const rng = makeRng(7007);
+    for (let i = 0; i < 22; i++) {
+      const x = -1500 + i * 140 + rng() * 40;
+      const h = 60 + rng() * 26;
+      const b = Math.sin(t * 0.05 + i) * 3;
+      ctx.beginPath(); ctx.roundRect(x, 340 - h + b, 22, h, 9); ctx.fill();
+      ctx.beginPath(); ctx.arc(x + 11, 336 - h + b, 12, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  },
+
+  update(M, t) {
+    /* LA BARQUE. Elle suit la houle, donc elle bouge tout le temps,
+       doucement. Elle sert de tremplin pour revenir du côté mer —
+       mais elle descend juste quand on en aurait le plus besoin. */
+    const b = this.plats.find(p => p.barque);
+    if (b) {
+      const cible = -60 + Math.sin(t * 0.022) * 90;
+      const av = cible - b.y;
+      b.y = cible;
+      entrainePlat(M, b, 0, av);
+    }
+  },
+
+  ambient(fx, t) {
+    if (Math.random() < 0.45) fx.spark(rnd(900, 1600), rnd(120, 220), rnd(-1, 1), rnd(-3, -1), '#dff4ff', rnd(24, 50), 3);
+    if (Math.random() < 0.03) fx.bird(rnd(-1400, 1400), rnd(-900, -500));
+  },
+
+  hazard(M, t) {
+    /* LA SALVE. Les canons se tournent (on le voit dans le décor),
+       une bannière prévient, et seulement quatre-vingts images plus
+       tard le boulet part à hauteur de parapet. C'est long exprès :
+       ce danger doit être ÉVITABLE, pas subi. */
+    if (t % 820 === 180) {
+      const cote = ((t / 820) | 0) % 2 ? 1 : -1;
+      M.banner(M.lang === 'en' ? 'CANNONS READY !' : 'CANONS PARÉS !', '#ffb03c');
+      M.warn(cote * 1010, -200, 80);
+      M.timers.push({ f: 80, run: () => {
+        try { Audio2.play('explode'); } catch (e) {}
+        M.shake(10);
+        M.spawnHazard({ x: cote * 1120, y: -230, w: 62, h: 62, vx: -cote * 15, life: 180,
+          dmg: 12, ang: 44, bkb: 40, kbg: 58, kind: 'bolt', color: '#ffb03c' });
+      } });
+    }
+    /* LE PAQUET DE MER. Il passe par-dessus le quai est et pousse
+       vers la ville. Aucun dégât notable : c'est un déplacement. */
+    if (t % 940 === 560) {
+      M.ticker(M.lang === 'en' ? 'SWELL' : 'PAQUET DE MER', '#bfe9ff');
+      try { Audio2.play('water', { power: 0.8 }); } catch (e) {}
+      M.timers.push({ f: 48, run: () => {
+        M.spawnHazard({ x: 1500, y: -190, w: 260, h: 240, vx: -10, life: 130,
+          dmg: 5, ang: 170, bkb: 30, kbg: 20, kind: 'wave', color: '#bfe9ff' });
+      } });
     }
   }
 });
@@ -34227,7 +35317,7 @@ const Bilan = {
       if (el) { el.classList.add('bil-cache'); el.classList.remove('bil-in'); }
     }
     const sc = document.getElementById('sc-results');
-    if (sc) sc.classList.add('bil-on');
+    if (sc) { sc.classList.add('bil-on'); sc.classList.remove('bil-fini'); }
     const row = sc && sc.querySelector('.row.mt');
     if (row) row.classList.add('bil-cache');
 
@@ -34314,8 +35404,33 @@ const Bilan = {
 
   termine() {
     this.actif = false;
+
+    /* RÉCAPITULATIF FINAL.
+       Sur téléphone, chaque acte masquait le précédent — parfait pour
+       lire un sujet à la fois, désastreux à l'arrivée : le joueur se
+       retrouvait devant un écran presque vide, avec pour tout bilan la
+       dernière ligne affichée. On rouvre donc TOUT à la fin : le
+       classement, l'expérience, la maîtrise et les récompenses tiennent
+       dans le corps qui défile, et on peut relire ses gains avant de
+       relancer. */
+    for (const act of this.actes)
+      for (const id of act.els) {
+        const el = document.getElementById(id);
+        if (!el) continue;
+        el.classList.remove('bil-cache');
+        el.classList.add('bil-in');
+      }
+    document.querySelectorAll('#sc-results .bil-ligne, #sc-results .achv-toast, #sc-results .bil-tro')
+      .forEach(el => el.classList.add('bil-in'));
+    const corps = document.getElementById('bil-corps');
+    if (corps) { try { corps.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { corps.scrollTop = 0; } }
+
+    /* On GARDE `bil-on` : c'est lui qui porte la mise en page à trois
+       étages. L'enlever faisait retomber l'écran en flux normal, et le
+       récapitulatif repassait alors sous les boutons d'action. Seule la
+       barre de navigation disparaît. */
     const sc = document.getElementById('sc-results');
-    if (sc) sc.classList.remove('bil-on');
+    if (sc) sc.classList.add('bil-fini');
     const nav = document.getElementById('bil-nav');
     if (nav) nav.style.display = 'none';
     const row = sc && sc.querySelector('.row.mt');
@@ -34562,6 +35677,17 @@ const Bilan = {
 
 /* trophées gagnés */
 #res-trophees { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+/* Les bulles de succès étaient conçues pour glisser en surimpression
+   sur le côté. Dans le récapitulatif, elles doivent se ranger comme
+   tout le reste, sinon elles se posent en travers des lignes d'XP. */
+#sc-results #res-achv {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 6px; width: 100%; position: static;
+}
+#sc-results #res-achv .achv-toast {
+  position: static; left: auto; right: auto; top: auto; bottom: auto;
+  transform: none; margin: 0; width: auto; max-width: 100%;
+}
 #sc-results .bil-tro {
   display: flex; align-items: center; gap: 12px; text-align: left;
   padding: 10px 14px; border-radius: 12px; cursor: pointer;
@@ -34584,6 +35710,13 @@ const Bilan = {
   padding: 2px 0 6px;
   scrollbar-width: thin;
 }
+/* Chaque acte garde SA hauteur naturelle et c'est le corps qui défile.
+   Sans cette ligne, le classement, qui hérite d'un débordement
+   automatique
+   de la feuille de style, se laissait écraser à zéro pixel par ses
+   voisins dès qu'on révélait tout le récapitulatif : le joueur voyait
+   un grand vide à la place de ses résultats. */
+#bil-corps > * { flex: 0 0 auto; max-height: none; overflow: visible; }
 #sc-results:not(.bil-on) #bil-corps { overflow: visible; }
 
 /* barre de navigation du bilan */
@@ -34591,7 +35724,7 @@ const Bilan = {
   display: flex; flex-direction: column; align-items: center; gap: 10px;
   width: min(1100px, 94%); margin-top: 14px;
 }
-#sc-results:not(.bil-on) #bil-nav { display: none; }
+#sc-results:not(.bil-on) #bil-nav, #sc-results.bil-fini #bil-nav { display: none; }
 #bil-nav .bil-titre { display: flex; align-items: center; gap: 12px; }
 #bil-nom { font-weight: 800; letter-spacing: .1em; font-size: 13px; opacity: .85; }
 #bil-pts { display: flex; gap: 6px; }
@@ -35735,24 +36868,52 @@ Object.assign(I18N.en, {
        Chaque combattant pèse dans le cadrage. Celui qui vient de
        toucher ou d'être touché pèse davantage, et celui qui vole est
        anticipé sur sa trajectoire : on cadre là où il SERA. */
+    const mainP = M.mainPlat();
     let sx = 0, sy = 0, poids = 0;
     if (alive.length) {
       for (const f of alive) {
         const vole = f.state === ST.HITSTUN || f.state === ST.TUMBLE;
-        const antX = f.x + (vole ? clamp(f.vx * 7, -260, 260) : clamp(f.vx * 2.5, -90, 90));
-        const antY = f.cy + (vole ? clamp(f.vy * 6, -240, 240) : 0);
-        minX = Math.min(minX, Math.min(f.x, antX)); maxX = Math.max(maxX, Math.max(f.x, antX));
-        minY = Math.min(minY, Math.min(f.top, antY)); maxY = Math.max(maxY, f.y);
-        let w = 1;
-        if (f === M.comboOwner && M.comboShow > 0) w += 0.9;
-        if (f.hitstun > 0 || f.hitlag > 0) w += 0.7;
+
+        /* ---------- CELUI QUI PART NE VOLE PAS LE CADRE ----------
+           Un combattant projeté très loin est perdu d'avance : le
+           suivre, c'est abandonner le combat qui continue au centre.
+           Passé une certaine distance de la scène, il cesse
+           progressivement de compter dans le cadrage — comme dans
+           Smash, où la caméra le laisse partir et le montre par une
+           bulle au bord de l'écran. */
+        let dehors = 0;
+        if (mainP) {
+          const g = mainP.x - 180, d = mainP.x + mainP.w + 180;
+          if (f.x < g) dehors = (g - f.x) / 620;
+          else if (f.x > d) dehors = (f.x - d) / 620;
+          const bas = mainP.y + 420;
+          if (f.y > bas) dehors = Math.max(dehors, (f.y - bas) / 620);
+        }
+        dehors = clamp(dehors, 0, 1);
+        const tenu = 1 - dehors;                    // 1 = il compte, 0 = on le laisse
+
+        /* l'anticipation ne sert que tant qu'il est récupérable */
+        const antX = f.x + (vole ? clamp(f.vx * 5 * tenu, -180, 180) : clamp(f.vx * 2.5, -90, 90));
+        const antY = f.cy + (vole ? clamp(f.vy * 4 * tenu, -180, 180) : 0);
+        /* la boîte englobante suit le combattant seulement en partie
+           quand il est déjà loin : elle s'arrête à mi-chemin */
+        const bxi = lerp(antX, mainP ? mainP.x + mainP.w / 2 : 0, dehors * 0.75);
+        const byi = lerp(antY, mainP ? mainP.y - 120 : -200, dehors * 0.75);
+        minX = Math.min(minX, Math.min(f.x * tenu + bxi * dehors, bxi));
+        maxX = Math.max(maxX, Math.max(f.x * tenu + bxi * dehors, bxi));
+        minY = Math.min(minY, Math.min(f.top * tenu + byi * dehors, byi));
+        maxY = Math.max(maxY, f.y * tenu + (mainP ? mainP.y : 0) * dehors);
+
+        let w = 1 - dehors * 0.9;
+        if (f === M.comboOwner && M.comboShow > 0) w += 0.9 * tenu;
+        if (f.hitstun > 0 || f.hitlag > 0) w += 0.7 * tenu;
         if (f.enSuper) w += 1.6;
-        sx += antX * w; sy += antY * w; poids += w;
+        sx += bxi * w; sy += byi * w; poids += w;
       }
     } else { minX = maxX = 0; minY = -200; maxY = 0; }
 
     /* on garde toujours un morceau de sol visible */
-    const main = M.mainPlat();
+    const main = mainP;
     if (main) {
       const mt = main.y + (main.dy || 0);
       if (maxX > main.x - 260 && minX < main.x + main.w + 260) maxY = Math.max(maxY, mt + 70);
@@ -35780,13 +36941,19 @@ Object.assign(I18N.en, {
     z = clamp(z, 0.58, alive.length <= 2 ? 1.9 : 1.55) * reglage;
     if (M.intro > 0) z = 0.8 * reglage;
 
-    /* coup de zoom sur le K.O. */
+    /* ---------- LE K.O. NE DÉPLACE PLUS LA CAMÉRA ----------
+       Aller chercher le point d'impact était une mauvaise idée : à
+       quatre, un K.O. arrive pendant que les trois autres se battent,
+       et la caméra abandonnait le combat pour filmer un bord d'écran
+       vide. On garde donc le cadrage sur les vivants et on ponctue
+       autrement : un très bref élargissement, le temps de comprendre
+       qu'il s'est passé quelque chose. La direction du K.O., elle, est
+       montrée par un repère au bord de l'écran (voir `drawKoMarque`),
+       ce qui informe sans rien déplacer. */
     if (this.ko && this.ko.t > 0) {
       this.ko.t--;
-      const kk = easeOut(clamp(this.ko.t / 26, 0, 1));
-      cx = lerp(cx, this.ko.x, kk * 0.5);
-      cy = lerp(cy, this.ko.y, kk * 0.5);
-      z *= 1 + kk * 0.2;
+      const kk = easeOut(clamp(this.ko.t / 20, 0, 1));
+      z *= 1 - kk * 0.07;                      // on recule à peine
     }
 
     /* cinématique finale : la caméra vient cadrer le vainqueur */
@@ -35826,15 +36993,80 @@ Object.assign(I18N.en, {
     if (this.shake > 0) { this.shake *= 0.86; if (this.shake < 0.4) this.shake = 0; }
   };
 
-  /* Le K.O. déclenche le coup de zoom. On se greffe sur `onKO` pour ne
-     pas toucher à la logique de match. */
+  /* Le K.O. arme le repère et le très bref élargissement. */
   if (typeof Match !== 'undefined' && Match.prototype.onKO) {
     const koOrig = Match.prototype.onKO;
     Match.prototype.onKO = function (f, killer, dir) {
       try {
-        this.cam.ko = { x: f.x, y: f.cy, t: 26 };
+        this.cam.ko = { t: 20 };
+        if (!this.koMarques) this.koMarques = [];
+        this.koMarques.push({ x: f.x, y: f.cy, dir, col: f.color, t: 0, vie: 62 });
+        if (this.koMarques.length > 4) this.koMarques.shift();
       } catch (e) {}
       return koOrig.call(this, f, killer, dir);
+    };
+  }
+
+  /* ============================================================
+     LE REPÈRE DE K.O.
+
+     Puisque la caméra ne va plus voir où l'adversaire est sorti, il
+     faut le dire autrement — sinon on entend le K.O. sans savoir qui,
+     ni de quel côté. Un jeton part de la position du combattant,
+     file vers le bord de l'écran dans la direction de l'éjection, et
+     s'y écrase en flèche. Toute l'information, aucun déplacement.
+     ============================================================ */
+  if (typeof Match !== 'undefined' && Match.prototype.draw) {
+    const drawOrig = Match.prototype.draw;
+    Match.prototype.draw = function (ctx) {
+      drawOrig.call(this, ctx);
+      const L = this.koMarques;
+      if (!L || !L.length) return;
+
+      ctx.save();
+      ctx.setTransform(RS, 0, 0, RS, 0, 0);
+      for (let i = L.length - 1; i >= 0; i--) {
+        const m = L[i];
+        m.t++;
+        if (m.t > m.vie) { L.splice(i, 1); continue; }
+        const k = m.t / m.vie;
+
+        /* position écran de départ, puis glissade vers le bord */
+        const z = this.cam.zoom;
+        const sx0 = VW / 2 + (m.x - this.cam.x) * z;
+        const sy0 = VH / 2 - 46 + (m.y - this.cam.y) * z;
+        let bx = sx0, by = sy0;
+        const marge = 54;
+        if (m.dir === 'left') bx = marge;
+        else if (m.dir === 'right') bx = VW - marge;
+        else if (m.dir === 'top') by = marge;
+        else by = VH - marge;
+        const e = easeOut(Math.min(1, k * 2.4));
+        const x = lerp(sx0, bx, e), y = lerp(sy0, by, e);
+        const a = k < 0.75 ? 1 : (1 - (k - 0.75) / 0.25);
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.globalAlpha = a;
+        /* la flèche pointe vers la sortie */
+        const ang = m.dir === 'left' ? Math.PI : m.dir === 'right' ? 0
+                  : m.dir === 'top' ? -Math.PI / 2 : Math.PI / 2;
+        ctx.rotate(ang);
+        ctx.globalCompositeOperation = 'lighter';
+        const g = ctx.createRadialGradient(0, 0, 2, 0, 0, 46);
+        g.addColorStop(0, rgba(m.col || '#ffd166', 0.85));
+        g.addColorStop(1, rgba(m.col || '#ffd166', 0));
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(0, 0, 46, 0, Math.PI * 2); ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = m.col || '#ffd166';
+        ctx.beginPath();
+        ctx.moveTo(24, 0); ctx.lineTo(-6, -15); ctx.lineTo(-1, 0); ctx.lineTo(-6, 15);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.restore();
+      }
+      ctx.restore();
     };
   }
 })();
@@ -36297,6 +37529,1945 @@ Object.assign(I18N.en, {
     if (this.arc) this.arc.length = 0;
     return dieOrig.call(this, dir);
   };
+})();
+
+
+/* ===== 49-son.js ===== */
+/* ============================================================
+   SMASH PÉI — LE SON DU COMBAT
+
+   Le moteur audio était correct mais il ne racontait presque rien :
+   trois sons d'impact pour tout le jeu, aucune différence entre un
+   coup de poing et un coup de masse, aucun bruit de pas, et pas la
+   moindre voix. Or dans Smash, la moitié de la sensation de frappe
+   passe par l'oreille — c'est ce qui distingue « une boîte de dégâts
+   a touché » de « ça a fait mal ».
+
+   Quatre ajouts, tous procéduraux (aucun fichier, le jeu reste un
+   seul HTML) :
+
+   1. DES IMPACTS PAR MATIÈRE. Le style d'arme du combattant décide
+      du timbre : une lame siffle et claque, une masse fait un boum
+      creux, des griffes déchirent, un poing fait un « pok » mat. Le
+      même coup ne sonne donc plus pareil selon qui le porte.
+
+   2. L'INTENSITÉ SUIT LES DÉGÂTS. Un coup à 3 % et un smash à 22 %
+      ne partagent plus le même échantillon : hauteur, longueur de
+      queue, présence de sub-basse, tout suit le chiffre réel.
+
+   3. DES VOIX. Chaque combattant a un timbre déduit de son poids et
+      de sa taille : un grognement court à l'effort, un cri en
+      encaissant, un râle en partant. C'est ce qui fait exister un
+      personnage.
+
+   4. LE DÉCOR SONORE. Pas de course, atterrissages selon le poids,
+      glissades, accroche au rebord, souffle d'éjection, blast de
+      K.O. et réaction de foule.
+
+   Tout passe par un enrobage de `Audio2.play` : les noms inconnus
+   retombent sur l'ancien moteur, rien n'est cassé.
+   ============================================================ */
+(function son() {
+  if (typeof Audio2 === 'undefined' || typeof Audio2.play !== 'function') return;
+  const A = Audio2;
+  const origPlay = A.play.bind(A);
+
+  const T = () => A.ctx ? A.ctx.currentTime : 0;
+
+  /* ---------- 1) les matières ----------
+     f  : fréquence du corps du son
+     br : brillance (part de bruit aigu)
+     q  : longueur de la queue
+     sub: présence de sub-basse */
+  const MATIERE = {
+    poings:  { f: 190, br: 0.55, q: 0.9,  sub: 0.9,  type: 'triangle' },
+    sabre:   { f: 620, br: 1.25, q: 1.25, sub: 0.45, type: 'sawtooth' },
+    masse:   { f: 110, br: 0.35, q: 1.5,  sub: 1.35, type: 'sine' },
+    fouet:   { f: 880, br: 1.4,  q: 0.7,  sub: 0.3,  type: 'square' },
+    griffes: { f: 1150, br: 1.5, q: 0.6,  sub: 0.25, type: 'sawtooth' },
+    souffle: { f: 300, br: 1.1,  q: 1.3,  sub: 0.6,  type: 'sine' },
+    roche:   { f: 145, br: 0.5,  q: 1.4,  sub: 1.2,  type: 'triangle' },
+    vif:     { f: 480, br: 1.0,  q: 0.75, sub: 0.5,  type: 'triangle' }
+  };
+  const DEFAUT = MATIERE.poings;
+
+  /* ---------- 2) la voix d'un combattant ----------
+     On ne stocke rien dans le personnage : le timbre se déduit de ses
+     chiffres, donc il est toujours le même, pour tout le monde. */
+  function voix(f) {
+    const st = (f && f.char && f.char.stats) || {};
+    const poids = st.weight || 100;
+    const taille = st.size || 1;
+    /* un colosse parle grave, un menu parle aigu */
+    const base = 300 * Math.pow(100 / poids, 0.75) / Math.pow(taille, 0.6);
+    return clamp(base, 90, 620);
+  }
+
+  /* Un grognement : deux harmoniques et un souffle, très court. */
+  function grogne(fBase, dur, gain, pan, monte) {
+    const t = T();
+    A.tone({ type: 'sawtooth', f0: fBase * (monte ? 0.86 : 1.1), f1: fBase * (monte ? 1.25 : 0.72),
+             dur, gain: gain * 0.5, pan, t });
+    A.tone({ type: 'triangle', f0: fBase * 2.02, f1: fBase * (monte ? 2.5 : 1.4),
+             dur: dur * 0.8, gain: gain * 0.26, pan, t });
+    A.noise({ t, dur: dur * 0.7, gain: gain * 0.16, type: 'bandpass', f0: fBase * 4, q: 1.6, pan });
+  }
+
+  /* ---------- l'aiguillage ---------- */
+  A.play = function (name, opt) {
+    opt = opt || {};
+    if (!this.ok || !this.ok()) return;
+    const t = T();
+    const pan = clamp(opt.pan || 0, -1, 1);
+    const p = opt.power !== undefined ? clamp(opt.power, 0, 1) : 0.5;
+    const M = MATIERE[opt.mat] || DEFAUT;
+
+    switch (name) {
+
+      /* ---- IMPACT PAR MATIÈRE ----
+         Trois couches, comme un vrai bruitage : le transitoire (le
+         claquement qui donne la netteté), le corps (ce qui donne la
+         masse) et la queue (ce qui donne la taille de la pièce). */
+      case 'impactMat': {
+        const f = M.f * (1 - p * 0.35);
+        /* transitoire */
+        this.noise({ t, dur: 0.018 + p * 0.012, gain: (0.22 + p * 0.3) * M.br,
+                     type: 'highpass', f0: 2600 + p * 3000, pan });
+        /* corps */
+        this.tone({ type: M.type, f0: f * (2.4 + p * 1.4), f1: f * 0.5,
+                    dur: (0.07 + p * 0.14) * M.q, gain: 0.26 + p * 0.3, pan, t });
+        /* queue */
+        this.noise({ t: t + 0.01, dur: (0.06 + p * 0.2) * M.q, gain: (0.14 + p * 0.26),
+                     type: 'lowpass', f0: 3200, f1: 240 + p * 200, pan });
+        /* sub : seulement quand ça cogne vraiment */
+        if (p > 0.32) this.tone({ type: 'sine', f0: 96 * M.sub, f1: 34,
+                                  dur: 0.16 + p * 0.26, gain: (0.16 + p * 0.34) * M.sub, pan, t });
+        return;
+      }
+
+      /* ---- LE COUP QUI TUE ----
+         Un smash décisif mérite son propre son : plus long, avec une
+         montée avant l'impact. */
+      case 'impactFort': {
+        this.tone({ type: 'sine', f0: 150, f1: 28, dur: 0.62, gain: 0.6, pan, t });
+        this.noise({ t, dur: 0.4, gain: 0.5, type: 'lowpass', f0: 5200, f1: 180, pan });
+        this.tone({ type: M.type, f0: M.f * 3.2, f1: M.f * 0.4, dur: 0.3, gain: 0.28, pan, t });
+        this.tone({ type: 'sawtooth', f0: 70, f1: 220, dur: 0.09, gain: 0.2, pan, t: t - 0.02 });
+        return;
+      }
+
+      /* ---- VOIX ---- */
+      case 'voixEffort': grogne(opt.f || 300, 0.13, 0.2, pan, false); return;
+      case 'voixTouche': grogne((opt.f || 300) * 1.18, 0.2, 0.3, pan, true); return;
+      case 'voixKo': {
+        const f0 = (opt.f || 300) * 1.1;
+        grogne(f0, 0.5, 0.34, pan, true);
+        this.tone({ type: 'triangle', f0: f0 * 2, f1: f0 * 4.2, dur: 0.6, gain: 0.12, pan, t });
+        return;
+      }
+
+      /* ---- PAS ET APPUIS ---- */
+      case 'pas':
+        this.noise({ t, dur: 0.045, gain: 0.055 + p * 0.05, type: 'bandpass',
+                     f0: 900 + p * 700, q: 1.2, pan });
+        this.tone({ type: 'sine', f0: 130, f1: 70, dur: 0.05, gain: 0.05, pan, t });
+        return;
+      case 'atterrit':
+        this.noise({ t, dur: 0.1 + p * 0.14, gain: 0.14 + p * 0.3, type: 'lowpass',
+                     f0: 1400, f1: 150, pan });
+        this.tone({ type: 'sine', f0: 130 - p * 45, f1: 46, dur: 0.14 + p * 0.2,
+                    gain: 0.16 + p * 0.34, pan, t });
+        return;
+      case 'derape':
+        this.noise({ t, dur: 0.22, gain: 0.13, type: 'bandpass', f0: 2200, f1: 600, q: 2.4, pan });
+        return;
+      case 'rebord':
+        this.tone({ type: 'triangle', f0: 520, f1: 300, dur: 0.09, gain: 0.13, pan, t });
+        this.noise({ t, dur: 0.08, gain: 0.1, type: 'bandpass', f0: 1600, q: 3, pan });
+        return;
+
+      /* ---- ÉJECTION ET K.O. ---- */
+      case 'ejection':
+        this.noise({ t, dur: 0.42, gain: 0.2 + p * 0.2, type: 'bandpass',
+                     f0: 260, f1: 1800, q: 0.8, pan });
+        return;
+      case 'blastKo':
+        /* le mur invisible qu'on traverse : une détonation sourde puis
+           un sifflement qui s'éloigne */
+        this.tone({ type: 'sine', f0: 180, f1: 24, dur: 0.9, gain: 0.62, pan, t });
+        this.noise({ t, dur: 0.7, gain: 0.5, type: 'lowpass', f0: 6000, f1: 120, pan });
+        this.tone({ type: 'triangle', f0: 1600, f1: 90, dur: 0.55, gain: 0.16, pan, t: t + 0.04 });
+        return;
+      case 'foule': {
+        /* une réaction de foule : du bruit filtré qui enfle et retombe */
+        this.noise({ t, dur: 1.1, gain: 0.15 + p * 0.14, type: 'bandpass', f0: 700, f1: 1500, q: 0.6 });
+        this.noise({ t: t + 0.06, dur: 0.9, gain: 0.1, type: 'bandpass', f0: 1800, f1: 500, q: 0.7 });
+        return;
+      }
+
+      /* ---- LE BOUCLIER ----
+         Un bouclier n'encaisse pas comme un corps : il ne claque pas,
+         il ABSORBE. D'où une attaque molle, un corps très filtré et une
+         petite résonance qui tremble — la bulle qui vibre. */
+      case 'shieldHit': {
+        this.noise({ t, dur: 0.03, gain: 0.16 + p * 0.14, type: 'bandpass',
+                     f0: 900 + p * 700, q: 1.1, pan });
+        this.tone({ type: 'sine', f0: 220 + p * 90, f1: 74,
+                    dur: 0.16 + p * 0.12, gain: 0.24 + p * 0.2, pan, t });
+        /* la vibration de la bulle : deux battements rapprochés */
+        this.tone({ type: 'triangle', f0: 640, f1: 470, dur: 0.13, gain: 0.1, pan, t: t + 0.015 });
+        this.tone({ type: 'triangle', f0: 470, f1: 620, dur: 0.11, gain: 0.07, pan, t: t + 0.06 });
+        return;
+      }
+
+      default:
+        return origPlay(name, opt);
+    }
+  };
+
+  /* ============================================================
+     LE BRANCHEMENT SUR LE JEU
+     ============================================================ */
+  if (typeof Fighter === 'undefined' || !Fighter.prototype) return;
+
+  /* --- la matière d'un combattant : son style d'arme --- */
+  function matDe(f) {
+    const s = f && f.char && (f.char.style || f.char.styleId);
+    if (s && MATIERE[s]) return s;
+    /* à défaut, on déduit de l'archétype */
+    const a = f && f.char && f.char.arch;
+    return a === 'heavy' ? 'masse' : a === 'swordie' ? 'sabre'
+         : a === 'rushdown' ? 'vif' : a === 'zoner' ? 'souffle' : 'poings';
+  }
+
+  /* Les anciens sons génériques font double emploi avec les nouveaux :
+     on les met en sourdine le temps de l'appel d'origine, sinon chaque
+     coup se joue deux fois et le mixage devient une bouillie. */
+  let muets = null;
+  const jouer = A.play.bind(A);
+  /* Compteur des sons RÉELLEMENT émis. Un compteur posé au-dessus de
+     cette fonction compterait aussi les sons mis en sourdine, et ferait
+     croire à des doublons qui n'existent pas : celui-ci est le seul
+     endroit honnête où mesurer. */
+  A._joues = Object.create(null);
+  A.play = function (name, opt) {
+    if (muets && muets[name]) return;
+    A._joues[name] = (A._joues[name] || 0) + 1;
+    return jouer(name, opt);
+  };
+  function sansDoublon(liste, fn) {
+    const av = muets;
+    muets = liste;
+    try { return fn(); } finally { muets = av; }
+  }
+
+  /* --- 1) chaque coup encaissé sonne selon qui frappe et combien --- */
+  const MUETS_COUP = { hit: 1, hitLight: 1, smashHit: 1 };
+  const takeOrig = Fighter.prototype.takeHit;
+  Fighter.prototype.takeHit = function (src, h, dir, hitPos) {
+    const avant = this.dmgTaken;
+    const r = sansDoublon(MUETS_COUP, () => takeOrig.call(this, src, h, dir, hitPos));
+    if (!r) return r;
+    const d = this.dmgTaken - avant;
+    if (d <= 0) return r;
+    const p = clamp(d / 24, 0, 1);
+    const mat = matDe(src && src.id ? src : this);
+    try {
+      A.play(p > 0.66 ? 'impactFort' : 'impactMat', { pan: this.sfxPan, power: p, mat });
+      /* la voix : on ne crie pas pour une pichenette */
+      if (d >= 4) A.play('voixTouche', { pan: this.sfxPan, f: voix(this) });
+      /* le souffle de l'éjection, quand ça part vraiment */
+      if (this.kbSpeed > 9) A.play('ejection', { pan: this.sfxPan, power: clamp(this.kbSpeed / 26, 0, 1) });
+    } catch (e) {}
+    return r;
+  };
+
+  /* --- 2) l'effort : on grogne en lançant un gros coup --- */
+  const startOrig = Fighter.prototype.startMove;
+  const LOURDS = { fsmash: 1, usmash: 1, dsmash: 1, dashAtk: 1, grab: 1 };
+  Fighter.prototype.startMove = function (key) {
+    const r = startOrig.call(this, key);
+    if (LOURDS[key] && this.move) {
+      try { A.play('voixEffort', { pan: this.sfxPan, f: voix(this) }); } catch (e) {}
+    }
+    return r;
+  };
+
+  /* --- 3) le décor sonore : pas, atterrissages, rebord --- */
+  const MUETS_SOL = { land: 1 };
+  const upOrig = Fighter.prototype.update;
+  Fighter.prototype.update = function () {
+    const solAvant = this.grounded;
+    const vyAvant = this.vy;
+    const etatAvant = this.state;
+    const r = sansDoublon(MUETS_SOL, () => upOrig.call(this));
+
+    try {
+      /* pas de course : cadencés sur la vitesse, pas sur l'horloge */
+      if (this.grounded && this.state === ST.RUN && Math.abs(this.vx) > 1.5) {
+        this._pasAcc = (this._pasAcc || 0) + Math.abs(this.vx);
+        const seuil = 46;
+        if (this._pasAcc > seuil) {
+          this._pasAcc = 0;
+          A.play('pas', { pan: this.sfxPan, power: clamp(Math.abs(this.vx) / 7, 0, 1) });
+          if (typeof FX !== 'undefined') FX.dust(this.x - sign(this.vx) * 10, this.y, 2, '#cfc6b4');
+        }
+      } else this._pasAcc = 0;
+
+      /* atterrissage : d'autant plus lourd qu'on tombait vite et qu'on pèse */
+      if (!solAvant && this.grounded && vyAvant > 3) {
+        const poids = ((this.char.stats && this.char.stats.weight) || 100) / 130;
+        const p = clamp((vyAvant / 17) * poids, 0.15, 1);
+        A.play('atterrit', { pan: this.sfxPan, power: p });
+        if (typeof FX !== 'undefined' && p > 0.45) {
+          FX.dust(this.x, this.y, 4 + Math.round(p * 6), '#d8d0bc');
+          FX.ring(this.x, this.y, 20 + p * 40, '#ffffff', 14, 4, 2.2, 0.25);
+        }
+      }
+
+      /* accroche au rebord */
+      if (etatAvant !== ST.LEDGE && this.state === ST.LEDGE)
+        A.play('rebord', { pan: this.sfxPan });
+    } catch (e) {}
+    return r;
+  };
+
+  /* --- 3bis) la prise : les coups portés dans la saisie ---
+     Ils passaient par le petit « hitLight » générique, le même pour
+     tout le monde. Un coup de coude d'un colosse et une griffure ne
+     peuvent pas faire le même bruit : on les fait sonner à la matière
+     de celui qui tient, et la victime souffle. */
+  const MUETS_PRISE = { hitLight: 1 };
+  if (typeof Fighter.prototype.startThrowMove === 'function') {
+    const pumOrig = Fighter.prototype.startThrowMove;
+    Fighter.prototype.startThrowMove = function (k) {
+      const r = sansDoublon(MUETS_PRISE, () => pumOrig.call(this, k));
+      const t = this.grabTarget;
+      try {
+        A.play('impactMat', { pan: this.sfxPan, power: 0.34, mat: matDe(this) });
+        if (t) A.play('voixTouche', { pan: t.sfxPan, f: voix(t) });
+      } catch (e) {}
+      return r;
+    };
+  }
+
+  /* --- 4) le K.O. : détonation, voix, foule --- */
+  const dieOrig = Fighter.prototype.die;
+  Fighter.prototype.die = function (dir) {
+    try {
+      A.play('voixKo', { pan: this.sfxPan, f: voix(this) });
+      A.play('blastKo', { pan: this.sfxPan });
+      A.play('foule', { power: 0.6 });
+    } catch (e) {}
+    return dieOrig.call(this, dir);
+  };
+})();
+
+
+/* ===== 50-impact.js ===== */
+/* ============================================================
+   SMASH PÉI — LA MATIÈRE DES COUPS
+
+   Dans Smash Bros, un coup qui touche n'est pas un événement de
+   moteur, c'est un petit spectacle de trois images : l'écran se fige
+   une fraction de seconde, les deux corps tremblent l'un contre
+   l'autre, une étoile blanche s'ouvre au point de contact, et une
+   onde plate part dans la direction où la victime va être envoyée.
+
+   Rien de tout cela n'est du décor. Chacun de ces signaux dit
+   quelque chose au joueur :
+     · la durée du tremblement dit la puissance du coup ;
+     · l'orientation de l'onde dit vers OÙ on part ;
+     · la traînée derrière un corps éjecté dit à quelle vitesse ;
+     · la poussière au sol dit qu'on glisse encore.
+
+   Tout est composé à partir des particules qui existent déjà, et
+   le reste est dessiné à la main dans l'enveloppe de `draw` : on
+   n'ajoute aucune passe de rendu, aucun calque hors-écran. Le coût
+   mesuré tient dans le bruit de fond du profileur.
+   ============================================================ */
+(function impacts() {
+  if (typeof Fighter === 'undefined' || !Fighter.prototype || typeof FX === 'undefined') return;
+
+  /* ------------------------------------------------------------
+     1) L'IMPACT COMPOSÉ
+     Un seul point d'entrée, appelé au moment exact où les dégâts
+     sont comptés, pour que l'image et le chiffre soient d'accord.
+     ------------------------------------------------------------ */
+  FX.frappe = function (x, y, ang, p, col, sol) {
+    p = clamp(p, 0, 1);
+    const c = col || '#ffd166';
+    const ca = Math.cos(ang), sa = Math.sin(ang);
+
+    /* L'étoile blanche : le repère de contact. Orientée sur l'angle
+       d'éjection pour que l'œil parte déjà dans le bon sens. */
+    this.spark4(x, y, 18 + p * 38, c, 8 + Math.round(p * 8), ang);
+
+    /* L'onde : un anneau ÉCRASÉ perpendiculairement à l'angle. Un
+       anneau rond ne dit rien ; un anneau plat dit une direction. */
+    this.ring(x, y, 26 + p * 44, '#ffffff', 12 + Math.round(p * 8),
+              4 + p * 5, 2.2 + p * 1.4, 0.3, ang + Math.PI / 2);
+
+    /* Les éclats : projetés dans un cône autour de l'angle, plus
+       serré quand le coup est fort — un smash concentre, une
+       pichenette éparpille. */
+    const n = 4 + Math.round(p * 9);
+    const cone = 1.25 - p * 0.65;
+    for (let i = 0; i < n; i++) {
+      const a = ang + rnd(-cone, cone), v = rnd(4, 8) + p * 9;
+      this.streak(x, y, Math.cos(a) * v, Math.sin(a) * v,
+                  i % 3 ? '#ffffff' : c, rndi(9, 19), 3 + p * 3);
+    }
+
+    /* Au-delà d'un certain seuil, le coup DÉPLACE de l'air : une
+       bavure lumineuse en travers, et de la fumée. */
+    if (p > 0.42) {
+      this.slash(x, y, ang + Math.PI / 2, 40 + p * 60, c, 10);
+      this.smoke(x, y, 1 + Math.round(p * 3), '#9a9086');
+    }
+    if (p > 0.62) this.burst(x, y, 22 + p * 26, '#fff6d8', 12);
+
+    /* Les débris : si la victime touche le sol, le sol en prend un
+       coup lui aussi. Des éclats sombres, lourds, qui retombent. */
+    if (sol && p > 0.4) {
+      for (let i = 0; i < 3 + Math.round(p * 5); i++)
+        this.spark(x + rnd(-16, 16), sol, rnd(-5, 5), rnd(-9, -3) - p * 4,
+                   pick(['#6b5f52', '#8a7c6b', '#4a423a']), rndi(20, 38), rnd(2, 4.5));
+      this.dust(x, sol, 3 + Math.round(p * 6), '#cdc3b2');
+    }
+  };
+
+  /* ------------------------------------------------------------
+     2) LE BRANCHEMENT SUR LE COUP ENCAISSÉ
+     ------------------------------------------------------------ */
+  const takeOrig = Fighter.prototype.takeHit;
+  Fighter.prototype.takeHit = function (src, h, dir, hitPos) {
+    const avant = this.dmgTaken;
+    const r = takeOrig.call(this, src, h, dir, hitPos);
+    if (!r) return r;
+    const d = this.dmgTaken - avant;
+    if (d <= 0) return r;
+
+    const p = clamp(d / 22, 0, 1);
+    /* L'angle réel d'éjection : celui du moteur, pas une invention.
+       Les degrés du hitbox sont comptés vers le haut, l'écran vers
+       le bas — d'où le signe. */
+    const deg = (h && h.ang !== undefined) ? h.ang : 45;
+    const sens = (dir !== undefined ? dir : 1);
+    const ang = Math.atan2(-Math.sin(deg * Math.PI / 180),
+                            Math.cos(deg * Math.PI / 180) * (sens < 0 ? -1 : 1));
+
+    const x = hitPos && hitPos.x !== undefined ? hitPos.x : this.cx;
+    const y = hitPos && hitPos.y !== undefined ? hitPos.y : this.cy;
+    const col = (src && src.color) || this.color || '#ffd166';
+    const sol = this.grounded ? this.y : 0;
+    try { FX.frappe(x, y, ang, p, col, sol); } catch (e) {}
+
+    /* La mémoire du choc : elle sert au tremblement et au halo
+       pendant les images de gel, puis s'éteint toute seule. */
+    this._choc = p;
+    this._chocAng = ang;
+
+    /* Le coup de zoom. Il ne DÉPLACE pas la caméra — c'est la
+       consigne : on ne quitte jamais le combat des yeux. Il ne fait
+       que resserrer un instant, ce qui suffit à faire peser le coup. */
+    if (p > 0.45 && this.M && this.M.cam) {
+      const cam = this.M.cam;
+      cam.punch = Math.max(cam.punch || 0, (p - 0.45) * 0.9);
+      if (typeof this.M.shake === 'function') this.M.shake(1.5 + p * 5);
+    }
+    return r;
+  };
+
+  /* ------------------------------------------------------------
+     3) LE SILLAGE ET LE FROTTEMENT
+     ------------------------------------------------------------ */
+  const upOrig = Fighter.prototype.update;
+  Fighter.prototype.update = function () {
+    const r = upOrig.call(this);
+    if (!this.sillage) this.sillage = [];
+    const S = this.sillage;
+
+    try {
+      const vite = (this.kbSpeed || 0) > 7 && this.state !== ST.DEAD;
+      if (vite) {
+        S.push({ x: this.x, y: this.cy, a: 1 });
+        if (S.length > 7) S.shift();
+        /* les lignes de vitesse : rares, dans l'axe du vol */
+        if (S.length > 2 && (this.M ? this.M.frame : 0) % 2 === 0) {
+          const a = Math.atan2(this.vy, this.vx);
+          FX.streak(this.x - Math.cos(a) * 26, this.cy - Math.sin(a) * 26,
+                    -Math.cos(a) * 7, -Math.sin(a) * 7,
+                    this.color || '#ffffff', rndi(6, 12), 3);
+        }
+      } else if (S.length) S.shift();
+      for (const s of S) s.a *= 0.84;
+
+      /* Le frottement au sol : quand un corps éjecté rase le sol, il
+         laboure. C'est le signal qui manque le plus dans les jeux qui
+         copient Smash sans le regarder. */
+      if (this.grounded && Math.abs(this.vx) > 4.5 &&
+          (this.state === ST.HITSTUN || this.state === ST.TUMBLE)) {
+        this._raclAcc = (this._raclAcc || 0) + Math.abs(this.vx);
+        if (this._raclAcc > 22) {
+          this._raclAcc = 0;
+          FX.dust(this.x - sign(this.vx) * 12, this.y, 2, '#cfc5b3');
+          FX.spark(this.x - sign(this.vx) * 14, this.y - 2,
+                   -sign(this.vx) * rnd(1, 3), rnd(-3, -1), '#ffd9a0', rndi(8, 14), rnd(1.5, 3));
+        }
+      } else this._raclAcc = 0;
+
+      /* Le choc s'estompe dès que le gel est fini. */
+      if (this._choc && this.hitlag <= 0) {
+        this._choc *= 0.78;
+        if (this._choc < 0.02) this._choc = 0;
+      }
+    } catch (e) {}
+    return r;
+  };
+
+  /* ------------------------------------------------------------
+     4) LE DESSIN : tremblement, halo, sillage
+     ------------------------------------------------------------ */
+  const drawOrig = Fighter.prototype.draw;
+  Fighter.prototype.draw = function (ctx) {
+    const S = this.sillage;
+
+    /* Le sillage, d'abord, DERRIÈRE le corps : des capsules qui
+       s'effacent, dans la couleur du combattant. On ne redessine
+       jamais le squelette — ce serait sept fois le prix du corps
+       pour un gain que l'œil ne verrait pas à cette vitesse. */
+    if (S && S.length > 1 && this.state !== ST.DEAD) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const col = this.color || '#ffd166';
+      const demiL = (this.h || 90) * 0.32, demil = (this.w || 46) * 0.42;
+      for (let i = 0; i < S.length - 1; i++) {
+        const s = S[i], k = (i + 1) / S.length;
+        ctx.globalAlpha = s.a * k * 0.3;
+        ctx.fillStyle = col;
+        ctx.beginPath();
+        ctx.ellipse(s.x, s.y, demil * (0.5 + k * 0.5), demiL * (0.5 + k * 0.5), 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    /* Le tremblement du gel : les deux corps vibrent l'un contre
+       l'autre pendant les images d'arrêt. C'est minuscule — quatre
+       pixels — et c'est ce qui fait que le coup a l'air d'avoir
+       heurté quelque chose de dur. */
+    const gel = this.hitlag > 0 && this._choc > 0;
+    let dx = 0;
+    if (gel) {
+      dx = Math.sin(this.hitlag * 2.7) * (1.4 + this._choc * 4.4);
+      ctx.save();
+      ctx.translate(dx, 0);
+    }
+
+    const res = drawOrig.call(this, ctx);
+
+    if (gel) ctx.restore();
+
+    /* Le halo de contact : une lueur additive centrée sur le corps,
+       qui remplace le blanchiment du personnage. Un blanchiment
+       demanderait de redessiner tout le squelette une seconde fois ;
+       la lueur coûte un dégradé et se lit pareil. */
+    if (gel) {
+      const R = (this.h || 90) * (0.5 + this._choc * 0.4);
+      const g = ctx.createRadialGradient(this.cx + dx, this.cy, 0, this.cx + dx, this.cy, R);
+      const a = clamp(this._choc * 0.5, 0, 0.55);
+      g.addColorStop(0, rgba('#ffffff', a));
+      g.addColorStop(0.45, rgba('#fff0c0', a * 0.45));
+      g.addColorStop(1, rgba('#fff0c0', 0));
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(this.cx + dx, this.cy, R, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+    return res;
+  };
+
+  /* On repart à vide : sinon le sillage de la vie précédente
+     réapparaît au moment de la renaissance. */
+  const dieOrig = Fighter.prototype.die;
+  Fighter.prototype.die = function (dir) {
+    if (this.sillage) this.sillage.length = 0;
+    this._choc = 0;
+    return dieOrig.call(this, dir);
+  };
+})();
+
+
+/* ===== 51-signature.js ===== */
+/* ============================================================
+   SMASH PÉI — LA SIGNATURE DE CHAQUE COMBATTANT
+
+   Un audit du casting a montré le vrai défaut du jeu :
+     · 47 combattants sur 48 avaient EXACTEMENT la même remontée
+       (une poussée verticale, `special: 'up'`, seul le chiffre de
+       vitesse changeait) ;
+     · 36 sur 48 avaient un neutre qui lance un projectile droit.
+
+   Autrement dit : les chiffres étaient différents, les GESTES ne
+   l'étaient pas. Or ce qu'un joueur retient d'un personnage, ce
+   n'est pas sa vitesse de montée, c'est la FORME de son retour sur
+   scène et la FORME de son tir. C'est ce qui manquait.
+
+   Ce fichier ne touche pas aux chiffres d'équilibrage existants. Il
+   ajoute des MANIÈRES : huit remontées qui ne se ressemblent pas,
+   huit façons de tirer, trois façons de ruer. Chaque combattant en
+   reçoit une combinaison choisie selon son archétype et son style
+   d'arme, avec un quota pour qu'aucune manière ne devienne la
+   nouvelle norme.
+
+   Tout est branché en enveloppe autour du moteur existant : le
+   `special` d'origine reste en place (donc la remontée rend toujours
+   un saut, l'état d'impuissance fonctionne toujours), et le mode ne
+   fait que sculpter la trajectoire par-dessus.
+   ============================================================ */
+(function signatures() {
+  if (typeof Fighter === 'undefined' || typeof CHAR_LIST === 'undefined') return;
+
+  const emp = typeof empreinte === 'function'
+    ? empreinte
+    : (s) => { let h = 0; s = String(s); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; };
+
+  /* ============================================================
+     1) LES HUIT REMONTÉES
+     ============================================================ */
+  const REMONTEES = {
+    /* L'hélice : on monte moins haut mais on dérive énormément, en
+       coupant tout ce qui passe. La remontée des voltigeurs. */
+    vrille:  { pousse: 0.74, duree: 20, lift: 0.66, derive: 1.55, multi: 5, impuissant: true },
+    /* La fusée : un temps mort, puis un départ en diagonale très
+       long et totalement engagé. On va loin, on ne corrige rien. */
+    fusee:   { attente: 6, pousse: 1.42, avance: 10.5, impuissant: true },
+    /* Le rebond : on fait exploser le sol sous soi. La déflagration
+       frappe vers le bas — elle punit qui vient contester en dessous. */
+    rebond:  { pousse: 1.5, avance: 5.2, souffle: true, impuissant: true },
+    /* La foreuse : une montée lente mais qui se PROLONGE tant qu'on
+       tient le bouton, en accrochant l'adversaire dans la vis. */
+    foreuse: { pousse: 0.62, duree: 30, lift: 0.62, tenue: true, multi: 4, impuissant: true },
+    /* Le planeur : une petite pichenette verticale, puis un très long
+       vol plané horizontal. Catastrophique sous la scène, imbattable
+       pour revenir de loin sur le côté. */
+    planeur: { pousse: 0.86, planeApres: 12, planeVy: 0.55, avance: 9.2, impuissant: true },
+    /* La téléportation : deux images d'invulnérabilité puis on
+       réapparaît où le stick pointe. Imprévisible, mais aveugle. */
+    teleporte: { pousse: 0.2, saut: 12, dist: 300, impuissant: true },
+    /* Le grappin : on lance loin, et si un rebord est dans la portée
+       on s'y accroche net. Le retour le plus sûr — s'il y a un bord. */
+    grappin: { pousse: 1.0, avance: 8.5, portee: 210, impuissant: true },
+    /* Le double appel : deux petites poussées au lieu d'une grosse,
+       et on garde le contrôle à la fin. Faible, mais on peut enchaîner. */
+    saut:    { pousse: 0.76, second: 15, secondPousse: 0.72, impuissant: false }
+  };
+
+  /* ============================================================
+     2) LES HUIT MANIÈRES DE TIRER
+     ============================================================ */
+  const TIRS = {
+    eventail:  { n: 3, ecart: 0.30, dmg: 0.62 },   // en éventail, couvre l'espace
+    rafale:    { n: 3, echelon: 1.4, dmg: 0.58 },  // trois projectiles en file
+    cloche:    { grav: 0.40, vy: -7.4, vx: 0.86 }, // en cloche, par-dessus les gardes
+    rayon:     { vx: 2.1, taille: 0.5, vie: 0.6, dmg: 0.86 },   // fin et rapide, traverse
+    mine:      { vx: 0.32, grav: 0.55, sol: true, vie: 3.4, dmg: 1.18 }, // se pose et attend
+    vague:     { sol: true, grav: 0.9, vx: 1.15, taille: 0.78 }, // rase le sol
+    nuee:      { n: 4, ecart: 0.16, vx: 0.62, dmg: 0.5, suit: 0.035 }, // une nuée qui suit
+    boomerang: { retour: 30, vx: 1.5, dmg: 0.9 }  // part et revient
+  };
+
+  /* ============================================================
+     3) LES TROIS RUÉES
+     ============================================================ */
+  const RUEES = {
+    bond:    { vy: -9.5 },     // la ruée saute par-dessus les coups bas
+    toupie:  { multi: 6 },     // la ruée tourne et râpe pendant tout le trajet
+    droite:  {}                // la ruée franche, celle d'origine
+  };
+
+  /* ============================================================
+     4) LA RÉPARTITION
+     Elle n'est pas tirée au hasard : chaque archétype et chaque
+     style d'arme a un ORDRE DE GOÛT, et on sert dans cet ordre tant
+     qu'il reste de la place. Le quota garantit qu'aucune manière ne
+     dépasse le sixième du casting, sinon on aurait remplacé une
+     uniformité par une autre.
+     ============================================================ */
+  const GOUT_REMONTEE = {
+    aerial:   ['planeur', 'vrille', 'saut', 'teleporte'],
+    rushdown: ['vrille', 'teleporte', 'saut', 'foreuse'],
+    heavy:    ['fusee', 'rebond', 'foreuse', 'grappin'],
+    swordie:  ['foreuse', 'fusee', 'vrille', 'grappin'],
+    zoner:    ['grappin', 'teleporte', 'planeur', 'rebond'],
+    balanced: ['saut', 'rebond', 'grappin', 'fusee']
+  };
+  const GOUT_TIR = {
+    aerial:   ['nuee', 'eventail', 'boomerang', 'cloche'],
+    rushdown: ['rafale', 'rayon', 'nuee', 'boomerang'],
+    heavy:    ['cloche', 'mine', 'vague', 'rafale'],
+    swordie:  ['rayon', 'boomerang', 'vague', 'eventail'],
+    zoner:    ['mine', 'vague', 'eventail', 'rayon'],
+    balanced: ['boomerang', 'cloche', 'rafale', 'mine']
+  };
+  /* le style d'arme peut faire pencher la balance */
+  const STYLE_REMONTEE = {
+    fouet: 'grappin', griffes: 'vrille', masse: 'fusee', roche: 'rebond',
+    souffle: 'planeur', vif: 'teleporte', sabre: 'foreuse', poings: 'saut'
+  };
+  const STYLE_TIR = {
+    souffle: 'vague', fouet: 'boomerang', griffes: 'nuee', masse: 'cloche',
+    roche: 'mine', sabre: 'rayon', vif: 'rafale', poings: 'eventail'
+  };
+
+  function repartir(liste, clefs, gouts, parStyle, sel, quota) {
+    const compte = {};
+    for (const k of clefs) compte[k] = 0;
+    /* on sert dans un ordre stable mais brassé, pour que les premiers
+       personnages déclarés ne raflent pas systématiquement leur
+       premier choix */
+    const ordre = liste.slice().sort((a, b) => emp(a.id + sel) - emp(b.id + sel));
+    const res = {};
+    for (const c of ordre) {
+      const envies = [];
+      const st = c.style || c.styleId;
+      if (st && parStyle[st]) envies.push(parStyle[st]);
+      for (const k of (gouts[c.arch] || [])) if (!envies.includes(k)) envies.push(k);
+      /* en dernier recours, tout le reste, dans un ordre propre au perso */
+      for (const k of clefs.slice().sort((a, b) => emp(c.id + a + sel) - emp(c.id + b + sel)))
+        if (!envies.includes(k)) envies.push(k);
+      let choisi = envies.find(k => compte[k] < quota) || envies[0];
+      compte[choisi]++;
+      res[c.id] = choisi;
+    }
+    return res;
+  }
+
+  const clefsR = Object.keys(REMONTEES), clefsT = Object.keys(TIRS), clefsRu = Object.keys(RUEES);
+  const CH = CHAR_LIST;
+  const monteDe = repartir(CH, clefsR, GOUT_REMONTEE, STYLE_REMONTEE, '|monte', Math.ceil(CH.length / clefsR.length));
+  const tireurs = CH.filter(c => c.specials && c.specials.n &&
+                            (c.specials.n.special === 'proj' || c.specials.n.special === 'chargeShot'));
+  const tireDe = repartir(tireurs, clefsT, GOUT_TIR, STYLE_TIR, '|tire', Math.ceil(tireurs.length / clefsT.length));
+  const rueurs = CH.filter(c => c.specials && c.specials.s && c.specials.s.special === 'rush');
+  const rueDe = repartir(rueurs, clefsRu, {}, {}, '|ruee', Math.ceil(rueurs.length / clefsRu.length));
+
+  /* --- on marque les coups (le moteur lira `mode` en cours de partie) --- */
+  for (const c of CH) {
+    const S = c.specials || {};
+    /* Un cas isolé traînait depuis longtemps : une remontée écrite en
+       `teleport`, qui se déplace strictement à l'horizontale et ne
+       rend donc PAS le saut. Le personnage ne pouvait pas revenir sur
+       scène. On la reverse dans la téléportation-remontée, qui a la
+       même intention et qui, elle, remonte. */
+    if (S.u && S.u.special === 'teleport') {
+      S.u.special = 'up';
+      S.u.riseF = S.u.riseF || S.u.at || 8;
+      S.u.riseV = S.u.riseV || -12;
+      S.u.total = Math.max(S.u.total || 0, 40);
+      monteDe[c.id] = 'teleporte';
+    }
+    if (S.u && S.u.special === 'up') {
+      const m = monteDe[c.id];
+      S.u.mode = m;
+      const R = REMONTEES[m];
+      /* la seule donnée d'équilibrage qu'on touche : l'impuissance en
+         fin de remontée, parce qu'elle fait partie de la manière */
+      S.u.helpless = R.impuissant;
+      if (R.derive) S.u.driftMul = Math.max(S.u.driftMul || 0.7, R.derive * 0.72);
+      if (m === 'planeur' || m === 'foreuse') S.u.total = Math.max(S.u.total, 56);
+      if (m === 'saut') S.u.total = Math.max(S.u.total, 46);
+    }
+    if (tireDe[c.id] && S.n) S.n.tir = tireDe[c.id];
+    if (rueDe[c.id] && S.s) S.s.ruee = rueDe[c.id];
+    c.signature = { monte: monteDe[c.id], tir: tireDe[c.id] || null, ruee: rueDe[c.id] || null };
+  }
+
+  /* ============================================================
+     5) LE MOTEUR DES REMONTÉES
+     On agit APRÈS `updateMove`, une fois l'élan de base appliqué :
+     ainsi la poussée d'origine sert de socle et le mode la sculpte,
+     au lieu de se battre avec elle.
+     ============================================================ */
+  const majOrig = Fighter.prototype.updateMove;
+  Fighter.prototype.updateMove = function () {
+    const mv = this.move;
+    const r = majOrig.call(this);
+    if (!mv || this.move !== mv || mv.special !== 'up' || !mv.mode) return r;
+    const R = REMONTEES[mv.mode];
+    if (!R) return r;
+    const f0 = mv.riseF || 8, k = this.mf - f0;
+    try { MONTEES[mv.mode].call(this, mv, R, k); } catch (e) {}
+    return r;
+  };
+
+  /* Un petit coup qui accroche : commun à l'hélice et à la foreuse. */
+  function accroche(f, mv, dmg, ang, large) {
+    if (!f.M || !f.M.spawnHitbox) return;
+    f.M.spawnHitbox(f, {
+      x: f.x - large / 2, y: f.cy - 40, w: large, h: 84,
+      dmg, ang, bkb: 14, kbg: 30, life: 3, fx: 'ring',
+      color: f.color, id: 'sig' + f.mf
+    });
+  }
+
+  const MONTEES = {
+    vrille(mv, R, k) {
+      if (k === 0) { this.vy = mv.riseV * R.pousse; this.vx = this.facing * 3.4; }
+      if (k > 0 && k < R.duree) {
+        this.vy -= R.lift;                       // on se maintient en l'air
+        this.vx = clamp(this.vx * 0.97, -9, 9);
+        if (k % R.multi === 0) {
+          accroche(this, mv, 1.9, 366, 108);
+          FX.ring(this.cx, this.cy, 46, this.color, 10, 3, 1.5, 0.42, k * 0.4);
+        }
+      }
+      if (k === R.duree) {                       // la sortie de vis : un pop
+        accroche(this, mv, 4.2, 78, 116);
+        FX.ring(this.cx, this.cy, 62, '#ffffff', 14, 5, 2.0, 0.5);
+        Audio2.play('whooshBig', { pan: this.sfxPan });
+      }
+    },
+    fusee(mv, R, k) {
+      if (k === 0) { this.vy = -1.4; this.vx = 0; }      // le temps mort
+      if (k > 0 && k < R.attente) {
+        this.vy = -1.2; this.vx *= 0.5;
+        if (k === 1) { FX.smoke(this.x, this.y - 10, 3, '#b8b0a4'); Audio2.play('charge', { pan: this.sfxPan }); }
+      }
+      if (k === R.attente) {
+        this.vy = mv.riseV * R.pousse;
+        this.vx = this.facing * R.avance;
+        this.M.shake(4);
+        Audio2.play('whooshBig', { pan: this.sfxPan });
+        FX.ring(this.cx, this.y, 54, this.color, 16, 6, 2.2, 0.5);
+        accroche(this, mv, 8.5, 72, 100);
+      }
+      if (k > R.attente && k < R.attente + 16) {
+        FX.smoke(this.x - this.facing * 12, this.cy + 20, 1, '#a89c90');
+        FX.spark(this.x, this.cy + 22, rnd(-1.4, 1.4), rnd(1, 3), '#ffb648', 16, 4);
+      }
+    },
+    rebond(mv, R, k) {
+      if (k === 0) {
+        this.vy = mv.riseV * R.pousse; this.vx = this.facing * R.avance;
+        if (this.M && this.M.spawnHitbox)
+          this.M.spawnHitbox(this, {
+            x: this.x - 66, y: this.y - 14, w: 132, h: 78,
+            dmg: 11, ang: 274, bkb: 42, kbg: 62, life: 5, fx: 'fire',
+            color: this.color, id: 'souffle'
+          });
+        FX.burst(this.x, this.y, 46, '#ffb648', 18);
+        FX.dust(this.x, this.y, 12, '#c9bda8');
+        FX.ring(this.x, this.y, 70, '#ff8a3c', 18, 7, 2.4, 0.34);
+        Audio2.play('explode');
+        if (this.M) this.M.shake(8);
+      }
+    },
+    foreuse(mv, R, k) {
+      if (k === 0) { this.vy = mv.riseV * R.pousse; this.vx = this.facing * 1.8; }
+      if (k > 0 && k < R.duree) {
+        /* tant qu'on appuie, la vis continue de mordre — mais pas
+           plus longtemps que la durée du coup : pas de vol infini */
+        const tient = R.tenue && this.mf < mv.total - 10 && (
+          this.slot && this.slot.kind === 'cpu' ? k < R.duree * 0.7
+            : Input.down(this.slot.device, 'special'));
+        if (tient) this.vy -= R.lift;
+        this.vx = clamp(this.vx * 0.96 + this.facing * 0.18, -7, 7);
+        if (k % R.multi === 0) {
+          accroche(this, mv, 1.6, 88, 74);
+          FX.spark(this.cx + rnd(-16, 16), this.cy + rnd(10, 34), rnd(-1, 1), rnd(1, 3), this.color, 14, 4);
+        }
+      }
+      if (k === R.duree) accroche(this, mv, 5.5, 86, 88);
+    },
+    planeur(mv, R, k) {
+      if (k === 0) { this.vy = mv.riseV * R.pousse; this.vx = this.facing * 3; }
+      if (k >= R.planeApres) {
+        /* le vol plané : on n'a plus le droit de monter, mais on
+           tombe très lentement et on avance beaucoup */
+        this.vy = Math.min(Math.max(this.vy, -0.4), R.planeVy);
+        this.vx = this.facing * R.avance;
+        if (k % 6 === 0) FX.streak(this.x - this.facing * 26, this.cy, -this.facing * 4, 0.4, '#e8f6ff', 12, 3);
+      }
+    },
+    teleporte(mv, R, k) {
+      if (k === 0) { this.vy = mv.riseV * R.pousse; this.vx = 0; }
+      if (k > 0 && k < R.saut) {
+        this.vy *= 0.7; this.vx *= 0.7;
+        this.intangible = Math.max(this.intangible || 0, 3);
+        if (k === 1) {
+          FX.burst(this.cx, this.cy, 44, this.color, 16);
+          Audio2.play('dodge', { pan: this.sfxPan });
+        }
+      }
+      if (k === R.saut) {
+        /* on va où le stick pointe ; à défaut, en haut devant */
+        const inp = this.readInput();
+        let ax = inp.ax, ay = inp.ay;
+        if (Math.abs(ax) < 0.3 && Math.abs(ay) < 0.3) ax = this.facing * 0.5;
+        /* On garde la liberté de viser, mais une remontée doit REMONTER :
+           sinon l'ordinateur, qui pointe toujours vers la scène, se
+           téléporte à l'horizontale et se noie sous le rebord. */
+        ay = Math.min(ay, -0.8);
+        const a = Math.atan2(ay, ax);
+        const B = this.M.stage.bounds;
+        this.x = clamp(this.x + Math.cos(a) * R.dist, B.left + 50, B.right - 50);
+        this.y = clamp(this.y + Math.sin(a) * R.dist, B.top + 90, B.bottom - 30);
+        this.vx = Math.cos(a) * 2.2; this.vy = Math.sin(a) * 1.4;
+        FX.burst(this.cx, this.cy, 46, this.color, 18);
+        for (let i = 0; i < 10; i++)
+          FX.streak(this.cx, this.cy, rnd(-7, 7), rnd(-7, 7), this.color, 18, 4);
+        Audio2.play('whoosh', { pan: this.sfxPan, power: 0.8 });
+      }
+    },
+    grappin(mv, R, k) {
+      if (k === 0) {
+        this.vy = mv.riseV * R.pousse; this.vx = this.facing * R.avance;
+        this._grappin = 22;                   // la portée d'accroche est élargie
+        Audio2.play('whoosh', { pan: this.sfxPan, power: 0.7 });
+      }
+      if (this._grappin > 0) {
+        this._grappin--;
+        /* le câble : un simple trait vers l'avant, qui dit la portée */
+        if (k % 2 === 0) FX.streak(this.cx + this.facing * 40, this.cy - 20,
+                                   this.facing * 5, -2.2, '#cfd8e2', 8, 2.5);
+      }
+      if (k > 2 && k < 20) this.vx = this.facing * R.avance * 0.9;
+    },
+    saut(mv, R, k) {
+      if (k === 0) { this.vy = mv.riseV * R.pousse; this.vx = this.facing * 2.6; }
+      if (k === R.second) {
+        this.vy = mv.riseV * R.secondPousse;
+        FX.ring(this.cx, this.y, 34, this.color, 14, 4, 1.8, 0.5);
+        Audio2.play('djump', { pan: this.sfxPan });
+      }
+      if (k > R.second) this.vx = clamp(this.vx, -6, 6);
+    }
+  };
+
+  /* Le grappin accroche de plus loin : on élargit la portée le temps
+     de son vol, plutôt que d'écrire une deuxième détection de rebord
+     qui ne se comporterait pas comme la vraie. */
+  if (typeof Match !== 'undefined' && Match.prototype.ledgeNear) {
+    const ledgeOrig = Match.prototype.ledgeNear;
+    Match.prototype.ledgeNear = function (f) {
+      if (!f || !f._grappin || f._grappin <= 0) return ledgeOrig.call(this, f);
+      const av = PHYS.ledgeGrabRange;
+      PHYS.ledgeGrabRange = av + 150;
+      try { return ledgeOrig.call(this, f); } finally { PHYS.ledgeGrabRange = av; }
+    };
+  }
+
+  /* ============================================================
+     6) LE MOTEUR DES TIRS
+     ============================================================ */
+  const feuOrig = Fighter.prototype.fireProjectile;
+  Fighter.prototype.fireProjectile = function (p, mv) {
+    const mode = mv && mv.tir;
+    if (!mode || !TIRS[mode] || !p) return feuOrig.call(this, p, mv);
+    const T = TIRS[mode];
+    const dir = this.facing;
+    const sx = this.x + dir * 42, sy = this.cy - 4;
+    const tir = (o) => this.M.spawnProjectile(this, Object.assign({}, p, { x: sx, y: sy }, o));
+
+    switch (mode) {
+      case 'eventail': {
+        const base = Math.atan2(p.vy || 0, p.vx);
+        const v = Math.hypot(p.vx, p.vy || 0);
+        for (let i = -1; i <= 1; i++) {
+          const a = base + i * T.ecart;
+          tir({ vx: dir * Math.cos(a) * v, vy: Math.sin(a) * v, dmg: p.dmg * T.dmg, dir });
+        }
+        break;
+      }
+      case 'rafale':
+        for (let i = 0; i < T.n; i++)
+          tir({ vx: dir * (p.vx + i * T.echelon), vy: (p.vy || 0) + (i - 1) * 0.5,
+                dmg: p.dmg * T.dmg, w: p.w * 0.8, h: p.h * 0.8, dir });
+        break;
+      case 'cloche':
+        tir({ vx: dir * p.vx * T.vx, vy: T.vy, grav: T.grav, bounce: Math.max(p.bounce || 0, 1), dir });
+        break;
+      case 'rayon':
+        tir({ vx: dir * p.vx * T.vx, vy: 0, w: p.w * T.taille, h: p.h * T.taille,
+              life: Math.round((p.life || 90) * T.vie), dmg: p.dmg * T.dmg, trail: true, dir });
+        break;
+      case 'mine':
+        tir({ vx: dir * p.vx * T.vx, vy: -2.4, grav: T.grav, ground: true,
+              life: Math.round((p.life || 90) * T.vie), dmg: p.dmg * T.dmg, dir });
+        break;
+      case 'vague':
+        tir({ vx: dir * p.vx * T.vx, vy: 2.6, grav: T.grav, ground: true,
+              w: p.w * T.taille, h: p.h * T.taille, dir });
+        break;
+      case 'nuee':
+        for (let i = 0; i < T.n; i++)
+          tir({ vx: dir * p.vx * T.vx, vy: (i - (T.n - 1) / 2) * 1.7,
+                w: p.w * 0.62, h: p.h * 0.62, dmg: p.dmg * T.dmg,
+                homing: T.suit, life: Math.round((p.life || 90) * 1.5), dir });
+        break;
+      case 'boomerang':
+        tir({ vx: dir * p.vx * T.vx, vy: 0, dmg: p.dmg * T.dmg, spin: true,
+              life: Math.round((p.life || 90) * 1.3), retourA: T.retour, retourDe: this, dir });
+        break;
+    }
+    Audio2.play(p.sfx || 'fire', { pan: this.sfxPan, power: 0.7 });
+    return true;
+  };
+
+  /* Le boomerang : il ralentit, s'arrête, puis rentre au bercail. Il
+     ne peut pas blesser deux fois la même cible à l'aller et au
+     retour sans qu'on remette sa liste à zéro — ce qui est fait au
+     demi-tour, sinon le retour serait inoffensif. */
+  if (typeof Projectile !== 'undefined') {
+    const projOrig = Projectile.prototype.update;
+    Projectile.prototype.update = function (M) {
+      if (this.retourA) {
+        if (this.age < this.retourA) this.vx *= 0.955;
+        else {
+          if (!this._demiTour) { this._demiTour = true; this.hitList = []; }
+          const o = this.retourDe;
+          if (o && !o.dead) {
+            const a = Math.atan2(o.cy - this.y, o.cx - this.x);
+            this.vx = lerp(this.vx, Math.cos(a) * 12, 0.16);
+            this.vy = lerp(this.vy, Math.sin(a) * 12, 0.16);
+            if (Math.hypot(o.cx - this.x, o.cy - this.y) < 40) { this.dead = true; return; }
+          }
+        }
+      }
+      return projOrig.call(this, M);
+    };
+  }
+
+  /* ============================================================
+     7) LE MOTEUR DES RUÉES
+     ============================================================ */
+  const RUEE_LOGIQUE = {
+    bond(mv, R, k) {
+      if (k === 0 && this.grounded) { this.vy = R.vy; this.grounded = false; FX.dust(this.x, this.y, 6); }
+    },
+    toupie(mv, R, k) {
+      if (k > 0 && k % R.multi === 0 && this.M && this.M.spawnHitbox) {
+        this.M.spawnHitbox(this, {
+          x: this.x - 52, y: this.cy - 38, w: 104, h: 78,
+          dmg: 1.8, ang: 366, bkb: 12, kbg: 26, life: 3, fx: 'ring',
+          color: this.color, id: 'ruee' + this.mf
+        });
+        FX.ring(this.cx, this.cy, 40, this.color, 8, 3, 1.4, 0.5, this.mf * 0.5);
+      }
+    },
+    droite() {}
+  };
+  const majRuee = Fighter.prototype.updateMove;
+  Fighter.prototype.updateMove = function () {
+    const mv = this.move;
+    const r = majRuee.call(this);
+    if (mv && this.move === mv && mv.special === 'rush' && mv.ruee && RUEE_LOGIQUE[mv.ruee]) {
+      const d = mv.moveX ? mv.moveX.s : 10;
+      if (this.mf >= d) { try { RUEE_LOGIQUE[mv.ruee].call(this, mv, RUEES[mv.ruee], this.mf - d); } catch (e) {} }
+    }
+    return r;
+  };
+
+  /* Le nom de la manière, pour la fiche technique. */
+  const NOMS = {
+    fr: { vrille: 'Hélice', fusee: 'Fusée', rebond: 'Déflagration', foreuse: 'Foreuse',
+          planeur: 'Vol plané', teleporte: 'Téléportation', grappin: 'Grappin', saut: 'Double appel',
+          eventail: 'Éventail', rafale: 'Rafale', cloche: 'Tir en cloche', rayon: 'Rayon',
+          mine: 'Mine', vague: 'Vague au sol', nuee: 'Nuée', boomerang: 'Boomerang',
+          bond: 'Ruée bondissante', toupie: 'Ruée toupie', droite: 'Ruée franche' },
+    cr: { vrille: 'Hélis', fusee: 'Fizé', rebond: 'Déflagrasion', foreuse: 'Forèz',
+          planeur: 'Volé plané', teleporte: 'Téléportasion', grappin: 'Grapin', saut: 'Doub apèl',
+          eventail: 'Évantay', rafale: 'Rafal', cloche: 'Tir an klos', rayon: 'Rayon',
+          mine: 'Min', vague: 'Vag atèr', nuee: 'Nyé', boomerang: 'Boumérang',
+          bond: 'Riyé ki sote', toupie: 'Riyé toupi', droite: 'Riyé drwat' },
+    en: { vrille: 'Spinner', fusee: 'Rocket', rebond: 'Blast-off', foreuse: 'Drill',
+          planeur: 'Glide', teleporte: 'Teleport', grappin: 'Grapple', saut: 'Double hop',
+          eventail: 'Fan shot', rafale: 'Burst', cloche: 'Lob', rayon: 'Beam',
+          mine: 'Mine', vague: 'Ground wave', nuee: 'Swarm', boomerang: 'Boomerang',
+          bond: 'Leaping rush', toupie: 'Spinning rush', droite: 'Straight rush' }
+  };
+  window.SIGNATURE_NOM = function (cle, lang) {
+    const t = NOMS[lang] || NOMS.fr;
+    return t[cle] || cle;
+  };
+})();
+
+/* ============================================================
+   LA SIGNATURE DANS LA FICHE TECHNIQUE
+
+   Une différence qu'on ne peut pas lire n'existe qu'à moitié. La
+   fiche affichait « Projectile » pour trente-six combattants ; elle
+   affiche maintenant la manière — Éventail, Rafale, Tir en cloche —
+   et une phrase qui dit ce que ça change en combat.
+   ============================================================ */
+(function ficheSignature() {
+  if (typeof UI === 'undefined' || typeof UI.dataSpecialKind !== 'function') return;
+
+  const EXPL = {
+    fr: {
+      vrille: 'monte peu mais dérive énormément, en fauchant autour de soi',
+      fusee: 'un temps mort, puis un départ en diagonale très long et sans correction',
+      rebond: 'une déflagration vers le bas qui punit ceux qui contestent en dessous',
+      foreuse: 'montée lente qui se prolonge tant qu\'on tient le bouton, et qui accroche',
+      planeur: 'petite poussée, puis un très long vol plané horizontal',
+      teleporte: 'quelques images intouchable, puis on réapparaît là où le stick pointe',
+      grappin: 'lancé long, et accroche au rebord de bien plus loin que la normale',
+      saut: 'deux petites poussées au lieu d\'une, et on garde le contrôle à la fin',
+      eventail: 'trois projectiles en éventail : couvre l\'espace plutôt que la ligne',
+      rafale: 'trois projectiles en file, de plus en plus rapides',
+      cloche: 'un tir en cloche qui passe par-dessus les gardes et rebondit',
+      rayon: 'fin, très rapide, très longue portée',
+      mine: 'se pose au sol et attend, longtemps',
+      vague: 'rase le sol et suit le relief',
+      nuee: 'quatre petits projectiles lents qui suivent légèrement la cible',
+      boomerang: 'part, ralentit, et revient frapper une seconde fois',
+      bond: 'la ruée saute par-dessus les coups bas',
+      toupie: 'la ruée tourne et râpe pendant tout le trajet',
+      droite: 'la ruée franche, tout droit'
+    }
+  };
+  EXPL.cr = EXPL.fr; EXPL.en = {
+    vrille: 'low rise, huge drift, hits all around',
+    fusee: 'a pause, then a very long committed diagonal',
+    rebond: 'a downward blast that punishes anyone contesting below',
+    foreuse: 'slow rise that holds as long as you hold the button, and drags opponents',
+    planeur: 'a short hop, then a very long horizontal glide',
+    teleporte: 'a few intangible frames, then you reappear where you aim',
+    grappin: 'thrown far, and grabs the ledge from much further than normal',
+    saut: 'two small pushes instead of one, and you keep control afterwards',
+    eventail: 'three projectiles in a fan: covers space rather than a line',
+    rafale: 'three projectiles in file, each faster than the last',
+    cloche: 'a lobbed shot that clears shields and bounces',
+    rayon: 'thin, very fast, very long range',
+    mine: 'settles on the ground and waits, for a long time',
+    vague: 'hugs the floor and follows the terrain',
+    nuee: 'four slow projectiles that track the target slightly',
+    boomerang: 'flies out, slows, and comes back for a second hit',
+    bond: 'the rush leaps over low attacks',
+    toupie: 'the rush spins and grinds the whole way',
+    droite: 'a straight, honest rush'
+  };
+
+  function cleDe(mv) { return mv && (mv.mode || mv.tir || mv.ruee) || null; }
+
+  const kindOrig = UI.dataSpecialKind;
+  UI.dataSpecialKind = function (mv) {
+    const k = cleDe(mv);
+    const base = kindOrig.call(this, mv);
+    if (!k || typeof SIGNATURE_NOM !== 'function') return base;
+    return SIGNATURE_NOM(k, this.lang) + ' · ' + base;
+  };
+
+  const propsOrig = UI.dataProps;
+  UI.dataProps = function (mv) {
+    const p = propsOrig.call(this, mv) || [];
+    const k = cleDe(mv);
+    if (!k) return p;
+    const tab = EXPL[this.lang] || EXPL.fr;
+    if (tab[k]) p.unshift([SIGNATURE_NOM(k, this.lang), tab[k]]);
+    return p;
+  };
+})();
+
+
+/* ===== 52-cadrage.js ===== */
+/* ============================================================
+   SMASH PÉI — ANTICIPATION, ACCOMPAGNEMENT, CADRAGE
+
+   Trois principes d'animation que Smash applique partout et que le
+   jeu n'avait pas :
+
+   1. L'ANTICIPATION. Avant de frapper, un corps recule et se tasse.
+      C'est ce qui prévient l'adversaire — et c'est ce qui rend un
+      smash lisible, donc esquivable, donc juste. Sans elle, le coup
+      « sort de nulle part » et le joueur a l'impression de subir.
+
+   2. L'ACCOMPAGNEMENT. Après l'impact, le corps continue sur sa
+      lancée avant de revenir. C'est ce qui donne du poids : un coup
+      qui s'arrête net a l'air de n'avoir rien touché.
+
+   3. L'ÉTIREMENT. Un corps envoyé à vingt pixels par image ne peut
+      pas rester un bonhomme bien droit. Il s'allonge dans l'axe du
+      vol et s'affine perpendiculairement — le volume se conserve,
+      l'œil suit la trajectoire au lieu de perdre le personnage.
+
+   Tout est fait par transformation du contexte autour du dessin
+   existant : aucune pose nouvelle à écrire, aucun surcoût mesurable,
+   et cela s'applique automatiquement aux quarante-huit combattants.
+
+   S'y ajoute le cadrage : une ouverture qui recule sur la scène au
+   début du match, et un plan final qui a le droit, LUI, d'aller
+   chercher le dernier K.O. — le combat est fini, il n'y a plus rien
+   à regarder ailleurs.
+   ============================================================ */
+(function cadrage() {
+  if (typeof Fighter === 'undefined' || !Fighter.prototype) return;
+
+  /* ------------------------------------------------------------
+     1) LE CORPS
+     ------------------------------------------------------------ */
+  /* Quels coups méritent de l'anticipation, et combien. Un jab n'en
+     a presque pas — sinon il cesse d'être rapide. */
+  const AMPLEUR = {
+    fsmash: 1, usmash: 0.9, dsmash: 0.9, dashAtk: 0.7, weapon: 0.8,
+    ftilt: 0.45, utilt: 0.42, dtilt: 0.4,
+    fair: 0.4, bair: 0.4, uair: 0.35, dair: 0.45, nair: 0.3,
+    jab1: 0.14, jab2: 0.14, jab3: 0.26
+  };
+
+  const dessin = Fighter.prototype.draw;
+  Fighter.prototype.draw = function (ctx) {
+    let pose = false;
+
+    /* --- l'étirement du vol --- */
+    const v = Math.hypot(this.vx, this.vy);
+    if ((this.kbSpeed || 0) > 8 && v > 9 && this.state !== ST.DEAD && this.hitlag <= 0) {
+      const s = clamp((v - 9) / 26, 0, 0.34);
+      const a = Math.atan2(this.vy, this.vx);
+      ctx.save(); pose = true;
+      ctx.translate(this.cx, this.cy);
+      ctx.rotate(a);
+      /* on conserve le volume : ce qu'on gagne en longueur, on le
+         perd en largeur. Sinon le personnage a l'air de grossir. */
+      ctx.scale(1 + s, 1 / (1 + s));
+      ctx.rotate(-a);
+      ctx.translate(-this.cx, -this.cy);
+    }
+
+    /* --- anticipation et accompagnement --- */
+    const mv = this.move, k = this.moveKey;
+    const amp = k && AMPLEUR[k];
+    if (amp && mv && mv.hits && mv.hits.length && !this.charging) {
+      const s0 = mv.hits[0].s, tot = mv.total || (s0 + 12);
+      let dx = 0, sy = 1, sx = 1;
+      if (this.mf < s0) {
+        /* on recule et on se tasse, de plus en plus près de l'impact */
+        const u = clamp(this.mf / Math.max(1, s0), 0, 1);
+        const e = u * u;                       // l'essentiel se joue à la fin
+        dx = -this.facing * 9 * amp * e;
+        sy = 1 - 0.085 * amp * e;
+        sx = 1 + 0.05 * amp * e;
+      } else {
+        /* on part devant, puis on revient : une seule oscillation
+           amortie, comme un corps qui se rattrape */
+        const u = clamp((this.mf - s0) / Math.max(1, tot - s0), 0, 1);
+        const d = Math.exp(-u * 3.2) * Math.cos(u * 5.4);
+        dx = this.facing * 11 * amp * d;
+        sy = 1 + 0.07 * amp * d;
+        sx = 1 - 0.04 * amp * d;
+      }
+      if (dx || sy !== 1) {
+        if (!pose) { ctx.save(); pose = true; }
+        ctx.translate(this.x + dx, this.y);   // on pivote autour des pieds
+        ctx.scale(sx, sy);
+        ctx.translate(-this.x, -this.y);
+      }
+    }
+
+    const r = dessin.call(this, ctx);
+    if (pose) ctx.restore();
+    return r;
+  };
+
+  /* ------------------------------------------------------------
+     2) LE CADRAGE
+     ------------------------------------------------------------ */
+  if (typeof Match === 'undefined' || !Match.prototype.update) return;
+
+  const majOrig = Match.prototype.update;
+  Match.prototype.update = function () {
+    const cam = this.cam;
+    /* Le zoom de la caméra est un ÉTAT qui se lisse d'une image à
+       l'autre. Un facteur appliqué par-dessus se multiplierait donc
+       par lui-même à chaque image et partirait à l'infini en une
+       seconde. On annule le facteur de l'image précédente avant de
+       laisser la caméra travailler, et on ne repose le nouveau
+       qu'après : le cadrage cinématique reste un vernis, jamais une
+       dérive. */
+    if (cam && cam._cine) cam.zoom /= cam._cine;
+    const r = majOrig.call(this);
+    if (!cam) return r;
+    let f = 1;
+    try {
+      /* --- l'ouverture : on entre sur la scène en reculant ---
+         Elle ne dure que le temps du décompte. */
+      if (this.intro > 0) {
+        const u = clamp(this.intro / 110, 0, 1);
+        f *= 1 + u * u * 0.42;
+      }
+
+      /* --- le plan final ---
+         Pendant le combat, la caméra ne quitte JAMAIS le groupe pour
+         aller voir un K.O. : on perdrait le combat de vue. Une fois
+         le match terminé, c'est l'inverse — il n'y a plus rien
+         d'autre à regarder, alors on va chercher le dernier coup et
+         on resserre lentement dessus. */
+      if (this.over) {
+        this._finT = (this._finT || 0) + 1;
+        const cible = this._finCible || (this._finCible = this.dernierKo || null);
+        if (cible) {
+          const u = clamp(this._finT / 46, 0, 1);
+          const e = 1 - Math.pow(1 - u, 3);
+          cam.x += (cible.x - cam.x) * 0.09 * e;
+          cam.y += (cible.y - cam.y) * 0.09 * e;
+          f *= 1 + e * 0.22;
+        }
+      }
+    } catch (e) {}
+    cam._cine = f;
+    cam.zoom *= f;
+    return r;
+  };
+
+  /* On note où le dernier K.O. a eu lieu — c'est la seule information
+     dont le plan final a besoin, et elle ne sert à rien d'autre. */
+  const mortOrig = Fighter.prototype.die;
+  Fighter.prototype.die = function (dir) {
+    if (this.M) this.M.dernierKo = { x: this.x, y: this.cy };
+    return mortOrig.call(this, dir);
+  };
+})();
+
+
+/* ===== 53-supers-tardifs.js ===== */
+/* ============================================================
+   SMASH PÉI — LES SUPERS DÉCLARÉS EN AVANCE
+
+   Les fichiers de personnages sont chargés AVANT `06-fighter.js` :
+   c'est obligatoire, puisque `03c-charfinal.js` construit les
+   movesets à partir d'eux. Mais un super, lui, est une mise en scène
+   écrite sur `Fighter.prototype.runSuper` — qui n'existe pas encore
+   à ce moment-là.
+
+   D'où cette file d'attente : chaque fichier de personnages y dépose
+   une fonction d'installation, et ce module — chargé bien après le
+   moteur — la vide dans l'ordre. Chaque enveloppe garde une
+   référence sur la précédente, si bien que les mises en scène
+   s'empilent proprement et que tout `kind` inconnu redescend
+   jusqu'au grand aiguillage d'origine.
+   ============================================================ */
+(function supersTardifs() {
+  const file = window.__SUPERS_TARDIFS;
+  if (!file || !file.length) return;
+  if (typeof Fighter === 'undefined' || !Fighter.prototype) return;
+  for (const installe of file) {
+    try { installe(); } catch (e) { console.warn('super tardif ignoré', e); }
+  }
+  file.length = 0;
+})();
+
+
+/* ===== 54-cretes.js ===== */
+/* ============================================================
+   SMASH PÉI — LA VRAIE CAUSE DES RALENTISSEMENTS
+
+   En cherchant pourquoi certaines arènes tombaient à quinze
+   millisecondes de dessin quand d'autres tenaient à une, la mesure
+   a désigné une seule ligne : les crêtes de montagne du fond.
+
+   `Paint.ridge` fait bien ce qu'il faut — il met la silhouette en
+   cache une fois pour toutes et se contente ensuite de la recopier.
+   Le problème est la TAILLE de ce cache. Une crête tracée sur huit
+   mille pixels de large et deux mille de haut fait seize millions de
+   pixels ; la recopier chaque image sous une transformation de
+   caméra fait basculer le rasteriseur sur un chemin lent, et ce seul
+   appel coûtait plus cher que tout le reste du jeu réuni.
+
+   Or une montagne de fond est une forme BASSE FRÉQUENCE : il n'y a
+   aucun détail fin à préserver. On la rend donc dans un cache réduit
+   — mille quatre cents pixels de large au maximum — et on la
+   ré-agrandit au moment de la poser. À l'œil, rien ne change : c'est
+   une silhouette floue à l'horizon, elle l'était déjà. À la mesure :
+
+     Plaine des Sables   15.0 ms → 1.0 ms
+     Grand Bénare         9.2 ms → 0.9 ms
+     Piton Maïdo          9.2 ms → 1.1 ms
+
+   Ce correctif ne touche à aucune arène en particulier : il répare
+   toutes celles qui ont des montagnes, y compris celles écrites il y
+   a longtemps.
+   ============================================================ */
+(function cretesLegeres() {
+  if (typeof Paint === 'undefined' || typeof Paint.ridge !== 'function') return;
+  if (typeof cachedDraw !== 'function' || typeof Paint._ridge !== 'function') return;
+
+  /* Largeur maximale du cache. Au-delà, on rend en réduit. La valeur
+     est choisie juste au-dessus de la largeur d'écran courante : une
+     crête n'est jamais plus détaillée que l'écran qui l'affiche. */
+  const LARGEUR_MAX = 1400;
+
+  const original = Paint.ridge.bind(Paint);
+
+  Paint.ridge = function (ctx, seed, x0, x1, baseY, amp, col, col2, steps = 48, snow) {
+    const larg = x1 - x0;
+    const ech = Math.min(1, LARGEUR_MAX / Math.max(1, larg));
+    /* Les petites crêtes ne gagnent rien à être réduites : on laisse
+       passer l'appel d'origine, au pixel près. */
+    if (!(ech < 0.999)) return original(ctx, seed, x0, x1, baseY, amp, col, col2, steps, snow);
+
+    const pad = 4;
+    const haut = baseY - amp * 1.2 - pad;
+    const bas = baseY + amp * 2 + pad;
+    const w = larg + pad * 2, h = bas - haut;
+
+    /* Clé distincte de celle du cache d'origine : les deux versions
+       peuvent coexister sans se marcher dessus. */
+    const cle = 'rq' + [seed, x0, x1, baseY, amp, col, col2, steps, !!snow].join('_');
+    const img = cachedDraw(cle, w * ech, h * ech, 0, 0, cc => {
+      /* On réduit d'abord, on recadre ensuite : le tracé lui-même est
+         inchangé, il est simplement exécuté dans un repère plus petit. */
+      cc.scale(ech, ech);
+      cc.translate(-(x0 - pad), -haut);
+      Paint._ridge(cc, seed, x0, x1, baseY, amp, col, col2, steps, snow);
+    });
+    ctx.drawImage(img, x0 - pad, haut, w, h);
+  };
+})();
+
+
+/* ===== 55-objets-cosmetiques.js ===== */
+/* ============================================================
+   SMASH PÉI — SIX OBJETS ET DOUZE PIÈCES DE PLUS
+
+   Deux constats guidaient cet ajout.
+
+   Côté OBJETS : la caisse contenait surtout des choses à lancer.
+   Or dans Smash, ce qui rend une partie mémorable, c'est la variété
+   des VERBES — soigner, poser, ralentir, échanger, se protéger — pas
+   la variété des projectiles. Les six objets ci-dessous font donc
+   six choses différentes, et un seul est un projectile classique.
+
+   Côté COSMÉTIQUES : le vestiaire manquait de pièces qui parlent
+   vraiment du pays. Les douze pièces ajoutées sont toutes tirées
+   d'objets réels — le chapeau tressé, la fleur de vanille, le châle
+   de Cilaos, le collier de coquillages — et toutes passent par le
+   système d'ajustement au gabarit, donc aucune ne se retrouvera
+   posée de travers sur une tête étroite ou large.
+
+   Ce fichier est chargé en dernier : il ne fait qu'ajouter, jamais
+   remplacer, et il sort proprement si l'une des tables qu'il vise
+   n'existe pas.
+   ============================================================ */
+
+/* ============================================================
+   1) LES OBJETS
+   ============================================================ */
+(function objets55() {
+  if (typeof ITEMS === 'undefined' || !ITEMS.defs || ITEMS.__nouveaux55) return;
+  ITEMS.__nouveaux55 = true;
+
+  /* --- les icônes, dessinées à la main ---
+     Repère centré, échelle 1 : environ 20 pixels de rayon utile. */
+  const ICONES = {
+    /* La bouteille de dodo : verre vert, étiquette claire */
+    dodobwar(ctx, col) {
+      ctx.fillStyle = '#2f6b3a';
+      ctx.beginPath(); ctx.roundRect(-7, -4, 14, 22, 4); ctx.fill();
+      ctx.fillRect(-3, -16, 6, 13);
+      ctx.fillStyle = '#d8c07a';
+      ctx.fillRect(-3, -18, 6, 4);
+      ctx.fillStyle = '#f2ead4';
+      ctx.fillRect(-7, 2, 14, 9);
+      ctx.fillStyle = '#8a2f2f';
+      ctx.fillRect(-5, 5, 10, 3);
+    },
+    /* La feuille de songe : une grande feuille en cœur */
+    songe(ctx, col) {
+      ctx.fillStyle = '#4f8f3e';
+      ctx.beginPath();
+      ctx.moveTo(0, 16);
+      ctx.bezierCurveTo(-20, 4, -16, -18, 0, -14);
+      ctx.bezierCurveTo(16, -18, 20, 4, 0, 16);
+      ctx.fill();
+      ctx.strokeStyle = '#2e5d24'; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(0, 14); ctx.lineTo(0, -11); ctx.stroke();
+      for (let i = 1; i <= 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(0, 12 - i * 7); ctx.lineTo(-9, 4 - i * 7); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, 12 - i * 7); ctx.lineTo(9, 4 - i * 7); ctx.stroke();
+      }
+    },
+    /* Le galet de rivière : lisse, gris-bleu, avec un reflet */
+    galet(ctx, col) {
+      ctx.fillStyle = '#6d7a84';
+      ctx.beginPath(); ctx.ellipse(0, 2, 17, 13, -0.2, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#8e9aa4';
+      ctx.beginPath(); ctx.ellipse(-4, -3, 8, 5, -0.3, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.5)';
+      ctx.beginPath(); ctx.ellipse(-6, -5, 4, 2, -0.3, 0, Math.PI * 2); ctx.fill();
+    },
+    /* Le vieux réveil : deux cloches et une aiguille */
+    reveil(ctx, col) {
+      ctx.fillStyle = '#c8562a';
+      for (const dx of [-11, 11]) { ctx.beginPath(); ctx.arc(dx, -12, 6, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = '#e07a3c';
+      ctx.beginPath(); ctx.arc(0, 2, 15, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fdf4dc';
+      ctx.beginPath(); ctx.arc(0, 2, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#33281a'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(0, 2); ctx.lineTo(0, -5); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, 2); ctx.lineTo(6, 4); ctx.stroke();
+    },
+    /* Le parasol de plage : quatre quartiers alternés */
+    parasol(ctx, col) {
+      const c1 = '#e04f4f', c2 = '#fdf4dc';
+      for (let i = 0; i < 6; i++) {
+        ctx.fillStyle = i % 2 ? c1 : c2;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, 18, Math.PI + i * Math.PI / 6, Math.PI + (i + 1) * Math.PI / 6);
+        ctx.closePath(); ctx.fill();
+      }
+      ctx.strokeStyle = '#8a5a2b'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 18); ctx.stroke();
+    },
+    /* Le bâton de vanille : deux gousses liées */
+    gousse(ctx, col) {
+      ctx.strokeStyle = '#3a2a18'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(-8, -15); ctx.quadraticCurveTo(-2, 0, -6, 16); ctx.stroke();
+      ctx.strokeStyle = '#4a3620';
+      ctx.beginPath(); ctx.moveTo(6, -16); ctx.quadraticCurveTo(2, 0, 8, 15); ctx.stroke();
+      ctx.strokeStyle = '#d8c07a'; ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.moveTo(-10, 2); ctx.lineTo(11, 1); ctx.stroke();
+    }
+  };
+
+  const iconeBase = ITEMS.drawIcon.bind(ITEMS);
+  ITEMS.drawIcon = function (ctx, d, x, y, s) {
+    const fn = ICONES[d.id];
+    if (fn) { ctx.save(); ctx.translate(x, y); ctx.scale(s, s); fn(ctx, d.color); ctx.restore(); return; }
+    return iconeBase(ctx, d, x, y, s);
+  };
+
+  ITEMS.defs.push(
+    /* --- LA FEUILLE DE SONGE : le seul objet DÉFENSIF du jeu.
+       Elle ne blesse personne, et elle n'empêche pas d'encaisser :
+       elle ANCRE. Pendant cinq secondes on part 40 % moins loin.
+       C'est différent de la marmite, qui ignore les petits coups :
+       ici les coups passent tous, mais aucun ne tue. Prendre une
+       feuille au lieu d'un piment, c'est choisir de tenir. */
+    { id: 'songe', nFR: 'Feuille de Songe', nEN: 'Taro Leaf', nCR: 'Fèy Song',
+      instant: true, weight: 7, color: '#4f8f3e',
+      apply(f) {
+        f.buffs = f.buffs || {};
+        f.buffs.ancre = Math.max(f.buffs.ancre || 0, 300);
+        try { Audio2.play('powerup', { pan: f.sfxPan, power: 0.7 }); } catch (e) {}
+        if (typeof FX !== 'undefined') {
+          FX.ring(f.cx, f.cy, 70, '#7fd06a', 24, 7, 1.9);
+          for (let i = 0; i < 12; i++)
+            FX.spark(f.cx + rnd(-26, 26), f.cy + rnd(-34, 34), rnd(-.6, .6), rnd(-2, -.4), '#7fd06a', 40, 5);
+        }
+      } },
+
+    /* --- LE GALET DE RIVIÈRE : lourd, sans effet spécial, mais il
+       REBONDIT trois fois. Sur une scène étroite il revient vous
+       chercher : c'est un objet qui punit celui qui le lance mal. */
+    { id: 'galet', nFR: 'Galet de rivière', nEN: 'River Pebble', nCR: 'Galé larivyèr',
+      weight: 10, color: '#6d7a84', throwable: true,
+      proj: { vx: 12, vy: -5, grav: 0.52, dmg: 13, ang: 46, bkb: 34, kbg: 72, w: 30, h: 26,
+              life: 150, kind: 'pot', color: '#6d7a84', sfx: 'hit', bounce: 3 } },
+
+    /* --- LE VIEUX RÉVEIL : il ne fait aucun dégât. Il RALENTIT tous
+       les adversaires pendant quatre secondes. C'est l'objet de
+       contrôle qui manquait : celui qui transforme une situation
+       plutôt qu'un pourcentage. */
+    { id: 'reveil', nFR: 'Vieux Réveil', nEN: 'Old Alarm Clock', nCR: 'Vyé Révèy',
+      instant: true, weight: 5, color: '#e07a3c',
+      apply(f) {
+        const M = f.M; if (!M) return;
+        for (const g of M.fighters) {
+          if (g === f || !g.alive) continue;
+          if (M.rules.teams && g.team === f.team) continue;
+          g.buffs = g.buffs || {};
+          g.buffs.glue = Math.max(g.buffs.glue || 0, 240);
+          if (typeof FX !== 'undefined') FX.ring(g.cx, g.cy, 60, '#e07a3c', 26, 6, 1.7);
+        }
+        try { Audio2.play('chargeTick', { pan: f.sfxPan, power: 1 }); } catch (e) {}
+        if (typeof M.ticker === 'function')
+          M.ticker(M.lang === 'en' ? 'TIME DRAGS' : 'LE TEMPS TRAÎNE', '#e07a3c');
+      } },
+
+    /* --- LE PARASOL : on le PLANTE. Il reste sur place et casse la
+       trajectoire de ce qui vient d'en haut. C'est le premier objet
+       de terrain du jeu : il change la géométrie, pas le score. */
+    { id: 'parasol', nFR: 'Parasol de plage', nEN: 'Beach Parasol', nCR: 'Parasol lo plaz',
+      instant: true, weight: 6, color: '#e04f4f',
+      apply(f) {
+        const M = f.M; if (!M || !M.spawnTrap) return;
+        M.spawnTrap(f, { kind: 'thorn', dmg: 7, radius: 78, life: 700, color: '#e04f4f' });
+        try { Audio2.play('itemDrop', { pan: f.sfxPan }); } catch (e) {}
+        if (typeof FX !== 'undefined') FX.dust(f.x, f.y, 8, '#e8d8c0');
+      } },
+
+    /* --- LA BOUTEILLE : elle SOIGNE, mais lentement, et elle ne se
+       lance pas. La prendre coûte du temps, donc de la position :
+       c'est un pari, pas un cadeau. */
+    { id: 'dodobwar', nFR: 'Bouteille fraîche', nEN: 'Cold Bottle', nCR: 'Boutèy fré',
+      instant: true, weight: 6, color: '#2f6b3a',
+      apply(f) {
+        f.dmgTaken = Math.max(0, f.dmgTaken - 22);
+        if (f.maxHp) f.hp = Math.min(f.maxHp, f.hp + 22);
+        try { Audio2.play('heal', { pan: f.sfxPan }); } catch (e) {}
+        if (typeof FX !== 'undefined') {
+          for (let i = 0; i < 16; i++)
+            FX.spark(f.cx + rnd(-26, 26), f.cy + rnd(-34, 34), rnd(-.6, .6), rnd(-2.6, -.6), '#7ef08a', 44, 5);
+        }
+      } },
+
+    /* --- LA GOUSSE DE VANILLE : elle accélère. Le contraire exact du
+       réveil, pour que les deux se répondent dans une même partie. */
+    { id: 'gousse', nFR: 'Gousse de vanille', nEN: 'Vanilla Pod', nCR: 'Gous vani',
+      instant: true, weight: 6, color: '#d8c07a',
+      apply(f) {
+        f.buffs = f.buffs || {};
+        f.buffs.speed = Math.max(f.buffs.speed || 0, 420);
+        try { Audio2.play('powerup', { pan: f.sfxPan, power: 0.9 }); } catch (e) {}
+        if (typeof FX !== 'undefined') {
+          FX.ring(f.cx, f.cy, 66, '#ffe6a8', 22, 6, 2.0);
+          for (let i = 0; i < 10; i++)
+            FX.streak(f.cx, f.cy, rnd(-5, 5), rnd(-5, 5), '#ffe6a8', 22, 4);
+        }
+      } }
+  );
+
+  /* L'ANCRE, en pratique. Le moteur ne connaissait aucun effet de ce
+     genre : on l'implémente ici, au plus près de l'objet qui le
+     donne, plutôt que d'aller éparpiller une exception dans le
+     coeur du combat. */
+  if (typeof Fighter !== 'undefined' && Fighter.prototype) {
+    const encaisseOrig = Fighter.prototype.takeHit;
+    Fighter.prototype.takeHit = function (src, h, dir, hitPos) {
+      const r = encaisseOrig.call(this, src, h, dir, hitPos);
+      if (r && this.buffs && this.buffs.ancre > 0) {
+        this.kbSpeed *= 0.6;
+        this.vx *= 0.6; this.vy *= 0.6;
+        if (typeof FX !== 'undefined')
+          FX.ring(this.cx, this.cy, 44, '#7fd06a', 12, 4, 1.4);
+      }
+      return r;
+    };
+    /* le décompte : le moteur fait déjà décroître tout ce qui est
+       dans `buffs`, on n'ajoute donc aucune horloge */
+  }
+})();
+
+/* ============================================================
+   2) LES DOUZE PIÈCES DE VESTIAIRE
+   ============================================================ */
+(function cosmetiques55() {
+  if (typeof COSMETICS === 'undefined') return;
+  if (COSMETICS.__nouveaux55) return;
+  COSMETICS.__nouveaux55 = true;
+
+  /* --- 2a) le dessin des nouvelles pièces de tête ---
+     On enveloppe le dessinateur existant : nos formes s'ajoutent au
+     `switch` sans qu'on ait à le réécrire, et tout ce qu'on ne
+     connaît pas redescend à l'original. Le repère est le centre de la
+     tête, `r` le rayon, et l'ajustement au gabarit est déjà fait par
+     l'appelant — c'est ce qui garantit qu'aucune pièce ne se pose de
+     travers sur une tête étroite ou large.
+
+     RÈGLE : rien ne descend sous -0.46 r, la ligne des sourcils. */
+  if (typeof COS_TETE === 'function') {
+    const teteOrig = COS_TETE;
+    window.COS_TETE = function (ctx, r, f, P, pose) {
+      switch (f.hatX) {
+
+        /* CHAPEAU TRESSÉ — le vrai chapeau de paille du pays, avec sa
+           tresse visible et un ruban sombre */
+        case 'tresse': {
+          ctx.beginPath();
+          ctx.ellipse(0, -r * 0.92, r * 1.5, r * 0.3, 0, 0, Math.PI * 2);
+          const g = ctx.createLinearGradient(-r * 1.5, 0, r * 1.5, 0);
+          g.addColorStop(0, '#c9a86a'); g.addColorStop(0.5, '#e8cf9a'); g.addColorStop(1, '#b08f52');
+          ctx.fillStyle = g; ctx.fill();
+          ctx.beginPath();
+          ctx.ellipse(0, -r * 1.1, r * 0.7, r * 0.42, 0, Math.PI, 0);
+          ctx.fillStyle = '#dcc088'; ctx.fill();
+          /* la tresse : de petites obliques sur le bord */
+          ctx.strokeStyle = 'rgba(120,92,44,.55)'; ctx.lineWidth = 1.3;
+          for (let i = 0; i < 18; i++) {
+            const a = (i / 18) * Math.PI * 2;
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(a) * r * 1.02, -r * 0.92 + Math.sin(a) * r * 0.2);
+            ctx.lineTo(Math.cos(a) * r * 1.44, -r * 0.92 + Math.sin(a) * r * 0.28);
+            ctx.stroke();
+          }
+          ctx.fillStyle = '#4a3320';
+          ctx.beginPath(); ctx.ellipse(0, -r * 0.98, r * 0.72, r * 0.14, 0, 0, Math.PI * 2); ctx.fill();
+          break;
+        }
+
+        /* FLEUR DE VANILLE — une seule fleur pâle sur le côté */
+        case 'vanillefl': {
+          const cx = r * 0.78, cy = -r * 0.86;
+          ctx.fillStyle = '#f6f2e2';
+          for (let i = 0; i < 6; i++) {
+            const a = i / 6 * Math.PI * 2;
+            ctx.beginPath();
+            ctx.ellipse(cx + Math.cos(a) * r * 0.2, cy + Math.sin(a) * r * 0.2,
+                        r * 0.21, r * 0.12, a, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.fillStyle = '#e2c56a';
+          ctx.beginPath(); ctx.arc(cx, cy, r * 0.12, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = '#4f7a3a'; ctx.lineWidth = r * 0.07;
+          ctx.beginPath();
+          ctx.moveTo(cx - r * 0.2, cy + r * 0.16);
+          ctx.quadraticCurveTo(-r * 0.1, -r * 1.02, -r * 0.66, -r * 0.7);
+          ctx.stroke();
+          break;
+        }
+
+        /* BONNET DES HAUTS — la laine de Cilaos, avec son pompon */
+        case 'bonnet': {
+          ctx.beginPath();
+          ctx.arc(0, -r * 0.72, r * 1.02, Math.PI, 0);
+          ctx.lineTo(r * 1.02, -r * 0.5);
+          ctx.lineTo(-r * 1.02, -r * 0.5);
+          ctx.closePath();
+          ctx.fillStyle = '#a8402f'; ctx.fill();
+          ctx.fillStyle = '#8a3324';
+          ctx.beginPath(); ctx.roundRect(-r * 1.06, -r * 0.62, r * 2.12, r * 0.16, r * 0.08); ctx.fill();
+          /* les côtes de la maille */
+          ctx.strokeStyle = 'rgba(60,20,14,.35)'; ctx.lineWidth = 1.4;
+          for (let i = -3; i <= 3; i++) {
+            ctx.beginPath();
+            ctx.moveTo(i * r * 0.28, -r * 0.52);
+            ctx.lineTo(i * r * 0.24, -r * 1.6 + Math.abs(i) * r * 0.14);
+            ctx.stroke();
+          }
+          ctx.fillStyle = '#f0e0c0';
+          ctx.beginPath(); ctx.arc(0, -r * 1.78, r * 0.28, 0, Math.PI * 2); ctx.fill();
+          break;
+        }
+
+        /* CASQUETTE DE PÊCHEUR — bob souple, bord tombant tout autour */
+        case 'bob': {
+          ctx.fillStyle = '#5d7a5a';
+          ctx.beginPath();
+          ctx.ellipse(0, -r * 0.86, r * 1.34, r * 0.34, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.ellipse(0, -r * 1.02, r * 0.82, r * 0.5, 0, Math.PI, 0);
+          ctx.fillStyle = '#6e8d69'; ctx.fill();
+          ctx.strokeStyle = 'rgba(30,50,28,.5)'; ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.ellipse(0, -r * 0.94, r * 0.84, r * 0.2, 0, 0, Math.PI * 2);
+          ctx.stroke();
+          break;
+        }
+
+        default:
+          return teteOrig(ctx, r, f, P, pose);
+      }
+    };
+  }
+
+  /* --- 2b) les nouvelles pièces de visage --- */
+  if (typeof COS_VISAGE === 'function') {
+    const visOrig = COS_VISAGE;
+    window.COS_VISAGE = function (ctx, r, f, P) {
+      switch (f.faceX) {
+
+        /* COQUILLAGES — un collier ras du cou, sous le menton */
+        case 'coquillages': {
+          ctx.strokeStyle = 'rgba(220,210,180,.8)'; ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.ellipse(0, r * 0.86, r * 0.72, r * 0.2, 0, 0, Math.PI);
+          ctx.stroke();
+          for (let i = -3; i <= 3; i++) {
+            const u = i / 3;
+            const x = u * r * 0.68, y = r * 0.86 + Math.cos(u * 1.4) * r * 0.14;
+            ctx.fillStyle = i % 2 ? '#f4ead2' : '#e0c9a4';
+            ctx.beginPath(); ctx.ellipse(x, y, r * 0.11, r * 0.09, u * 0.5, 0, Math.PI * 2); ctx.fill();
+          }
+          break;
+        }
+
+        /* LUNETTES DE SOUDEUR — verres ronds fumés, sangle de cuir */
+        case 'soudeur': {
+          ctx.strokeStyle = '#4a3620'; ctx.lineWidth = r * 0.13;
+          ctx.beginPath();
+          ctx.moveTo(-r * 0.98, -r * 0.16); ctx.lineTo(r * 0.98, -r * 0.16);
+          ctx.stroke();
+          for (const dx of [-r * 0.42, r * 0.42]) {
+            ctx.fillStyle = '#2b2f36';
+            ctx.beginPath(); ctx.arc(dx, -r * 0.16, r * 0.3, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#8a6f3e'; ctx.lineWidth = r * 0.07;
+            ctx.beginPath(); ctx.arc(dx, -r * 0.16, r * 0.3, 0, Math.PI * 2); ctx.stroke();
+            ctx.fillStyle = 'rgba(160,220,255,.4)';
+            ctx.beginPath(); ctx.arc(dx - r * 0.1, -r * 0.25, r * 0.1, 0, Math.PI * 2); ctx.fill();
+          }
+          break;
+        }
+
+        default:
+          return visOrig(ctx, r, f, P);
+      }
+    };
+  }
+
+  /* --- 2c) les nouvelles pièces de dos --- */
+  if (typeof COS_DOS === 'function') {
+    const dosOrig = COS_DOS;
+    window.COS_DOS = function (ctx, hx, hy, cx, cy, pose, P, kind, gab) {
+      if (kind !== 'chale' && kind !== 'nasse') return dosOrig(ctx, hx, hy, cx, cy, pose, P, kind, gab);
+      const midX = (hx + cx) / 2, midY = (hy + cy) / 2;
+      const k = gab || 1;
+      ctx.save();
+      ctx.translate(midX - 24, midY);
+      ctx.scale(k, k);
+      ctx.rotate(rad(pose.torso * 0.4));
+
+      if (kind === 'chale') {
+        /* LE CHÂLE DE CILAOS — une pointe de laine brodée qui pend */
+        ctx.fillStyle = '#b8493a';
+        ctx.beginPath();
+        ctx.moveTo(-18, -16); ctx.lineTo(20, -16); ctx.lineTo(4, 26);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = 'rgba(250,235,210,.7)'; ctx.lineWidth = 1.4;
+        for (let i = 0; i < 3; i++) {
+          ctx.beginPath();
+          ctx.moveTo(-15 + i * 3, -11 + i * 7); ctx.lineTo(17 - i * 4, -11 + i * 7);
+          ctx.stroke();
+        }
+        ctx.strokeStyle = '#f0e2c4'; ctx.lineWidth = 1.2;
+        for (let i = 0; i < 6; i++) {
+          ctx.beginPath();
+          ctx.moveTo(-14 + i * 6, 6 + i); ctx.lineTo(-16 + i * 6, 14 + i);
+          ctx.stroke();
+        }
+      } else {
+        /* LA NASSE — le casier du pêcheur, en osier */
+        ctx.fillStyle = 'rgba(170,140,90,.55)';
+        ctx.beginPath(); ctx.roundRect(-20, -14, 38, 30, 8); ctx.fill();
+        ctx.strokeStyle = '#8a6a3a'; ctx.lineWidth = 1.4;
+        for (let i = 0; i <= 5; i++) {
+          ctx.beginPath(); ctx.moveTo(-20 + i * 7.6, -14); ctx.lineTo(-20 + i * 7.6, 16); ctx.stroke();
+        }
+        for (let i = 0; i <= 3; i++) {
+          ctx.beginPath(); ctx.moveTo(-20, -14 + i * 10); ctx.lineTo(18, -14 + i * 10); ctx.stroke();
+        }
+        ctx.strokeStyle = '#6d5330'; ctx.lineWidth = 2.4;
+        ctx.beginPath(); ctx.arc(-1, -16, 9, Math.PI, 0); ctx.stroke();
+      }
+      ctx.restore();
+    };
+  }
+
+  /* --- 2d) les nouvelles auras --- */
+  if (typeof COS_AURA === 'function') {
+    const auraOrig = COS_AURA;
+    window.COS_AURA = function (f, kind, px, py) {
+      if (kind === 'brume') {
+        /* LA BRUME DES HAUTS : elle traîne au sol, elle ne monte pas */
+        FX.smoke(px + rnd(-16, 16), f.y - rnd(0, 18), 1, '#cfd8d4');
+        return;
+      }
+      if (kind === 'braisier') {
+        /* LES BRAISES DU KABAR : elles montent en tournant */
+        FX.spark(px + rnd(-14, 14), py + rnd(-10, 20), rnd(-0.8, 0.8), rnd(-1.8, -0.6),
+                 pick(['#ff8a3c', '#ffd166', '#ff5a2c']), 46, 4);
+        return;
+      }
+      return auraOrig(f, kind, px, py);
+    };
+  }
+
+  /* --- 2e) la déclaration des pièces ---
+     Le `lvl` reprend l'échelle déjà en place : les pièces d'entrée
+     autour de 3-8, les pièces de milieu vers 15-25, et deux pièces
+     tardives au-delà de 30 pour qu'il reste quelque chose à viser. */
+  const nouveaux = [
+    /* --- chapeaux --- */
+    { id: 'h_tresse', slot: 'hat', lvl: 5, fr: 'Chapeau tressé', en: 'Woven hat', cr: 'Shapo tresé',
+      apply: f => { delete f.hat; delete f.cosTete; f.hatX = 'tresse'; } },
+    { id: 'h_vanillefl', slot: 'hat', lvl: 11, fr: 'Fleur de vanille', en: 'Vanilla flower', cr: 'Flèr vani',
+      apply: f => { delete f.hat; delete f.cosTete; f.hatX = 'vanillefl'; } },
+    { id: 'h_bonnet', slot: 'hat', lvl: 18, fr: 'Bonnet des Hauts', en: 'Highland beanie', cr: 'Bonè dé Ho',
+      apply: f => { delete f.hat; delete f.cosTete; f.hatX = 'bonnet'; } },
+    { id: 'h_bob', slot: 'hat', lvl: 26, fr: 'Bob de pêcheur', en: "Fisherman's bucket hat", cr: 'Bob pésèr',
+      apply: f => { delete f.hat; delete f.cosTete; f.hatX = 'bob'; } },
+
+    /* --- visage --- */
+    { id: 'f_coquillages', slot: 'face', lvl: 7, fr: 'Collier de coquillages', en: 'Shell necklace', cr: 'Kolyé koki',
+      apply: f => { delete f.face; delete f.shades; f.faceX = 'coquillages'; } },
+    { id: 'f_soudeur', slot: 'face', lvl: 23, fr: 'Lunettes de soudeur', en: 'Welding goggles', cr: 'Linèt soudèr',
+      apply: f => { delete f.face; delete f.shades; f.faceX = 'soudeur'; } },
+
+    /* --- dos --- */
+    { id: 'b_chale', slot: 'back', lvl: 13, fr: 'Châle de Cilaos', en: 'Cilaos shawl', cr: 'Shal Silaos',
+      apply: f => { delete f.cape; delete f.wings; delete f.back; f.backX = 'chale'; } },
+    { id: 'b_nasse', slot: 'back', lvl: 20, fr: 'Nasse en osier', en: 'Wicker creel', cr: 'Nas an osyé',
+      apply: f => { delete f.cape; delete f.wings; delete f.back; f.backX = 'nasse'; } },
+
+    /* --- auras --- */
+    { id: 'a_brume', slot: 'aura', lvl: 17, fr: 'Brume des Hauts', en: 'Highland mist', cr: 'Brim dé Ho',
+      apply: f => { f.aura = 'brume'; } },
+    { id: 'a_braisier', slot: 'aura', lvl: 32, fr: 'Braises du kabar', en: 'Kabar embers', cr: 'Bréz kabar',
+      apply: f => { f.aura = 'braisier'; } },
+
+    /* --- teintes --- */
+    { id: 's_lavefroide', slot: 'skin', lvl: 9, fr: 'Lave refroidie', en: 'Cooled lava', cr: 'Lav frédi',
+      hue: 12, dark: -0.3 },
+    { id: 's_ecume', slot: 'skin', lvl: 38, fr: 'Écume du récif', en: 'Reef foam', cr: 'Ékim rési',
+      hue: 186, light: 0.22 }
+  ];
+  for (const c of nouveaux) { c.__x = true; COSMETICS.push(c); }
+
+  /* Les icônes du vestiaire : sans elles, dix casiers afficheraient
+     le même pictogramme d'emplacement et deviendraient impossibles à
+     distinguer dans la grille. */
+  if (typeof COS_ICON !== 'undefined') Object.assign(COS_ICON, {
+    h_tresse: '👒', h_vanillefl: '🌾', h_bonnet: '🧶', h_bob: '🎣',
+    f_coquillages: '🐚', f_soudeur: '🥽',
+    b_chale: '🧣', b_nasse: '🧺',
+    a_brume: '🌫️', a_braisier: '🔥',
+    s_lavefroide: '🟥', s_ecume: '🩵',
+    /* les objets, pour la fiche des objets */
+    songe: '🌿', galet: '🪨', reveil: '⏰', parasol: '⛱️', dodobwar: '🍾', gousse: '🌱'
+  });
+})();
+
+/* ============================================================
+   3) LES DESCRIPTIONS
+
+   La fiche des objets lit `I18N.<langue>['id' + Id]`. Sans cette
+   entrée, un objet s'affiche sans un mot d'explication : le joueur
+   ramasse une feuille verte et n'a aucun moyen de savoir ce qu'elle
+   fait, ce qui est exactement le contraire de l'effet recherché.
+   ============================================================ */
+(function textes55() {
+  if (typeof I18N === 'undefined') return;
+  Object.assign(I18N.fr, {
+    idSonge: 'Une feuille de songe tenue au-dessus de la tête. Elle n\'empêche pas les coups, elle empêche de partir loin.',
+    idGalet: 'Un galet de rivière, lisse et lourd. Il rebondit trois fois : sur une petite scène, il revient souvent vous chercher.',
+    idReveil: 'Un vieux réveil qui sonne pour tout le monde sauf pour vous. Quatre secondes où les autres traînent des pieds.',
+    idParasol: 'Planté dans le sol, il tient longtemps et casse tout ce qui descend par-dessus.',
+    idDodobwar: 'Bien fraîche, bue d\'un trait. Vingt-deux pour cent en moins, et rien d\'autre.',
+    idGousse: 'Une gousse de vanille mâchée à la va-vite. Sept secondes où plus personne ne vous rattrape.'
+  });
+  Object.assign(I18N.en, {
+    idSonge: 'A taro leaf held overhead. It will not stop the hits, only stop you flying.',
+    idGalet: 'A smooth, heavy river stone. It bounces three times: on a small stage it often comes back for you.',
+    idReveil: 'An old alarm clock that rings for everyone but you. Four seconds of everybody else dragging their feet.',
+    idParasol: 'Planted in the ground, it lasts a long while and breaks anything coming down on top of it.',
+    idDodobwar: 'Ice cold, downed in one. Twenty-two percent off, and nothing else.',
+    idGousse: 'A vanilla pod chewed in a hurry. Seven seconds where nobody catches you.'
+  });
+  Object.assign(I18N.cr, {
+    idSonge: 'In fèy song tienbo anlèr la tèt. I anpèsh pa lo kou, i anpèsh alé lwin.',
+    idGalet: 'In galé larivyèr, lis é lour. I rebondi trwa fwa : dsi in ti sèn, i rovien souvan rod aou.',
+    idReveil: 'In vyé révèy i son pou tout lo monn sof pou ou. Kat sgond kot lezot i trinn zot pié.',
+    idParasol: 'Planté dann tèr, i tien lontan é i kas tout sak i dsann par lao.',
+    idDodobwar: 'Byen fré, bwa dinn sèl kou. Vindeu pour san an mwin, é ryin dot.',
+    idGousse: 'In gous vani mashé vitman. Sèt sgond kot pèrsonn i ratrap aou.'
+  });
 })();
 
 </script>
