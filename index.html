@@ -2407,7 +2407,33 @@ const PHYS = {
   wallJumpV: -15.5,
   wallJumpX: 8.2,
   tempoBonus: 1.28,
-  tempoWindow: 0.105
+  tempoWindow: 0.105,
+
+  /* ---------- Jauge de super ----------
+     Un super doit rester un moment rare, préparé, mérité. Avec les
+     anciens taux (0.9 par point de dégât infligé et 0.55 par point
+     encaissé) la jauge se remplissait en une poignée de secondes :
+     dans un combat à quatre on voyait un super toutes les cinq
+     secondes, ce qui vidait le mouvement de tout son poids.
+
+     Les nouveaux taux visent quarante à soixante secondes de combat
+     actif pour un remplissage. Frapper reste la façon principale de
+     charger, encaisser en donne un peu (on ne punit pas celui qui
+     subit), et la parade parfaite garde une prime nette parce qu'elle
+     demande une lecture précise.
+
+     Enfin la jauge fuit lentement une fois pleine : on ne peut plus la
+     mettre de côté indéfiniment, il faut choisir son moment. La fuite
+     ne commence qu'après six secondes de grâce et met plus de trente
+     secondes à tout vider : largement le temps de placer son super,
+     jamais assez pour le garder toute la partie. */
+  superGainDeal: 0.30,      // par point de dégât infligé
+  superGainTake: 0.16,      // par point de dégât encaissé
+  superGainParry: 6,        // prime de parade parfaite
+  superGainTempo: 3,        // prime de frappe sur le tempo maloya
+  superDecayDelay: 480,     // images pleines avant que la fuite commence
+  superDecay: 0.045,        // fuite par image ensuite
+  superDecayFloor: 0.7      // la fuite s'arrête à 70 % : on ne repart pas de zéro
 };
 
 /* ---------- Enchaînements ----------
@@ -4543,7 +4569,13 @@ function drawFighterRig(ctx, ch, pose, opt = {}) {
     drawCape(ctx, cx, cy, hipX, hipY, pose, P);
   }
   if (ch.features && ch.features.back) {
-    drawBackItem(ctx, hipX, hipY, cx, cy, pose, P, ch.features.back);
+    /* Le sac, le roulèr ou la botte de cannes étaient dessinés à une
+       taille fixe : minuscules sur un colosse, énormes sur un fluet.
+       On les met à l'échelle du gabarit du porteur. */
+    drawBackItem(ctx, hipX, hipY, cx, cy, pose, P, ch.features.back, (bw + bh) / 2);
+  }
+  if (ch.features && ch.features.backX && typeof COS_DOS === 'function') {
+    COS_DOS(ctx, hipX, hipY, cx, cy, pose, P, ch.features.backX, (bw + bh) / 2);
   }
   if (ch.features && ch.features.tentacles) {
     drawTentacles(ctx, hipX, hipY, pose, P, ch.features.tentacles);
@@ -4783,9 +4815,13 @@ function drawFoot(ctx, x, y, ang, w, P, back) {
 }
 
 /* Accessoires de dos débloquables */
-function drawBackItem(ctx, hx, hy, cx, cy, pose, P, kind) {
+function drawBackItem(ctx, hx, hy, cx, cy, pose, P, kind, gab) {
   ctx.save();
   const midX = (hx + cx) / 2, midY = (hy + cy) / 2;
+  /* mise à l'échelle autour du milieu du dos : l'objet grossit avec le
+     porteur sans se décoller de lui */
+  const k = gab || 1;
+  if (k !== 1) { ctx.translate(midX, midY); ctx.scale(k, k); ctx.translate(-midX, -midY); }
   switch (kind) {
     case 'bertel': {                       // sac traditionnel en vacoa
       ctx.translate(midX - 14, midY + 4);
@@ -5020,6 +5056,46 @@ function drawCape(ctx, cx, cy, hx, hy, pose, P) {
   ctx.restore();
 }
 
+/* ============================================================
+   AJUSTEMENT DES ACCESSOIRES AU GABARIT
+
+   Les chapeaux, lunettes et marques de visage étaient dessinés dans
+   un repère fait pour une tête ronde. Sur une tête large, un chapeau
+   flottait au-dessus du crâne ; sur une tête en goutte, il s'enfonçait
+   dedans ; sur un bec, les lunettes tombaient à côté des yeux. D'où
+   l'impression de cosmétiques mal posés.
+
+   On calcule donc, pour chaque combattant, un petit décalage et une
+   mise à l'échelle qui collent à la forme de sa tête, à sa chevelure
+   et à sa crête. Un personnage peut affiner le résultat avec un champ
+   facultatif `cosFit` (valeurs exprimées en rayons de tête).
+
+   Rien n'est retiré : sans forme particulière, l'ajustement est neutre
+   et le rendu est exactement celui d'avant.
+   ============================================================ */
+function cosFitTete(ch, r, kind, f) {
+  let dx = 0, dy = 0, sx = 1, sy = 1;
+  switch (kind) {
+    /* large et basse : le sommet est plus bas, il faut descendre et élargir */
+    case 'wide':  sx = 1.20; sy = 0.94; dy =  r * 0.11; break;
+    /* ovale : plus haute que large, on remonte et on resserre */
+    case 'oval':  sx = 0.95; sy = 1.05; dy = -r * 0.09; break;
+    /* goutte : pointe nettement plus haut */
+    case 'drop':  sx = 1.03; sy = 1.08; dy = -r * 0.17; break;
+    /* museau allongé vers l'avant : tout glisse vers le nez */
+    case 'shark': sx = 1.14; sy = 0.98; dx =  r * 0.18; dy = r * 0.03; break;
+  }
+  /* une chevelure ou une crête surélève ce qu'on pose dessus */
+  if (f.hair) dy -= r * 0.13;
+  if (f.crest || f.finHead) dy -= r * 0.07;
+  /* un bec décale le visage vers l'avant */
+  if (f.beak) dx += r * 0.07;
+  /* réglage manuel éventuel, en rayons de tête */
+  const o = ch.cosFit;
+  if (o) { dx += (o.dx || 0) * r; dy += (o.dy || 0) * r; sx *= (o.sx || 1); sy *= (o.sy || 1); }
+  return { dx, dy, sx, sy };
+}
+
 function drawHead(ctx, x, y, r, pose, ch, P, opt) {
   const f = ch.features || {};
   const blink = (opt && opt.blink !== undefined) ? opt.blink : 1;
@@ -5132,6 +5208,13 @@ function drawHead(ctx, x, y, r, pose, ch, P, opt) {
   }
 
   // accessoires de tête
+  /* Tout ce qui vient du vestiaire (chapeau, visage, lunettes) passe
+     par l'ajustement au gabarit ; les traits propres au personnage
+     (cornes natives, crête, cheveux, aileron) restent intacts. */
+  const FIT = cosFitTete(ch, r, kind, f);
+  ctx.save();
+  ctx.translate(FIT.dx, FIT.dy);
+  ctx.scale(FIT.sx, FIT.sy);
   if (f.hat === 'chef') {
     ctx.beginPath();
     ctx.ellipse(0, -r * 0.9, r * 0.95, r * 0.28, 0, 0, Math.PI * 2);
@@ -5366,6 +5449,14 @@ function drawHead(ctx, x, y, r, pose, ch, P, opt) {
     ctx.fillStyle = 'rgba(15,15,25,0.9)'; ctx.fill();
     ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 1.4; ctx.stroke();
   }
+  /* Accessoires ajoutés après coup : plutôt que d'allonger encore
+     cette fonction, on appelle un dessinateur externe s'il existe.
+     Il travaille dans le même repère, déjà ajusté au gabarit. */
+  if (f.hatX && typeof COS_TETE === 'function') COS_TETE(ctx, r, f, P, pose);
+  if (f.faceX && typeof COS_VISAGE === 'function') COS_VISAGE(ctx, r, f, P, pose);
+
+  ctx.restore();     // fin de l'ajustement des accessoires cosmétiques
+
   if (f.horns) {
     ctx.fillStyle = P.horn || '#e6d5b8';
     for (const s of [-1, 1]) {
@@ -11154,7 +11245,7 @@ STAGES.chantiernrl = makeStage({
    1. LE MARCHÉ DE SAINT-PAUL
    ============================================================ */
 STAGES.marchepaul = makeStage({
-  id: 'marchepaul', nFR: 'Marché de Saint-Paul', nEN: 'Saint-Paul Market', nCR: 'Marshé Sin-Pol',
+  id: 'marchepaul', nFR: 'Front de mer de Saint-Paul', nEN: 'Saint-Paul Seafront', nCR: 'Bordmèr Sin-Pol',
   tagFR: 'Étals & bâches', tagEN: 'Stalls & tarps', music: 'kabar',
   tint: '#f0b840', night: false,
   plats: [
@@ -11272,7 +11363,7 @@ STAGES.marchepaul = makeStage({
    2. LE TUNNEL DE LAVE
    ============================================================ */
 STAGES.tunnellave = makeStage({
-  id: 'tunnellave', nFR: 'Tunnel de Lave', nEN: 'Lava Tube', nCR: 'Tinèl Lav',
+  id: 'tunnellave', nFR: 'Caverne du Piton', nEN: 'Piton Cavern', nCR: 'Kavern Piton',
   tagFR: 'Souterrain brûlant', tagEN: 'Burning underground', music: 'volcan',
   tint: '#ff6b2c', night: true,
   plats: [
@@ -11469,6 +11560,647 @@ STAGES.ermitage = makeStage({
   ambient(ctx, t) {
     if (t % 11 === 0) FX.spark(rnd(-1200, 1200), rnd(-500, 0), rnd(-0.3, 0.3), rnd(-0.5, -0.1),
                                '#ffd9a0', rndi(70, 140), rnd(2, 4));
+  }
+});
+
+
+/* ===== 04h-newstages7.js ===== */
+/* ============================================================
+   SMASH PÉI — TROIS GRANDES ARÈNES VIVANTES
+
+   Jusqu'ici les arènes étaient des décors : jolis, mais inertes.
+   Dans Smash Bros, la scène est un troisième combattant — un
+   convoyeur qui vous emporte, un camion qui traverse, un
+   éboulement qui redessine le sol. C'est ce qui manquait.
+
+   Les trois arènes ci-dessous sont nettement plus vastes que les
+   précédentes (limites poussées à ±1700 au lieu de ±1150) et
+   chacune tourne autour d'un élément extérieur qui change
+   réellement la partie :
+
+   · LA ROUTE DU LITTORAL — la falaise lâche ses blocs, la houle
+     frappe la digue et pousse tout le monde vers l'intérieur, et
+     un camion de cannes traverse la voie : on peut lui monter
+     dessus, ou se faire emporter.
+
+   · L'USINE SUCRIÈRE DU GOL — deux tapis roulants entraînent les
+     combattants dans des sens opposés, une presse hydraulique
+     s'abat sur le centre, et les cheminées lâchent une vapeur qui
+     soulève.
+
+   · LE GRAND BÉNARE — au-dessus des nuages. Le téléphérique fait
+     la navette d'un bord à l'autre et sert de plateforme mobile,
+     la mer de nuages monte et descend, et les rafales d'altitude
+     changent de sens sans prévenir.
+
+   Toutes les mécaniques passent par les mêmes canaux que le reste
+   du jeu (`M.spawnHazard`, `M.spawnFalling`, `M.wind`, `p.dx`),
+   donc rien de neuf n'est demandé au moteur, et les dangers
+   restent désactivables par la règle « DANGERS » comme partout.
+   ============================================================ */
+
+/* Petit utilitaire local : pousser les combattants posés sur une
+   plateforme donnée. Sert aux tapis roulants et au camion. */
+function entrainePlat(M, p, ax) {
+  for (const f of M.fighters) {
+    if (!f.alive || !f.grounded || f.platform !== p) continue;
+    f.x += ax;
+    /* on garde une trace pour l'élan : sortir d'un tapis doit lancer */
+    f.vx += ax * 0.06;
+  }
+}
+
+/* ============================================================
+   1. LA ROUTE DU LITTORAL
+   ============================================================ */
+STAGES.littoral = makeStage({
+  id: 'littoral', nFR: 'Route du Littoral', nEN: 'Coastal Road', nCR: 'Rout Litoral',
+  tagFR: 'Falaise & houle', tagEN: 'Cliff & swell', music: 'kabar',
+  tint: '#4d7f9c', night: false,
+  plats: [
+    /* la chaussée, très longue : on peut vraiment courir */
+    { x: -900, y: 0, w: 1800, h: 150 },
+    /* la digue basse, côté mer */
+    { x: 620, y: -120, w: 340, h: 26, pass: true },
+    { x: -960, y: -120, w: 340, h: 26, pass: true },
+    /* la corniche accrochée à la falaise */
+    { x: -420, y: -300, w: 300, h: 24, pass: true },
+    { x: 120, y: -300, w: 300, h: 24, pass: true },
+    { x: -150, y: -480, w: 300, h: 24, pass: true },
+    /* le camion : plateforme mobile, position pilotée par update() */
+    { x: -1500, y: -170, w: 260, h: 26, pass: false, camion: true }
+  ],
+  bounds: { left: -1700, right: 1700, top: -1250, bottom: 860 },
+  spawns: [{ x: -380, y: -380 }, { x: 380, y: -380 }, { x: -140, y: -560 }, { x: 140, y: -560 }],
+
+  sky(ctx, t) {
+    Paint.sky(ctx, [[0, '#0f2438'], [0.34, '#2b5a7d'], [0.68, '#6ea3bd'], [1, '#d8e6e2']],
+              -3400, -1800, 6800, 3200);
+    for (let i = 0; i < 9; i++)
+      Paint.cloud(ctx, -2000 + ((i * 520 + t * 0.12) % 4400), -1000 + (i % 4) * 130, 2.1, '#ffffff', 0.34);
+    /* les oiseaux, très haut */
+    const rng = makeRng(9014);
+    for (let i = 0; i < 9; i++) {
+      const x = -1600 + ((rng() * 3200 + t * 0.5) % 3200);
+      const y = -900 + rng() * 260;
+      ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x - 9, y); ctx.quadraticCurveTo(x, y - 6, x + 9, y); ctx.stroke();
+    }
+  },
+
+  far(ctx, t) {
+    /* LA FALAISE : c'est elle qui domine tout le décor, à gauche */
+    const g = ctx.createLinearGradient(0, -1300, 0, 300);
+    g.addColorStop(0, '#3a3f47'); g.addColorStop(0.55, '#4e5560'); g.addColorStop(1, '#2b3038');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(-3400, 300);
+    ctx.lineTo(-3400, -1400);
+    ctx.lineTo(-1500, -1400);
+    /* le profil dentelé de la paroi */
+    /* La paroi plonge vite : passé le milieu de la scène elle est
+       sous la chaussée, et on retrouve le ciel et la mer à droite.
+       Sans ça le décor n'était qu'un grand mur gris. */
+    const rng = makeRng(5521);
+    let x = -1500;
+    while (x < 700) {
+      const dx = 70 + rng() * 100;
+      const k = Math.min(1, (x + 1500) / 2100);
+      const y = -1400 + Math.pow(k, 0.82) * 1720 + rng() * 55;
+      ctx.lineTo(x + dx, y);
+      x += dx;
+    }
+    ctx.lineTo(760, 320);
+    ctx.lineTo(3400, 320);
+    ctx.closePath(); ctx.fill();
+    /* stries d'érosion */
+    ctx.save();
+    ctx.globalAlpha = 0.16; ctx.strokeStyle = '#0d1016'; ctx.lineWidth = 5;
+    const r2 = makeRng(3312);
+    for (let i = 0; i < 44; i++) {
+      const bx = -3200 + r2() * 5400, by = -1350 + r2() * 1200;
+      ctx.beginPath();
+      ctx.moveTo(bx, by); ctx.lineTo(bx + 16 + r2() * 30, by + 170 + r2() * 220); ctx.stroke();
+    }
+    ctx.restore();
+
+    /* LA MER, à droite et au fond */
+    Paint.waterBand(ctx, 220, 500, t, '#2c6f92', '#17455e', -400, 3400);
+  },
+
+  mid(ctx, t) {
+    /* les filets pare-blocs suspendus à la paroi */
+    ctx.save();
+    ctx.globalAlpha = 0.5; ctx.strokeStyle = '#9aa3ad'; ctx.lineWidth = 1.6;
+    for (let i = 0; i < 13; i++) {
+      const x = -1400 + i * 130;
+      ctx.beginPath(); ctx.moveTo(x, -760); ctx.lineTo(x - 40, -240); ctx.stroke();
+    }
+    for (let k = 0; k < 6; k++) {
+      const y = -740 + k * 86;
+      ctx.beginPath();
+      ctx.moveTo(-1500, y);
+      ctx.lineTo(160, y + 240);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    /* la houle qui frappe la digue : hauteur pilotée par le temps */
+    const h = 40 + Math.sin(t * 0.026) * 34;
+    ctx.save();
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = '#cfeaf4';
+    for (let i = 0; i < 8; i++) {
+      const x = 700 + i * 130;
+      ctx.beginPath();
+      ctx.ellipse(x, 20 - h, 70 + Math.sin(t * 0.05 + i) * 22, h * 0.8, 0, Math.PI, 0);
+      ctx.fill();
+    }
+    ctx.restore();
+  },
+
+  ground(ctx, t) {
+    /* la chaussée */
+    Paint.rockPlatform(ctx, { x: -900, y: 0, w: 1800, h: 150 }, '#3a3f47', '#585f69');
+    ctx.save();
+    /* bande centrale discontinue */
+    ctx.fillStyle = 'rgba(240,230,190,.8)';
+    for (let x = -880; x < 900; x += 130) ctx.fillRect(x, 62, 74, 9);
+    ctx.fillStyle = 'rgba(240,240,240,.55)';
+    ctx.fillRect(-900, 12, 1800, 6);
+    ctx.fillRect(-900, 126, 1800, 6);
+    ctx.restore();
+
+    /* Les glissières appartiennent à la chaussée : dessinées dans la
+       couche du fond, la parallaxe les décollait du sol. */
+    ctx.fillStyle = '#b9c2cb';
+    for (let x = -900; x < 900; x += 120) {
+      ctx.fillRect(x, -34, 96, 11);
+      ctx.fillStyle = '#7e8894'; ctx.fillRect(x + 42, -34, 9, 34);
+      ctx.fillStyle = '#b9c2cb';
+    }
+
+    for (const p of this.plats) {
+      if (p.camion) continue;
+      if (p.y === 0) continue;
+      Paint.rockPlatform(ctx, p, '#4a515b', '#79838f', '#cfd6dd');
+    }
+
+    /* LE CAMION DE CANNES : la plateforme mobile du niveau */
+    const c = this.plats.find(p => p.camion);
+    if (c) {
+      const x = c.x + (c.dx || 0), y = c.y + (c.dy || 0);
+      ctx.save();
+      ctx.translate(x, y);
+      /* remorque chargée de cannes */
+      ctx.fillStyle = '#6d5330';
+      ctx.fillRect(0, 0, 260, 54);
+      ctx.fillStyle = '#c9b072';
+      for (let i = 0; i < 16; i++) {
+        ctx.fillRect(8 + i * 15, -22 + (i % 3) * 4, 11, 24);
+      }
+      ctx.strokeStyle = '#4a3a1c'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(10, -6); ctx.lineTo(250, -10); ctx.stroke();
+      /* cabine */
+      ctx.fillStyle = '#c0392b';
+      ctx.beginPath(); ctx.roundRect(228, -50, 74, 104, 8); ctx.fill();
+      ctx.fillStyle = '#9fd0e6';
+      ctx.beginPath(); ctx.roundRect(248, -40, 46, 34, 5); ctx.fill();
+      /* roues */
+      ctx.fillStyle = '#22262c';
+      for (const wx of [40, 96, 262]) {
+        ctx.beginPath(); ctx.arc(wx, 58, 20, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#5c646e'; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(wx, 58, 9, t * 0.2, t * 0.2 + 4.6); ctx.stroke();
+      }
+      ctx.restore();
+    }
+  },
+
+  fore(ctx, t) {
+    /* embruns au premier plan, côté mer */
+    ctx.save();
+    ctx.globalAlpha = 0.2;
+    const rng = makeRng(1177);
+    for (let i = 0; i < 16; i++) {
+      const x = 500 + rng() * 1200;
+      const y = 200 + Math.sin(t * 0.03 + i) * 40;
+      Paint.disc(ctx, x, y, 22 + rng() * 24, '#ffffff');
+    }
+    ctx.restore();
+  },
+
+  update(M, t) {
+    /* LE CAMION : il traverse toute la scène, de gauche à droite,
+       puis repart. On peut lui monter dessus et voyager avec. */
+    const c = this.plats.find(p => p.camion);
+    if (c) {
+      const cycle = 900;
+      const k = (t % cycle) / cycle;
+      const cible = -1500 + k * 3100;
+      const av = cible - c.x;
+      c.x = cible;
+      /* la remorque emporte ceux qui sont dessus */
+      if (Math.abs(av) < 60) entrainePlat(M, c, av);
+      /* avertissement au moment où il entre dans le champ */
+      if (t % cycle === 40) {
+        M.ticker(M.lang === 'en' ? 'TRUCK INCOMING' : 'CAMION !', '#f0b840');
+        try { Audio2.play('whooshBig'); } catch (e) {}
+      }
+    }
+  },
+
+  ambient(fx, t) {
+    if (Math.random() < 0.4) fx.spark(rnd(620, 1500), rnd(140, 220), rnd(-1, 1), rnd(-4, -1), '#e8fbff', rnd(24, 54), 3);
+    if (Math.random() < 0.05) fx.dust(rnd(-1400, 1400), -300, 3, '#c8bda8');
+  },
+
+  hazard(M, t) {
+    /* ÉBOULEMENT : la falaise lâche trois blocs. On les voit venir. */
+    if (t % 520 === 120) {
+      const base = rnd(-800, 500);
+      M.banner(M.lang === 'en' ? 'ROCKFALL !' : 'ÉBOULEMENT !', '#c8bda8');
+      for (let i = 0; i < 3; i++) {
+        const x = base + i * 190;
+        M.warn(x, 0, 52);
+        M.timers.push({ f: 52 + i * 8, run: () => {
+          M.spawnFalling({ x, y: -1100, r: 34, dmg: 15, ang: 78, bkb: 44, kbg: 72, color: '#6b5a4a' });
+        } });
+      }
+    }
+    /* LAME DE FOND : la houle passe par-dessus la digue et pousse
+       tout le monde vers la falaise. Un mur d'eau, pas un mur tout
+       court : on peut sauter au-dessus. */
+    if (t % 700 === 400) {
+      M.banner(M.lang === 'en' ? 'BIG SWELL !' : 'LAME DE FOND !', '#bfe9ff');
+      try { Audio2.play('water', { power: 1 }); } catch (e) {}
+      M.timers.push({ f: 46, run: () => {
+        M.spawnHazard({ x: 900, y: -230, w: 300, h: 300, vx: -13, life: 130,
+          dmg: 10, ang: 168, bkb: 40, kbg: 34, kind: 'wave', color: '#bfe9ff' });
+      } });
+    }
+  }
+});
+
+/* ============================================================
+   2. L'USINE SUCRIÈRE DU GOL
+   ============================================================ */
+STAGES.usinegol = makeStage({
+  id: 'usinegol', nFR: 'Usine sucrière du Gol', nEN: 'Gol Sugar Mill', nCR: 'Lizine Gol',
+  tagFR: 'Tapis & presse', tagEN: 'Belts & press', music: 'kabar',
+  tint: '#c9a24a', night: true,
+  plats: [
+    /* le plancher de l'atelier */
+    { x: -820, y: 0, w: 1640, h: 150 },
+    /* les deux tapis roulants, sens opposés */
+    { x: -840, y: -230, w: 620, h: 30, pass: true, tapis: 1.9 },
+    { x: 220, y: -230, w: 620, h: 30, pass: true, tapis: -1.9 },
+    /* la passerelle centrale, sous la presse */
+    { x: -230, y: -400, w: 460, h: 26, pass: true },
+    /* les deux paliers hauts */
+    { x: -700, y: -580, w: 300, h: 24, pass: true },
+    { x: 400, y: -580, w: 300, h: 24, pass: true }
+  ],
+  bounds: { left: -1700, right: 1700, top: -1350, bottom: 880 },
+  spawns: [{ x: -340, y: -520 }, { x: 340, y: -520 }, { x: -110, y: -680 }, { x: 110, y: -680 }],
+
+  sky(ctx, t) {
+    Paint.sky(ctx, [[0, '#0a0c12'], [0.42, '#171d2a'], [0.78, '#2d2a2c'], [1, '#4a3728']],
+              -3400, -1800, 6800, 3200);
+    /* la lune derrière la fumée */
+    Paint.disc(ctx, 900, -1050, 74, '#f4e9c8', '#d8c79a', true);
+    const rng = makeRng(6620);
+    for (let i = 0; i < 40; i++)
+      Paint.cloud(ctx, -1700 + ((rng() * 3400 + t * 0.24) % 3400), -1200 + rng() * 500,
+                  1.6 + rng(), '#5d5a58', 0.2);
+  },
+
+  far(ctx, t) {
+    /* les cheminées de l'usine, en enfilade */
+    for (let i = 0; i < 4; i++) {
+      const x = -1300 + i * 780;
+      ctx.fillStyle = '#3b3630';
+      ctx.fillRect(x, -1100, 90, 1400);
+      ctx.fillStyle = '#4a443c';
+      ctx.fillRect(x - 12, -1120, 114, 34);
+      ctx.fillStyle = '#c0392b';
+      for (let k = 0; k < 5; k++) ctx.fillRect(x, -1040 + k * 240, 90, 22);
+      /* la fumée qui sort */
+      ctx.save();
+      ctx.globalAlpha = 0.24;
+      for (let k = 0; k < 6; k++) {
+        const p = ((t * 0.6 + k * 90 + i * 40) % 540) / 540;
+        Paint.disc(ctx, x + 45 + Math.sin(p * 6 + i) * 60, -1130 - p * 420, 30 + p * 70, '#a8a49c');
+      }
+      ctx.restore();
+    }
+    /* la halle, silhouette de fond */
+    ctx.fillStyle = '#241f1b';
+    ctx.fillRect(-2400, -760, 4800, 1100);
+    ctx.fillStyle = '#151210';
+    for (let i = 0; i < 26; i++) ctx.fillRect(-2380 + i * 186, -740, 12, 1080);
+    /* les fenêtres allumées */
+    for (let i = 0; i < 26; i++)
+      for (let k = 0; k < 3; k++) {
+        const on = ((i * 7 + k * 13) % 5) < 3;
+        ctx.fillStyle = on ? 'rgba(255,196,90,.5)' : 'rgba(60,60,70,.4)';
+        ctx.fillRect(-2340 + i * 186, -700 + k * 190, 96, 110);
+      }
+  },
+
+  mid(ctx, t) {
+    /* la charpente métallique */
+    ctx.strokeStyle = '#4d4841'; ctx.lineWidth = 12;
+    for (let i = 0; i < 9; i++) {
+      const x = -1600 + i * 400;
+      ctx.beginPath(); ctx.moveTo(x, 140); ctx.lineTo(x, -1000); ctx.stroke();
+    }
+    ctx.lineWidth = 9;
+    for (let k = 0; k < 4; k++) {
+      const y = -940 + k * 250;
+      ctx.beginPath(); ctx.moveTo(-1700, y); ctx.lineTo(1700, y); ctx.stroke();
+    }
+    /* les croix de contreventement */
+    ctx.strokeStyle = 'rgba(90,84,74,.7)'; ctx.lineWidth = 5;
+    for (let i = 0; i < 8; i++)
+      for (let k = 0; k < 3; k++) {
+        const x = -1600 + i * 400, y = -940 + k * 250;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 400, y + 250); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x + 400, y); ctx.lineTo(x, y + 250); ctx.stroke();
+      }
+
+    /* LA PRESSE, suspendue au-dessus du centre. Sa hauteur suit le
+       même cycle que le danger : on la voit descendre. */
+    const cyc = 480, k = (t % cyc) / cyc;
+    let py = -980;
+    if (k > 0.72) py = -980 + Math.min(1, (k - 0.72) / 0.1) * 560;
+    else if (k > 0.86) py = -420;
+    ctx.save();
+    ctx.strokeStyle = '#6b6459'; ctx.lineWidth = 16;
+    ctx.beginPath(); ctx.moveTo(-60, -1200); ctx.lineTo(-60, py); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(60, -1200); ctx.lineTo(60, py); ctx.stroke();
+    ctx.fillStyle = '#8a7f6d';
+    ctx.beginPath(); ctx.roundRect(-230, py, 460, 90, 8); ctx.fill();
+    ctx.fillStyle = '#5c5348';
+    ctx.beginPath(); ctx.roundRect(-210, py + 66, 420, 30, 6); ctx.fill();
+    ctx.fillStyle = '#f0b840';
+    for (let i = -3; i <= 3; i++) ctx.fillRect(i * 58 - 14, py + 16, 28, 34);
+    ctx.restore();
+  },
+
+  ground(ctx, t) {
+    Paint.rockPlatform(ctx, { x: -820, y: 0, w: 1640, h: 150 }, '#3a352e', '#5b544a');
+    /* les rails du chariot dans le sol */
+    ctx.fillStyle = '#7d7568';
+    ctx.fillRect(-820, 26, 1640, 7);
+    ctx.fillRect(-820, 62, 1640, 7);
+    ctx.fillStyle = 'rgba(30,26,22,.7)';
+    for (let x = -800; x < 820; x += 60) ctx.fillRect(x, 22, 14, 48);
+
+    for (const p of this.plats) {
+      if (p.y === 0) continue;
+      if (p.tapis) {
+        /* LE TAPIS ROULANT : les taquets défilent, on lit tout de
+           suite dans quel sens il entraîne. */
+        ctx.save();
+        ctx.fillStyle = '#2a2723';
+        ctx.beginPath(); ctx.roundRect(p.x, p.y, p.w, p.h, 8); ctx.fill();
+        ctx.fillStyle = '#c9a24a';
+        const dec = (t * p.tapis * 2) % 46;
+        for (let x = p.x - 46; x < p.x + p.w + 46; x += 46) {
+          const px = x + (p.tapis > 0 ? dec : -dec);
+          if (px < p.x - 6 || px > p.x + p.w - 16) continue;
+          ctx.beginPath(); ctx.roundRect(px, p.y + 5, 22, p.h - 10, 4); ctx.fill();
+        }
+        /* rouleaux aux extrémités */
+        ctx.fillStyle = '#8a7f6d';
+        ctx.beginPath(); ctx.arc(p.x + 10, p.y + p.h / 2, p.h * 0.62, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(p.x + p.w - 10, p.y + p.h / 2, p.h * 0.62, 0, Math.PI * 2); ctx.fill();
+        /* la flèche du sens, discrète */
+        ctx.globalAlpha = 0.55; ctx.strokeStyle = '#f0b840'; ctx.lineWidth = 4;
+        const mx = p.x + p.w / 2, s = p.tapis > 0 ? 1 : -1;
+        ctx.beginPath();
+        ctx.moveTo(mx - 30 * s, p.y - 20); ctx.lineTo(mx + 30 * s, p.y - 20);
+        ctx.lineTo(mx + 12 * s, p.y - 32); ctx.stroke();
+        ctx.restore();
+      } else {
+        Paint.rockPlatform(ctx, p, '#4a443c', '#7a7264', '#c9a24a');
+      }
+    }
+  },
+
+  fore(ctx, t) {
+    /* vapeur au ras du sol */
+    ctx.save();
+    ctx.globalAlpha = 0.16;
+    for (let i = 0; i < 10; i++) {
+      const x = -1500 + ((i * 340 + t * 1.1) % 3200);
+      Paint.disc(ctx, x, 60 + Math.sin(t * 0.03 + i) * 18, 60 + (i % 3) * 26, '#d8d4cc');
+    }
+    ctx.restore();
+  },
+
+  update(M, t) {
+    /* LES TAPIS entraînent en continu ce qui se tient dessus. */
+    for (const p of this.plats) if (p.tapis) entrainePlat(M, p, p.tapis);
+  },
+
+  ambient(fx, t) {
+    if (Math.random() < 0.3) fx.spark(rnd(-820, 820), 0, rnd(-.6, .6), rnd(-2.4, -.6), '#c9a24a', rnd(28, 60), 3);
+    if (Math.random() < 0.12) fx.dust(rnd(-1500, 1500), rnd(-400, 100), 3, '#8a8278');
+  },
+
+  hazard(M, t) {
+    /* LA PRESSE : elle s'abat sur le centre. Le décor la montre
+       descendre, donc l'avertissement est visuel autant que sonore. */
+    if (t % 480 === 320) {
+      M.warn(0, -400, 26);
+      M.banner(M.lang === 'en' ? 'PRESS !' : 'LA PRESSE !', '#f0b840');
+    }
+    if (t % 480 === 346) {
+      try { Audio2.play('explode'); } catch (e) {}
+      M.shake(18);
+      M.spawnHazard({ x: -230, y: -420, w: 460, h: 130, life: 26,
+        dmg: 20, ang: 78, bkb: 56, kbg: 86, kind: 'geyser', color: '#8a7f6d' });
+    }
+    /* LES ÉVENTS DE VAPEUR : ils soulèvent plus qu'ils ne blessent,
+       et servent de remontée express vers les paliers hauts. */
+    if (t % 300 === 150) {
+      const x = pick([-620, 620]);
+      M.warn(x, 0, 40);
+      M.timers.push({ f: 40, run: () => {
+        M.spawnHazard({ x: x - 60, y: -560, w: 120, h: 580, life: 60,
+          dmg: 4, ang: 90, bkb: 54, kbg: 16, kind: 'geyser', color: '#dfe6ea' });
+        try { Audio2.play('whooshBig'); } catch (e) {}
+      } });
+    }
+  }
+});
+
+/* ============================================================
+   3. LE GRAND BÉNARE
+   ============================================================ */
+STAGES.benare = makeStage({
+  id: 'benare', nFR: 'Grand Bénare', nEN: 'Grand Bénare', nCR: 'Gran Bénar',
+  tagFR: 'Au-dessus des nuages', tagEN: 'Above the clouds', music: 'cilaos',
+  tint: '#bcd6e8', night: false,
+  plats: [
+    /* le sommet, étroit : la scène ne pardonne pas */
+    { x: -420, y: 0, w: 840, h: 150 },
+    /* les rochers en escalier */
+    { x: -880, y: -180, w: 260, h: 40, pass: true },
+    { x: 620, y: -180, w: 260, h: 40, pass: true },
+    { x: -300, y: -330, w: 240, h: 24, pass: true },
+    { x: 60, y: -330, w: 240, h: 24, pass: true },
+    /* la plateforme sommitale */
+    { x: -130, y: -530, w: 260, h: 24, pass: true },
+    /* la cabine du téléphérique : mobile, pilotée par update() */
+    { x: -1200, y: -700, w: 200, h: 26, pass: false, cabine: true }
+  ],
+  bounds: { left: -1700, right: 1700, top: -1500, bottom: 900 },
+  spawns: [{ x: -260, y: -420 }, { x: 260, y: -420 }, { x: -90, y: -640 }, { x: 90, y: -640 }],
+
+  sky(ctx, t) {
+    Paint.sky(ctx, [[0, '#0f2f56'], [0.3, '#2f6ea6'], [0.62, '#8dc0dd'], [1, '#e9f3f6']],
+              -3400, -1900, 6800, 3300);
+    /* le soleil bas */
+    Paint.disc(ctx, -700, -1180, 92, '#fff3c8', '#ffd98a', true);
+  },
+
+  far(ctx, t) {
+    /* les remparts du cirque, en trois plans */
+    Paint.ridge(ctx, 8811, -3200, 3200, -180, 420, '#5a7fa0', '#2f4a66', 56, true);
+    Paint.ridge(ctx, 4412, -3200, 3200, 60, 320, '#4a6b8a', '#26405a', 50, true);
+    /* LA MER DE NUAGES : elle respire, et cache le fond par instants */
+    const h = 120 + Math.sin(t * 0.011) * 60;
+    ctx.save();
+    ctx.fillStyle = 'rgba(248,251,255,.88)';
+    ctx.beginPath();
+    ctx.moveTo(-3400, 900);
+    for (let x = -3400; x <= 3400; x += 60)
+      ctx.lineTo(x, 250 - h + Math.sin(x * 0.0025 + t * 0.014) * 34 + Math.sin(x * 0.008 - t * 0.02) * 12);
+    ctx.lineTo(3400, 900); ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 0.5;
+    for (let i = 0; i < 14; i++)
+      Paint.cloud(ctx, -3000 + ((i * 480 + t * 0.3) % 6200), 210 - h + (i % 3) * 26, 3.2, '#ffffff', 0.7);
+    ctx.restore();
+  },
+
+  mid(ctx, t) {
+    /* LE CÂBLE du téléphérique, tendu d'un rempart à l'autre */
+    ctx.strokeStyle = 'rgba(40,50,62,.75)'; ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(-1700, -820);
+    ctx.quadraticCurveTo(0, -640, 1700, -820);
+    ctx.stroke();
+    /* les pylônes */
+    for (const px of [-1250, 1250]) {
+      ctx.strokeStyle = '#6e7783'; ctx.lineWidth = 12;
+      ctx.beginPath(); ctx.moveTo(px, -240); ctx.lineTo(px, -900); ctx.stroke();
+      ctx.lineWidth = 7;
+      ctx.beginPath(); ctx.moveTo(px - 70, -860); ctx.lineTo(px + 70, -860); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(px - 60, -260); ctx.lineTo(px, -640); ctx.lineTo(px + 60, -260); ctx.stroke();
+    }
+    /* quelques branches de brande accrochées aux rochers */
+    const rng = makeRng(3321);
+    ctx.strokeStyle = '#4c6b46'; ctx.lineWidth = 3;
+    for (let i = 0; i < 26; i++) {
+      const x = -1100 + rng() * 2200, y = -120 + rng() * 200;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.quadraticCurveTo(x + 14, y - 40, x + 4, y - 70);
+      ctx.stroke();
+    }
+  },
+
+  ground(ctx, t) {
+    Paint.rockPlatform(ctx, { x: -420, y: 0, w: 840, h: 150 }, '#5c6673', '#8e99a6', '#e4edf3');
+    for (const p of this.plats) {
+      if (p.y === 0 || p.cabine) continue;
+      Paint.rockPlatform(ctx, p, '#5c6673', '#8e99a6', '#e4edf3');
+    }
+
+    /* LA CABINE DU TÉLÉPHÉRIQUE */
+    const c = this.plats.find(p => p.cabine);
+    if (c) {
+      const x = c.x + (c.dx || 0), y = c.y + (c.dy || 0);
+      ctx.save();
+      ctx.translate(x, y);
+      /* la suspente jusqu'au câble */
+      ctx.strokeStyle = '#4a525c'; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(100, 0); ctx.lineTo(100, -120); ctx.stroke();
+      ctx.fillStyle = '#3b424b';
+      ctx.beginPath(); ctx.roundRect(78, -136, 44, 20, 5); ctx.fill();
+      /* la cabine */
+      ctx.fillStyle = '#c0392b';
+      ctx.beginPath(); ctx.roundRect(0, -6, 200, 22, 6); ctx.fill();
+      ctx.fillStyle = '#e6ebef';
+      ctx.beginPath(); ctx.roundRect(6, -96, 188, 92, 12); ctx.fill();
+      ctx.fillStyle = '#7fb4d4';
+      ctx.beginPath(); ctx.roundRect(18, -84, 74, 58, 8); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(108, -84, 74, 58, 8); ctx.fill();
+      ctx.strokeStyle = 'rgba(30,40,50,.5)'; ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.roundRect(6, -96, 188, 92, 12); ctx.stroke();
+      ctx.restore();
+    }
+  },
+
+  fore(ctx, t) {
+    /* les écharpes de brume qui passent devant */
+    ctx.save();
+    ctx.globalAlpha = 0.14;
+    for (let i = 0; i < 6; i++) {
+      const x = -2000 + ((i * 760 + t * 1.6) % 4600);
+      Paint.cloud(ctx, x, -120 + (i % 3) * 130, 4.4, '#ffffff', 1);
+    }
+    ctx.restore();
+  },
+
+  update(M, t) {
+    /* LE TÉLÉPHÉRIQUE fait la navette. Il suit la courbe du câble,
+       donc il descend au milieu : c'est un ascenseur horizontal
+       autant qu'un raccourci. */
+    const c = this.plats.find(p => p.cabine);
+    if (c) {
+      const cycle = 1080;
+      const k = (t % cycle) / cycle;
+      /* aller-retour doux, sans à-coup aux extrémités */
+      const u = k < 0.5 ? k * 2 : (1 - k) * 2;
+      const e = u * u * (3 - 2 * u);
+      const nx = -1250 + e * 2500;
+      const av = nx - c.x;
+      c.x = nx;
+      c.y = -700 + Math.sin(e * Math.PI) * 70;      // la courbe du câble
+      if (Math.abs(av) < 40) entrainePlat(M, c, av);
+    }
+  },
+
+  ambient(fx, t) {
+    if (Math.random() < 0.3) fx.spark(rnd(-1400, 1400), rnd(-800, 200), rnd(-2, 2), rnd(-.6, .6), '#ffffff', rnd(40, 90), 2);
+  },
+
+  hazard(M, t) {
+    /* RAFALES D'ALTITUDE : elles changent de sens sans prévenir et
+       durent longtemps. À cette hauteur, le retour sur scène devient
+       une vraie décision. */
+    if (t % 470 === 0) {
+      const dir = (Math.floor(t / 470) % 2) ? 1 : -1;
+      M.wind = { dir, frames: 240, power: 0.38 };
+      M.banner(M.lang === 'en' ? 'HIGH WIND !' : 'RAFALE D’ALTITUDE !', '#cfe3f0');
+      try { Audio2.play('whooshBig'); } catch (e) {}
+    }
+    /* GRÊLE : quelques grêlons, plus gênants que dangereux, mais ils
+       cassent une remontée mal négociée. */
+    if (t % 640 === 300) {
+      M.ticker(M.lang === 'en' ? 'HAIL' : 'GRÊLE', '#dff0ff');
+      for (let i = 0; i < 5; i++) {
+        const x = rnd(-700, 700);
+        M.timers.push({ f: i * 12, run: () => {
+          M.spawnFalling({ x, y: -1300, r: 20, dmg: 7, ang: 84, bkb: 26, kbg: 48, color: '#dff0ff', kind: 'hail' });
+        } });
+      }
+    }
   }
 });
 
@@ -12023,7 +12755,9 @@ class Fighter {
     this.downPrev = 0; this.downTapT = 0;         // double-bas : descendre d'une plateforme
     this.superLock = 0;                          // images restantes d'invulnérabilité de super
     this.superMeter = 0; this.superMax = 100;
+    this.superPleinT = 0; this.superFuite = false;   // fuite de la jauge laissée pleine
     this.item = null; this.itemUses = 0; this.itemsPicked = 0;
+    this.itemProche = null;          // objet a portee, ramassable a la touche SAISIE
     this.buffs = { power: 0, speed: 0, wings: 0, star: 0, burn: 0, cloak: 0, blind: 0,
                    tank: 0, leech: 0, mirror: 0, glue: 0 };
     this.grabTarget = null; this.grabber = null; this.grabTime = 0; this.mash = 0;
@@ -12104,6 +12838,7 @@ class Fighter {
     }
     this.sfxPan = clamp(this.x / 900, -1, 1);
     Groove.tick(this);
+    this.tickSuper();
 
     if (this.hitlag > 0) {
       this.hitlag--;
@@ -12225,7 +12960,8 @@ class Fighter {
       // esquives depuis le bouclier
       if (Math.abs(inp.ax) > 0.5) { this.startRoll(sign(inp.ax)); return; }
       if (inp.ay > 0.5) { this.startSpotDodge(); return; }
-      /* Bouclier levé : on tente d'abord d'attraper ce qui arrive. */
+      /* Bouclier levé : on ramasse ce qui traîne, sinon on attrape ce qui arrive. */
+      if (this.buf.has('grab') && this.ramasser()) { this.buf.consume('grab'); return; }
       if (this.buf.has('grab') && this.tryCatch()) { this.buf.consume('grab'); return; }
       if (this.buf.consume('grab') || (this.buf.consume('attack'))) { this.startMove('grab'); return; }
       if (this.buf.consume('jump')) { this.startJumpSquat(); return; }
@@ -12271,7 +13007,10 @@ class Fighter {
     }
 
     // ---- prise ----
-    /* Hors bouclier aussi : SAISIE attrape ce qui vole vers toi. */
+    /* SAISIE sert à trois choses, dans cet ordre : ramasser l'objet
+       posé à ses pieds, rattraper celui qui vole vers soi, et sinon
+       attraper l'adversaire. */
+    if (this.buf.has('grab') && this.ramasser()) { this.buf.consume('grab'); return; }
     if (this.buf.has('grab') && this.tryCatch()) { this.buf.consume('grab'); return; }
     if (this.buf.consume('grab') && this.grounded) { this.startMove('grab'); return; }
 
@@ -12588,6 +13327,45 @@ class Fighter {
     if (mv.special === 'up') { this.jumps = Math.max(this.jumps, 1); this.upUsed = true; }
     const sfx = mv.grab ? 'grab' : (mv.charge ? 'charge' : 'whoosh');
     Audio2.play(sfx, { pan: this.sfxPan, power: mv.charge ? 1 : 0.4 });
+  }
+
+  /* ---------- Remplissage de la jauge de super ----------
+     Un seul passage obligé pour toutes les sources de charge : c'est là
+     qu'on garde la trace de l'instant où la jauge est devenue pleine,
+     et c'est ce qui permet à la fuite ci-dessous de savoir quand
+     commencer. */
+  gagneSuper(v) {
+    if (!(v > 0) || this.superMax <= 0) return;
+    const avant = this.superMeter;
+    this.superMeter = Math.min(this.superMax, this.superMeter + v);
+    if (avant < this.superMax && this.superMeter >= this.superMax) {
+      this.superPleinT = 0;
+      /* Un signal discret : le joueur doit savoir que son super est prêt
+         sans avoir à surveiller sa jauge en plein échange. */
+      try {
+        Audio2.play('powerup', { pan: this.sfxPan, power: 0.55 });
+        FX.ring(this.cx, this.cy, 96, '#ffd166', 26, 7, 1.6);
+      } catch (e) {}
+    }
+  }
+
+  /* ---------- Fuite de la jauge pleine ----------
+     Garder son super en réserve pendant toute la partie enlevait tout
+     le sel de la ressource. Passé quelques secondes de grâce, la jauge
+     se vide lentement : on a le temps de choisir son moment, pas celui
+     de la mettre à la banque. */
+  tickSuper() {
+    if (this.superMax <= 0 || this.enSuper) return;
+    if (this.superMeter >= this.superMax) {
+      this.superPleinT = (this.superPleinT || 0) + 1;
+      if (this.superPleinT > PHYS.superDecayDelay) this.superFuite = true;
+    } else if (this.superMeter <= this.superMax * PHYS.superDecayFloor) {
+      /* La fuite s'arrête au plancher : on ne repart jamais de zéro,
+         on doit seulement regagner la dernière tranche. */
+      this.superFuite = false; this.superPleinT = 0;
+    }
+    if (this.superFuite)
+      this.superMeter = Math.max(0, this.superMeter - PHYS.superDecay);
   }
 
   startSuper() {
@@ -12959,7 +13737,7 @@ class Fighter {
           Audio2.play('explode');
           Audio2.play('water');
           this.M.shake(26);
-          this.M.hitstop(14);
+          this.M.impact(10, this);
         }
         break;
       }
@@ -13037,7 +13815,7 @@ class Fighter {
           FX.slash(this.cx + dir * 170, this.cy - 20, 0, 220, '#ffffff', 16);
           Audio2.play('smashHit');
           this.M.shake(22);
-          this.M.hitstop(12);
+          this.M.impact(9, this);
         }
         break;
       }
@@ -13103,7 +13881,7 @@ class Fighter {
             FX.streak(this.cx + dir * 120, this.cy - 30, dir * rnd(6, 18), rnd(-10, 10), '#efe3c8', rndi(18, 38), 6);
           Audio2.play('smashHit');
           this.M.shake(26);
-          this.M.hitstop(12);
+          this.M.impact(9, this);
         }
         break;
       }
@@ -13261,7 +14039,7 @@ class Fighter {
           Audio2.play('explode');
           this.M.shake(30);
           this.M.flash(0.45);
-          this.M.hitstop(16);
+          this.M.impact(11, this);
         }
         break;
       }
@@ -13537,7 +14315,7 @@ class Fighter {
           Audio2.play('break');
           Audio2.play('smashHit');
           this.M.shake(28);
-          this.M.hitstop(16);
+          this.M.impact(11, this);
         } else if (t % 4 === 0) {
           for (let i = 0; i < 3; i++)
             FX.spark(this.cx + rnd(-90, 90), this.cy + 20, rnd(-2, 2), rnd(-4, -1), s.color, 30, 5);
@@ -13667,7 +14445,7 @@ class Fighter {
           FX.slash(this.cx + dir * 320, hy, 0, 320, '#ffffff', 14);
           Audio2.play('whooshBig');
           Audio2.play(n === 2 ? 'smashHit' : 'hit', { pan: this.sfxPan, power: 0.8 });
-          if (n === 2) { this.M.shake(24); this.M.hitstop(14); }
+          if (n === 2) { this.M.shake(24); this.M.hitstop(6); }
         }
         break;
       }
@@ -14226,7 +15004,7 @@ class Fighter {
       this.mf = mv.total - 14;
       FX.burst(this.cx, this.cy, 60, this.color, 22);
       Audio2.play('shieldHit', { pan: this.sfxPan });
-      M.hitstop(10);
+      M.hitstop(6);
       if (src.takeHit) src.takeHit(this, { dmg: d, ang: 45, bkb: 60, kbg: 70, fx: 'impact', sfx: 'smashHit' }, sign(src.x - this.x) || this.facing);
       return true;
     }
@@ -14235,16 +15013,16 @@ class Fighter {
     if (this.state === ST.SHIELD && this.sf <= PHYS.parryWindow && this.shieldStun <= 0) {
       this.shieldStun = 0;
       this.intangible = 8;
-      this.superMeter = Math.min(this.superMax, this.superMeter + 16);
+      this.gagneSuper(PHYS.superGainParry);
       Stat.bump(this, 'parries');
       if (src && src.hitlag !== undefined) { src.hitlag = 26; src.parried = 26; }
       Audio2.play('parry', { pan: this.sfxPan });
-      M.hitstop(16); M.flash(0.3); M.shake(6);
+      M.hitstop(6); M.flash(0.3); M.shake(6);
       FX.ring(this.cx, this.cy, 78, '#ffffff', 22, 9, 1.9);
       FX.ring(this.cx, this.cy, 60, '#7ee8fa', 26, 6, 2.4);
       for (let i = 0; i < 10; i++)
         FX.spark(this.cx, this.cy - 20, Math.cos(i / 10 * 6.28) * 4, Math.sin(i / 10 * 6.28) * 4, '#7ee8fa', 22, 6);
-      M.slowmo(16, 0.35);
+      M.slowmo(10, 0.5);
       return true;
     }
 
@@ -14256,7 +15034,7 @@ class Fighter {
       this.vx += dir * h.dmg * 0.28;
       Audio2.play('shieldHit', { pan: this.sfxPan });
       FX.ring(this.cx, this.cy, 60 * (this.shield / PHYS.shieldMax), '#a8e8ff', 14, 5, 1.2);
-      M.hitstop(Math.floor(3 + h.dmg * 0.2));
+      M.impact(Math.floor(3 + h.dmg * 0.2), this, src);
       if (this.shield <= 0) this.breakShield();
       return true;
     }
@@ -14296,7 +15074,7 @@ class Fighter {
     if (this.M.rules.tempo && src && src.id && Audio2.onBeat(PHYS.tempoWindow)) {
       onTempo = true;
       dmg *= PHYS.tempoBonus;
-      src.superMeter = Math.min(src.superMax, src.superMeter + 9);
+      if (src.gagneSuper) src.gagneSuper(PHYS.superGainTempo);
       src.tempoStreak = (src.tempoStreak || 0) + 1;
       Audio2.play('tempo', { pan: this.sfxPan });
       FX.ring(this.cx, this.cy, 84, '#ffd166', 22, 7, 1.8);
@@ -14317,8 +15095,8 @@ class Fighter {
       if (src.maxHp) src.hp = Math.min(src.maxHp, src.hp + dmg * 0.45);
       FX.spark(src.cx, src.cy, rnd(-1, 1), rnd(-2, -.5), '#8fd14f', 26, 5);
     }
-    if (src && src.stats) { src.stats.dmgDealt += dmg; src.superMeter = Math.min(src.superMax, src.superMeter + dmg * 0.9 * (this.M.modSuper || 1)); }
-    this.superMeter = Math.min(this.superMax, this.superMeter + dmg * 0.55);
+    if (src && src.stats) { src.stats.dmgDealt += dmg; if (src.gagneSuper) src.gagneSuper(dmg * PHYS.superGainDeal * (this.M.modSuper || 1)); }
+    this.gagneSuper(dmg * PHYS.superGainTake);
     this.lastHitBy = src && src.id ? src : (src && src.owner ? src.owner : this.lastHitBy);
 
     if (h.burn) this.buffs.burn = 150;
@@ -14380,7 +15158,7 @@ class Fighter {
       if (dmg >= 5)
         FX.text(px, py - 44, Math.round(dmg) + '', onTempo ? '#ffd166' : '#fff3b0', 20 + power * 12, 30);
     Audio2.play(h.sfx || (dmg > 12 ? 'smashHit' : 'hit'), { pan: this.sfxPan, power });
-    M.hitstop(Math.floor((h.hitlag || 1) * (2 + dmg * 0.42)));
+    M.impact(Math.floor((h.hitlag || 1) * (2 + dmg * 0.42)), src);
     M.shake(4 + power * 14);
     if (power > 0.55) M.zoomPunch(power);
     return true;
@@ -14528,7 +15306,24 @@ class Fighter {
     return false;
   }
 
-  /* ---------- objets ---------- */
+  /* ---------- objets ----------
+     RAMASSAGE MANUEL : `M.checkItems` a note l'objet a portee dans
+     `itemProche`, mais rien ne se produit tant que le joueur n'appuie
+     pas sur SAISIE. Un objet n'atterrit donc jamais dans les mains par
+     accident. */
+  ramasser() {
+    const it = this.itemProche;
+    if (!it || it.dead) return false;
+    if (this.item && !it.def.instant) return false;   // mains prises
+    if (!this.actionable && this.state !== ST.SHIELD) return false;
+    this.pickup(it);
+    it.dead = true;
+    this.itemProche = null;
+    FX.burst(it.x, it.y, 34, it.def.color, 16);
+    FX.ring(it.x, it.y, 42, it.def.color, 14, 5, 2.2, 0.5);
+    return true;
+  }
+
   pickup(item) {
     const d = item.def;
     this.itemsPicked = (this.itemsPicked || 0) + 1;
@@ -14572,7 +15367,7 @@ class Fighter {
       FX.ring(this.cx, this.cy, 62, '#7ee8fa', 18, 6, 1.7);
       FX.text(this.cx, this.cy - 80, this.M.lang === 'en' ? 'CAUGHT!' : 'RATTRAPÉ !', '#7ee8fa', 22, 34, -1.1);
       Audio2.play('pickup', { pan: this.sfxPan });
-      this.M.hitstop(5);
+      this.M.impact(5, this);
 
       if (def) {
         /* un objet instantané se consomme, les autres reviennent en main */
@@ -14815,6 +15610,8 @@ class Fighter {
       case 'papillons': FX.text(px, py, pick(['\u2726', '\u273f']), pick(['#ffd166', '#ff8ac4', '#7ee8fa']), 20, 60, -0.7); break;
       case 'lava': FX.spark(px, this.y - rnd(0, 12), rnd(-.7, .7), rnd(-.4, .4), pick(['#ff4b2b', '#ff8a3c']), 34, 6); break;
       case 'petales': FX.leaf(px, py, 0.5); break;
+      /* auras ajoutées plus tard : déléguées à un dessinateur externe */
+      default: if (typeof COS_AURA === 'function') COS_AURA(this, kind, px, py); break;
     }
   }
 
@@ -15062,7 +15859,7 @@ const ITEMS = {
     { id: 'samoussa', nFR: 'Samoussa chaud', nEN: 'Hot Samosa', instant: true, weight: 12, color: '#e8b45c',
       apply(f) { f.dmgTaken = Math.max(0, f.dmgTaken - 10); if (f.maxHp) f.hp = Math.min(f.maxHp, f.hp + 12); Audio2.play('heal', { pan: f.sfxPan }); } },
     { id: 'piment', nFR: 'Bonbon piment', nEN: 'Chili Bonbon', instant: true, weight: 9, color: '#e74c3c',
-      apply(f) { f.superMeter = f.superMax; Audio2.play('powerup', { pan: f.sfxPan });
+      apply(f) { f.superMeter = f.superMax; f.superPleinT = 0; f.superFuite = false; Audio2.play('powerup', { pan: f.sfxPan });
         FX.ring(f.cx, f.cy, 70, '#ffd166', 26, 8, 2.0); } },
     { id: 'etoile', nFR: 'Étoile lontan', nEN: 'Star', instant: true, weight: 5, color: '#f1c40f',
       apply(f) { f.buffs.star = 360; f.inv = 360; Audio2.play('powerup', { pan: f.sfxPan });
@@ -15300,6 +16097,28 @@ class ItemEnt {
     }
     if (this.age > this.life - 120 && Math.floor(this.age / 5) % 2 === 0) return;
     ITEMS.drawIcon(ctx, this.def, this.x, this.y + bob, 1.05);
+
+    /* INVITE DE RAMASSAGE.
+       Le ramassage etant manuel, il faut le dire : une petite etiquette
+       flotte au-dessus de l'objet quand un joueur humain peut le
+       prendre. Elle disparait des qu'il s'eloigne. */
+    if (this.invite) {
+      const lang = (typeof UI !== 'undefined' && UI.lang) || 'fr';
+      const txt = lang === 'en' ? 'GRAB' : (lang === 'cr' ? 'PRAN' : 'SAISIE');
+      const y = this.y + bob - 44 + Math.sin(this.age * 0.16) * 2.5;
+      ctx.save();
+      ctx.font = '700 15px system-ui, sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const w = ctx.measureText(txt).width + 20;
+      ctx.fillStyle = 'rgba(10,12,18,.78)';
+      if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(this.x - w / 2, y - 12, w, 24, 8); ctx.fill(); }
+      else ctx.fillRect(this.x - w / 2, y - 12, w, 24);
+      ctx.strokeStyle = rgba(this.def.color, 0.9); ctx.lineWidth = 1.6;
+      if (ctx.roundRect) ctx.stroke();
+      ctx.fillStyle = '#fff';
+      ctx.fillText(txt, this.x, y + 1);
+      ctx.restore();
+    }
   }
 }
 
@@ -15470,6 +16289,418 @@ class Trap {
 }
 
 
+/* ===== 40-invocations.js ===== */
+/* ============================================================
+   SMASH PÉI — INVOCATIONS
+
+   Dans le vrai Smash, certains objets ne frappent pas : ils
+   appellent quelqu'un. On ramasse une capsule, une créature en
+   sort, elle se bat pour vous pendant quelques secondes, puis elle
+   repart. C'est ce qui manquait ici.
+
+   Cinq compagnons péi, tous invoqués par un objet à ramasser
+   manuellement, tous alliés de celui qui les a appelés :
+
+     • LE TANGUE     — fonce au sol, coup de tête, revient.
+     • LE PAILLE-EN-QUEUE — tourne en l'air et plonge en piqué.
+     • GRAND-MÈRE KAL — flotte et jette des sorts à distance.
+     • LE BŒUF MOKA  — charge lourde qui envoie loin.
+     • LE ZANDOLI    — colle sa langue à l'ennemi et le ramène.
+
+   Règles communes, pour que ça reste équilibré :
+     - une invocation ne peut pas encaisser de dégâts, mais elle a
+       une durée de vie courte (5 à 8 secondes) ;
+     - elle ne touche jamais son invocateur ni ses coéquipiers,
+       parce que ses coups passent par `spawnHitbox` avec lui comme
+       propriétaire ;
+     - un seul compagnon par combattant à la fois : en invoquer un
+       second renvoie le premier ;
+     - aucun tirage aléatoire dans ce qui décide d'une boîte de
+       dégâts, pour que le jeu en ligne reste synchrone.
+   ============================================================ */
+
+/* ---------- Les cinq espèces ---------- */
+const INVOCS = {
+  tangue: {
+    nFR: 'Tangue', nCR: 'Tang', nEN: 'Tenrec',
+    vie: 330, w: 46, h: 40, sol: true, vitesse: 5.2, portee: 92,
+    couleur: '#a97c50', cadence: 46,
+    frappe: { dmg: 7, ang: 42, bkb: 34, kbg: 62, w: 100, h: 70 }
+  },
+  paille: {
+    nFR: 'Paille-en-queue', nCR: 'Pay-an-ké', nEN: 'Tropicbird',
+    vie: 400, w: 58, h: 40, sol: false, vitesse: 6.4, portee: 130,
+    couleur: '#eef4ff', cadence: 46,
+    frappe: { dmg: 11, ang: 76, bkb: 38, kbg: 66, w: 120, h: 120 }
+  },
+  kal: {
+    nFR: 'Grand-mère Kal', nCR: 'Granmèr Kal', nEN: 'Granny Kal',
+    vie: 380, w: 52, h: 76, sol: false, vitesse: 3.1, portee: 460,
+    couleur: '#9b6bd6', cadence: 52, tire: true,
+    frappe: { dmg: 8, ang: 60, bkb: 26, kbg: 58, w: 40, h: 40 }
+  },
+  boeuf: {
+    nFR: 'Bœuf moka', nCR: 'Bèf moka', nEN: 'Moka Ox',
+    vie: 300, w: 92, h: 66, sol: true, vitesse: 7.4, portee: 110,
+    couleur: '#5a4636', cadence: 62,
+    frappe: { dmg: 16, ang: 38, bkb: 62, kbg: 82, w: 130, h: 90 }
+  },
+  zandoli: {
+    nFR: 'Zandoli', nCR: 'Zandoli', nEN: 'Anole',
+    vie: 340, w: 44, h: 32, sol: true, vitesse: 4.6, portee: 300,
+    couleur: '#6fbf4f', cadence: 44, langue: true,
+    frappe: { dmg: 6, ang: 16, bkb: 14, kbg: 24, w: 60, h: 30 }
+  }
+};
+
+/* ============================================================
+   L'ENTITÉ ALLIÉE
+   ============================================================ */
+class Allie {
+  constructor(maitre, kind, x, y) {
+    this.maitre = maitre;
+    this.kind = kind;
+    this.D = INVOCS[kind];
+    this.team = maitre ? maitre.team : -1;
+    this.x = x; this.y = y;
+    this.vx = 0; this.vy = 0;
+    this.w = this.D.w; this.h = this.D.h;
+    this.age = 0; this.life = this.D.vie;
+    this.dead = false;
+    this.cd = 24;                 // petit temps d'apparition avant la première frappe
+    this.facing = maitre ? maitre.facing : 1;
+    this.anim = 0;
+    this.grounded = false;
+  }
+
+  get cx() { return this.x; }
+  get cy() { return this.y - this.h / 2; }
+  rect() { return { x: this.x - this.w / 2, y: this.y - this.h, w: this.w, h: this.h }; }
+
+  /* La cible est l'adversaire vivant le plus proche : le compagnon ne
+     se retourne jamais contre celui qui l'a appelé. */
+  cible(M) {
+    let best = null, bd = Infinity;
+    for (const f of M.fighters) {
+      if (!f.alive || f === this.maitre || f.state === ST.DEAD) continue;
+      if (M.rules.teams && this.maitre && f.team === this.maitre.team) continue;
+      const d = Math.abs(f.cx - this.x) + Math.abs(f.cy - this.cy) * 0.6;
+      if (d < bd) { bd = d; best = f; }
+    }
+    return best;
+  }
+
+  update(M) {
+    this.age++; this.anim++;
+    if (this.age > this.life || (this.maitre && !this.maitre.alive)) { this.partir(M); return; }
+    if (this.cd > 0) this.cd--;
+
+    const t = this.cible(M);
+    const D = this.D;
+
+    /* Sans cible on reste sagement près de son invocateur. */
+    const vx = t ? t.cx : (this.maitre ? this.maitre.cx : this.x);
+    const vy = t ? t.cy : (this.maitre ? this.maitre.cy : this.y);
+    const dx = vx - this.x, dy = vy - this.cy;
+    const adx = Math.abs(dx), ady = Math.abs(dy);
+    if (adx > 6) this.facing = dx > 0 ? 1 : -1;
+
+    if (D.sol) {
+      /* déplacement au sol : on suit la plateforme sous les pieds */
+      const veut = D.tire || D.langue ? D.portee * 0.55 : D.portee * 0.5;
+      const app = adx > veut ? this.facing * D.vitesse : this.vx * 0.7;
+      this.vx = app;
+      this.x += this.vx;
+      this.vy += 0.7;
+      this.y += this.vy;
+      this.grounded = false;
+      for (const p of M.stage.plats) {
+        const top = p.y + (p.dy || 0), l = p.x + (p.dx || 0);
+        if (this.x > l - 10 && this.x < l + p.w + 10 && this.y >= top - 4 && this.y <= top + 30 && this.vy >= 0) {
+          this.y = top; this.vy = 0; this.grounded = true;
+        }
+      }
+      /* un compagnon ne tombe pas dans le vide : il rebondit vers la scène */
+      if (this.y > M.stage.bounds.bottom - 260) { this.vy = -14; this.x -= this.facing * 30; }
+    } else {
+      /* vol : approche douce, sans à-coups */
+      const cibleY = vy - (this.kind === 'paille' ? 120 : 90);
+      this.vx += clamp(dx * 0.012, -0.8, 0.8);
+      this.vy += clamp((cibleY - this.y) * 0.012, -0.7, 0.7);
+      this.vx = clamp(this.vx, -D.vitesse, D.vitesse);
+      this.vy = clamp(this.vy, -D.vitesse, D.vitesse);
+      this.x += this.vx; this.y += this.vy;
+    }
+
+    /* garde-fous : on ne quitte jamais l'arène */
+    const B = M.stage.bounds;
+    this.x = clamp(this.x, B.left + 60, B.right - 60);
+    this.y = clamp(this.y, B.top + 120, B.bottom - 120);
+
+    /* ---------- la frappe ---------- */
+    if (t && this.cd <= 0 && adx < D.portee && ady < D.portee * 0.9) {
+      this.attaquer(M, t);
+      this.cd = D.cadence;
+    }
+
+    /* poussière / plumes pendant le déplacement */
+    if (this.anim % 9 === 0)
+      FX.spark(this.x - this.facing * 12, this.y - this.h * 0.4,
+               -this.facing * 0.6, -0.4, D.couleur, 16, 3);
+  }
+
+  attaquer(M, t) {
+    const D = this.D, F = D.frappe;
+    const dir = this.facing;
+    this.frappeT = 16;
+
+    if (D.tire) {
+      /* Grand-mère Kal jette un sort : un projectile lent qui suit sa
+         trajectoire, propriété de l'invocateur pour que les règles
+         d'équipe s'appliquent. */
+      const a = Math.atan2(t.cy - this.cy, t.cx - this.x);
+      M.spawnProjectile(this.maitre, {
+        x: this.x, y: this.cy, vx: Math.cos(a) * 9, vy: Math.sin(a) * 9,
+        w: 30, h: 30, dmg: F.dmg, ang: F.ang, bkb: F.bkb, kbg: F.kbg,
+        life: 90, color: D.couleur, dir: Math.cos(a) > 0 ? 1 : -1,
+        reflectable: true, fxHit: 'ring', sfxHit: 'hitLight'
+      });
+      Audio2.play('whoosh', { pan: clamp(this.x / 900, -1, 1), power: 0.4 });
+      return;
+    }
+
+    if (D.langue) {
+      /* Le zandoli tire la langue : la cible est ramenée vers lui, ce
+         qui la sort de sa position et l'offre à l'invocateur. */
+      M.spawnHitbox(this.maitre, {
+        x: Math.min(this.x, t.cx) - 20, y: this.cy - 24,
+        w: Math.abs(t.cx - this.x) + 40, h: 48,
+        dmg: F.dmg, ang: F.ang, bkb: F.bkb, kbg: F.kbg,
+        life: 6, fx: 'ring', color: D.couleur, sfx: 'hitLight',
+        id: 'langue' + this.age
+      });
+      const pull = sign(this.x - t.cx) || 1;
+      t.vx += pull * 7;
+      this.langueT = 14;
+      Audio2.play('grab', { pan: clamp(this.x / 900, -1, 1) });
+      return;
+    }
+
+    M.spawnHitbox(this.maitre, {
+      x: this.x + (dir > 0 ? 0 : -F.w), y: this.cy - F.h / 2,
+      w: F.w, h: F.h,
+      dmg: F.dmg, ang: F.ang, bkb: F.bkb, kbg: F.kbg,
+      life: 6, fx: 'impact', color: D.couleur,
+      sfx: this.kind === 'boeuf' ? 'smashHit' : 'hit',
+      id: 'inv' + this.age
+    });
+    if (this.kind === 'boeuf') { M.shake(9); this.vx = dir * D.vitesse * 1.6; }
+    if (this.kind === 'paille') { this.vy = 7; }
+    Audio2.play(this.kind === 'boeuf' ? 'whooshBig' : 'whoosh', { pan: clamp(this.x / 900, -1, 1) });
+  }
+
+  partir(M) {
+    if (this.dead) return;
+    this.dead = true;
+    FX.smoke(this.x, this.y - this.h / 2, 8);
+    FX.ring(this.x, this.y - this.h / 2, 54, this.D.couleur, 18, 5, 1.8);
+  }
+
+  /* ---------- dessin ----------
+     Chaque compagnon a une silhouette reconnaissable en une fraction
+     de seconde : c'est ce qui compte en pleine mêlée. */
+  draw(ctx) {
+    const D = this.D, x = this.x, y = this.y, f = this.facing;
+    const restant = this.life - this.age;
+    if (restant < 90 && Math.floor(this.age / 4) % 2 === 0) return;   // clignote avant de partir
+    const bob = Math.sin(this.anim * (D.sol ? 0.24 : 0.11)) * (D.sol ? 2 : 5);
+
+    ctx.save();
+    ctx.translate(x, y + bob);
+    ctx.scale(f, 1);
+
+    /* halo d'appartenance : la couleur de celui qui l'a invoqué */
+    const cm = (this.maitre && this.maitre.color) || '#ffd166';
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(0, -this.h * 0.5, 4, 0, -this.h * 0.5, this.w * 1.5);
+    g.addColorStop(0, rgba(cm, 0.42)); g.addColorStop(1, rgba(cm, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, -this.h * 0.5, this.w * 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+
+    const c = D.couleur, o = shade(c, -0.45);
+    ctx.lineJoin = 'round';
+
+    switch (this.kind) {
+      case 'tangue': {
+        ctx.fillStyle = c;
+        ctx.beginPath(); ctx.ellipse(0, -18, 24, 17, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = o;
+        ctx.beginPath(); ctx.moveTo(16, -26); ctx.lineTo(34, -14); ctx.lineTo(16, -8); ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = '#f4e3c4'; ctx.lineWidth = 2.6;
+        for (let i = -3; i <= 3; i++) {
+          ctx.beginPath(); ctx.moveTo(i * 6, -30);
+          ctx.lineTo(i * 6 + 2, -42); ctx.stroke();
+        }
+        ctx.fillStyle = '#1b1b1b';
+        ctx.beginPath(); ctx.arc(24, -20, 2.4, 0, Math.PI * 2); ctx.fill();
+        break;
+      }
+      case 'paille': {
+        const bat = Math.sin(this.anim * 0.36);
+        ctx.fillStyle = c; ctx.strokeStyle = o; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(0, -20, 22, 12, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(-4, -24); ctx.quadraticCurveTo(-26, -24 - bat * 22, -44, -14 - bat * 10);
+        ctx.quadraticCurveTo(-24, -14, -4, -16); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(4, -24); ctx.quadraticCurveTo(24, -24 - bat * 22, 40, -14 - bat * 10);
+        ctx.quadraticCurveTo(22, -14, 4, -16); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(-18, -18); ctx.lineTo(-48, -6); ctx.stroke();  // la longue plume
+        ctx.fillStyle = '#f4a340';
+        ctx.beginPath(); ctx.moveTo(20, -22); ctx.lineTo(34, -18); ctx.lineTo(20, -14); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#1b1b1b';
+        ctx.beginPath(); ctx.arc(14, -23, 2.2, 0, Math.PI * 2); ctx.fill();
+        break;
+      }
+      case 'kal': {
+        const flot = Math.sin(this.anim * 0.08) * 4;
+        ctx.fillStyle = rgba(c, 0.85);
+        ctx.beginPath();
+        ctx.moveTo(-22, -8 + flot);
+        ctx.quadraticCurveTo(-26, -62, 0, -74);
+        ctx.quadraticCurveTo(26, -62, 22, -8 + flot);
+        ctx.quadraticCurveTo(0, 2 + flot, -22, -8 + flot);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#f2e3c9';
+        ctx.beginPath(); ctx.arc(0, -60, 13, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#2a1a3a';
+        ctx.beginPath(); ctx.arc(-4, -62, 2.2, 0, Math.PI * 2); ctx.arc(5, -62, 2.2, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#e8e8f2'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(-13, -68); ctx.quadraticCurveTo(0, -84, 13, -68); ctx.stroke();
+        ctx.fillStyle = rgba('#ffd166', 0.8);
+        const s = 4 + Math.sin(this.anim * 0.2) * 2;
+        ctx.beginPath(); ctx.arc(18, -34, s, 0, Math.PI * 2); ctx.fill();
+        break;
+      }
+      case 'boeuf': {
+        ctx.fillStyle = c; ctx.strokeStyle = o; ctx.lineWidth = 2.5;
+        ctx.beginPath(); ctx.roundRect(-44, -52, 82, 40, 12); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.roundRect(30, -58, 30, 30, 8); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = '#efe3c8'; ctx.lineWidth = 5;
+        ctx.beginPath(); ctx.moveTo(38, -58); ctx.quadraticCurveTo(48, -74, 62, -68); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(46, -58); ctx.quadraticCurveTo(58, -70, 68, -58); ctx.stroke();
+        ctx.strokeStyle = o; ctx.lineWidth = 7; ctx.lineCap = 'round';
+        const p = Math.sin(this.anim * 0.3) * 8;
+        ctx.beginPath(); ctx.moveTo(-28, -14); ctx.lineTo(-28 + p, 0); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(18, -14); ctx.lineTo(18 - p, 0); ctx.stroke();
+        ctx.lineCap = 'butt';
+        ctx.fillStyle = '#1b1b1b';
+        ctx.beginPath(); ctx.arc(50, -46, 2.8, 0, Math.PI * 2); ctx.fill();
+        break;
+      }
+      default: {   // zandoli
+        ctx.fillStyle = c; ctx.strokeStyle = o; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(0, -14, 22, 10, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(20, -18, 11, 8, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = c; ctx.lineWidth = 5;
+        const q = Math.sin(this.anim * 0.18) * 10;
+        ctx.beginPath(); ctx.moveTo(-20, -14); ctx.quadraticCurveTo(-38, -14 + q, -46, -4 + q); ctx.stroke();
+        ctx.strokeStyle = o; ctx.lineWidth = 4; ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.moveTo(-8, -6); ctx.lineTo(-14, 2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(10, -6); ctx.lineTo(16, 2); ctx.stroke();
+        ctx.lineCap = 'butt';
+        if (this.langueT > 0) {
+          this.langueT--;
+          ctx.strokeStyle = '#ff6b8a'; ctx.lineWidth = 3.5;
+          ctx.beginPath(); ctx.moveTo(28, -18); ctx.lineTo(28 + this.D.portee * 0.5, -18); ctx.stroke();
+        }
+        ctx.fillStyle = '#1b1b1b';
+        ctx.beginPath(); ctx.arc(25, -21, 2.4, 0, Math.PI * 2); ctx.fill();
+        break;
+      }
+    }
+    ctx.restore();
+
+    /* jauge de temps restant, discrète, sous les pattes */
+    const k = clamp(restant / this.life, 0, 1);
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,.42)';
+    ctx.fillRect(x - 22, y + 8, 44, 4);
+    ctx.fillStyle = cm;
+    ctx.fillRect(x - 22, y + 8, 44 * k, 4);
+    ctx.restore();
+  }
+}
+
+/* ============================================================
+   LES OBJETS QUI INVOQUENT
+   Ramassés à la main comme tous les autres, ils se consomment
+   aussitôt : le compagnon apparaît à côté de vous.
+   ============================================================ */
+(function ajouteInvocations() {
+  if (typeof ITEMS === 'undefined' || !ITEMS.defs) return;
+
+  function invoque(f, kind) {
+    const M = f.M;
+    if (!M) return;
+    if (!M.allies) M.allies = [];
+    /* un seul compagnon par combattant : le précédent s'en va */
+    for (const a of M.allies) if (a.maitre === f) a.partir(M);
+    const a = new Allie(f, kind, f.cx + f.facing * 70, f.y);
+    M.allies.push(a);
+    FX.ring(a.x, a.y - 30, 80, INVOCS[kind].couleur, 26, 8, 2.1);
+    FX.burst(a.x, a.y - 30, 60, INVOCS[kind].couleur, 20);
+    Audio2.play('powerup', { pan: f.sfxPan });
+    M.ticker(
+      (M.lang === 'en' ? INVOCS[kind].nEN : (M.lang === 'cr' ? INVOCS[kind].nCR : INVOCS[kind].nFR)) +
+      (M.lang === 'en' ? ' JOINS YOU !' : ' VIENT T’AIDER !'),
+      INVOCS[kind].couleur);
+    Stat.bump(f, 'invocations');
+  }
+
+  const nouveaux = [
+    { id: 'capsuletangue', nFR: 'Panier tangue', nCR: 'Panyé tang', nEN: 'Tenrec Basket',
+      instant: true, weight: 6, color: '#a97c50', invoc: 'tangue' },
+    { id: 'capsulepaille', nFR: 'Plume paille-en-queue', nCR: 'Plim pay-an-ké', nEN: 'Tropicbird Feather',
+      instant: true, weight: 5, color: '#eef4ff', invoc: 'paille' },
+    { id: 'capsulekal', nFR: 'Grigri Grand-mère Kal', nCR: 'Grigri Granmèr Kal', nEN: 'Granny Kal Charm',
+      instant: true, weight: 4, color: '#9b6bd6', invoc: 'kal' },
+    { id: 'capsuleboeuf', nFR: 'Cloche à bœuf', nCR: 'Klosh bèf', nEN: 'Ox Bell',
+      instant: true, weight: 4, color: '#5a4636', invoc: 'boeuf' },
+    { id: 'capsulezandoli', nFR: 'Boîte à zandoli', nCR: 'Bwat zandoli', nEN: 'Anole Box',
+      instant: true, weight: 5, color: '#6fbf4f', invoc: 'zandoli' }
+  ];
+  for (const d of nouveaux) {
+    d.apply = (function (kind) { return function (f) { invoque(f, kind); }; })(d.invoc);
+    ITEMS.defs.push(d);
+  }
+
+  /* Icônes : le dessin d'origine ne connaît pas ces objets, on greffe
+     un cas supplémentaire plutôt que de toucher au fichier d'origine. */
+  const iconOrig = ITEMS.drawIcon.bind(ITEMS);
+  ITEMS.drawIcon = function (ctx, d, x, y, s) {
+    if (!d.invoc) return iconOrig(ctx, d, x, y, s);
+    ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+    /* une capsule ronde, striée, avec la couleur de la créature */
+    ctx.fillStyle = shade(d.color, -0.35);
+    ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = d.color;
+    ctx.beginPath(); ctx.arc(0, 0, 15, Math.PI, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#0d0f14'; ctx.lineWidth = 2.4;
+    ctx.beginPath(); ctx.moveTo(-15, 0); ctx.lineTo(15, 0); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#0d0f14'; ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.arc(0, 0, 5, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  };
+})();
+
+
 /* ===== 08-ai.js ===== */
 /* ============================================================
    SMASH PÉI — INTELLIGENCE DES BOTS
@@ -15638,6 +16869,10 @@ class Brain {
     }
 
     // ------- ramasser un objet -------
+    /* Depuis que le ramassage est manuel, le bot doit lui aussi appuyer
+       sur SAISIE une fois arrive dessus : sans cela il pietinerait
+       indefiniment sur l'objet sans jamais le prendre. */
+    if (f.itemProche && !f.item) { o.grab = true; this.out = o; return o; }
     const it = M.nearestItem(f);
     if (it && dist2(it.x, it.y, f.cx, f.cy) < 420 * 420 && Math.random() < 0.4) {
       o.ax = clamp((it.x - f.cx) / 90, -1, 1);
@@ -16292,6 +17527,7 @@ class Match {
     this.hitboxes = [];
     this.hazards = [];
     this.traps = [];
+    this.allies = [];        // compagnons invoques par les objets capsules
     this.timers = [];
     this.warns = [];
     this.hitstopF = 0;
@@ -16453,12 +17689,30 @@ class Match {
   }
 
   /* ---------- effets globaux ---------- */
-  /* Le gel d'impact donne du poids aux coups, mais au-dela d'une
-     dizaine d'images il ne se lit plus comme un impact : il se lit
-     comme un jeu qui plante. On le borne donc. */
+  /* GEL GLOBAL — à n'utiliser que pour les très gros moments.
+     Il fige TOUT : les quatre combattants, les objets, la caméra. À
+     raison d'un gel par coup encaissé, dans une mêlée à quatre, cela
+     revenait à couper l'image plusieurs fois par seconde — d'où
+     l'impression tenace que le jeu ramait alors qu'il tournait à
+     soixante images. Il est désormais réservé au K.O., au super, à la
+     parade parfaite et au bouclier brisé, et borné à sept images.
+
+     Pour un coup ordinaire, on utilise `impact()` juste en dessous :
+     seuls l'attaquant et sa cible se figent, comme dans Smash. Le
+     reste de la partie continue de tourner. */
   hitstop(f) {
     const v = Math.round(f * (Save.data ? Save.data.opts.hitstop : 1));
-    this.hitstopF = Math.min(12, Math.max(this.hitstopF, v));
+    this.hitstopF = Math.min(7, Math.max(this.hitstopF, v));
+  }
+
+  /* GEL LOCAL — le poids du coup sans l'arrêt sur image.
+     On fige uniquement les combattants concernés ; tout le reste du
+     match continue à sa vitesse normale. */
+  impact(frames, ...cibles) {
+    const v = Math.round(frames * (Save.data ? Save.data.opts.hitstop : 1));
+    if (v <= 0) return;
+    for (const c of cibles)
+      if (c && c.hitlag !== undefined) c.hitlag = Math.max(c.hitlag, Math.min(14, v));
   }
   shake(v) { this.cam.shake = Math.max(this.cam.shake, v * (Save.data ? Save.data.opts.shake : 1)); }
   zoomPunch(v) { this.cam.punch = Math.max(this.cam.punch, v); }
@@ -16472,7 +17726,7 @@ class Match {
   superCut(f) {
     /* La vignette du super reste, mais le jeu ne s'arrete plus une
        demi-seconde : on garde juste l'a-coup qui marque le coup. */
-    this.hitstop(10); this.flash(0.5); this.shake(10);
+    this.hitstop(6); this.flash(0.5); this.shake(10);
     this.cutIn = { f, t: 46 };
   }
 
@@ -16583,7 +17837,7 @@ class Match {
       }
     }
 
-    for (const arr of [this.projectiles, this.items, this.hitboxes, this.hazards, this.traps]) {
+    for (const arr of [this.projectiles, this.items, this.hitboxes, this.hazards, this.traps, this.allies]) {
       for (let i = arr.length - 1; i >= 0; i--) {
         arr[i].update(this);
         if (arr[i].dead) arr.splice(i, 1);
@@ -16715,21 +17969,30 @@ class Match {
     /* Objets : la zone de ramassage est un peu plus généreuse que la
        boîte du combattant, sinon on passe sans arrêt à côté. On marque
        aussi l'objet le plus proche pour que le joueur sache qu'il l'a. */
-    const REACH = 26;
+    /* RAMASSAGE MANUEL.
+       Marcher sur un objet ne le ramasse plus jamais : on se contente
+       de noter qu'il est a portee. C'est la touche SAISIE qui decide,
+       comme dans Smash. Cela evite d'attraper une bombe qu'on voulait
+       eviter, et rend le controle du terrain autour d'un objet beaucoup
+       plus interessant. */
+    const REACH = 30;
+    for (const f of F) f.itemProche = null;
     for (const it of this.items) {
-      it.near = false;
+      it.near = false; it.invite = false;
       if (it.dead) continue;
       const ir = it.rect();
-      const grab = { x: ir.x - REACH, y: ir.y - REACH, w: ir.w + REACH * 2, h: ir.h + REACH * 2 };
+      const zone = { x: ir.x - REACH, y: ir.y - REACH, w: ir.w + REACH * 2, h: ir.h + REACH * 2 };
       for (const f of F) {
         if (!f.alive || f.state === ST.DEAD) continue;
-        if (!rectHit(grab, f.rect())) continue;
-        if (f.item && !it.def.instant) { it.near = true; continue; }
-        f.pickup(it);
-        it.dead = true;
-        FX.burst(it.x, it.y, 34, it.def.color, 16);
-        FX.ring(it.x, it.y, 42, it.def.color, 14, 5, 2.2, 0.5);
-        break;
+        if (!rectHit(zone, f.rect())) continue;
+        it.near = true;
+        if (f.item && !it.def.instant) continue;      // les mains sont deja prises
+        /* on garde le plus proche, pour que le geste soit sans ambiguite */
+        if (!f.itemProche || Math.abs(it.x - f.cx) < Math.abs(f.itemProche.x - f.cx))
+          f.itemProche = it;
+        /* L'invite « appuie sur SAISIE » ne s'affiche que pour un joueur
+           humain : inutile de la montrer au-dessus d'un bot. */
+        if (f.slot && f.slot.kind === 'human') it.invite = true;
       }
     }
   }
@@ -16759,7 +18022,7 @@ class Match {
     const star = dir === 'top';
     Audio2.play(star ? 'starKo' : 'ko');
     Audio2.duckMusic(0.4, 0.9);
-    this.hitstop(star ? 8 : 14);
+    this.hitstop(star ? 5 : 7);
     this.shake(20);
     this.flash(0.55);
     if (killer && killer !== f) {
@@ -16814,7 +18077,7 @@ class Match {
     const teams = new Set(alive.map(x => this.rules.teams ? x.team : x.id));
     /* Ralenti final : assez pour savourer le KO decisif, pas au point
        de croire que le jeu s'est fige. */
-    if (teams.size <= 1) { this.slowmo(42, 0.42); this.finish(alive[0] || null); }
+    if (teams.size <= 1) { this.slowmo(34, 0.5); this.finish(alive[0] || null); }
   }
 
   endByTime() {
@@ -16863,7 +18126,7 @@ class Match {
     this.banner(draw ? (this.lang === 'en' ? 'DRAW !' : 'ÉGALITÉ !') : (this.lang === 'en' ? 'GAME !' : 'FIN DU MATCH !'), '#ffd166');
     // cinématique de fin : zoom lent sur le vainqueur + rayons + confettis
     this.finale = { t: 0, f: winner || null, rays: 0 };
-    this.slowmo(80, 0.30);
+    this.slowmo(56, 0.42);
     this.shake(22); this.flash(0.5);
     if (winner) {
       this.timers.push({ f: 26, run: () => {
@@ -16893,7 +18156,8 @@ class Match {
     FX.draw(ctx, -1);
     this.stage.ground(ctx, this.frame);
 
-    // pièges / objets / projectiles
+    // compagnons invoques, puis pieges / objets / projectiles
+    for (const a of this.allies) a.draw(ctx);
     for (const t of this.traps) t.draw(ctx);
     for (const it of this.items) it.draw(ctx);
     // avertissements de danger
@@ -17450,11 +18714,21 @@ class Match {
     ctx.beginPath(); ctx.roundRect(x + 8, y + H - 14, W - 16, 8, 4); ctx.fill();
     const sg = ctx.createLinearGradient(x, 0, x + W, 0);
     sg.addColorStop(0, '#ffd166'); sg.addColorStop(1, '#ff8a3c');
-    ctx.fillStyle = sm >= 1 ? sg : 'rgba(255,209,102,0.7)';
+    /* La jauge fuit quand on la laisse pleine sans s'en servir : elle
+       vire à l'orange vif pour que le joueur comprenne qu'il est en
+       train de perdre son super, et non que la barre bugue. */
+    const fuite = !!f.superFuite;
+    ctx.fillStyle = sm >= 1 ? sg : (fuite ? 'rgba(255,122,72,0.92)' : 'rgba(255,209,102,0.7)');
     ctx.beginPath(); ctx.roundRect(x + 8, y + H - 14, Math.max(2, (W - 16) * sm), 8, 4); ctx.fill();
+    /* le repère du plancher : la fuite ne descend jamais plus bas */
+    if (fuite || sm >= 1) {
+      const bx = x + 8 + (W - 16) * (PHYS.superDecayFloor || 0.7);
+      ctx.fillStyle = 'rgba(255,255,255,.5)';
+      ctx.fillRect(bx - 1, y + H - 16, 2, 12);
+    }
     if (sm >= 1) {
       ctx.save();
-      ctx.globalAlpha = 0.55 + Math.sin(this.frame * 0.2) * 0.45;
+      ctx.globalAlpha = 0.55 + Math.sin(this.frame * (fuite ? 0.42 : 0.2)) * 0.45;
       const key = this.superKeyLabel(f);
       ctx.font = '900 12px Bangers, Impact, sans-serif';
       ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
@@ -20914,13 +22188,15 @@ const Net = {
     switch (type) {
       case 'ko':
         Audio2.play(d.s ? 'starKo' : 'ko');
-        M.hitstop(d.s ? 8 : 14); M.shake(20); M.flash(0.55);
+        M.hitstop(d.s ? 5 : 7); M.shake(20); M.flash(0.55);
         FX.koBurst(d.x || 0, d.y || 0, d.c || '#fff');
         break;
       case 'hit':
         Audio2.play((d.p || 0) > 0.5 ? 'smashHit' : 'hit', { pan });
         FX.hit(d.x || 0, d.y || 0, d.d || 1, 'punch', d.c || '#fff', d.p || 0.4);
-        M.hitstop(Math.round(2 + (d.p || 0) * 6));
+        /* En ligne aussi, un coup ordinaire ne fige plus toute la partie :
+           l'a-coup est rendu par la secousse et l'effet, pas par un arrêt. */
+        M.shake(3 + (d.p || 0) * 10);
         break;
       case 'banner':
         M.banner(d.t || '', d.c || '#fff');
@@ -23228,6 +24504,7 @@ const Touch = {
     const d = this._st;
 
     this._tickSuper();
+    this._tickRamasse();
 
     /* boutons (avec maintien minimum pour ne pas rater un tap court) */
     const B = this._btns;
@@ -23292,6 +24569,26 @@ const Touch = {
      Anneau de progression, chiffre en pourcentage, puis
      allumage franc avec vibration quand la jauge est pleine.
      ============================================================ */
+  /* Le ramassage étant devenu manuel, le bouton SAISIE s'allume dès
+     qu'un objet est à portée : sur téléphone, personne ne devinerait
+     tout seul qu'il faut appuyer. */
+  _tickRamasse() {
+    const b = this._grab;
+    if (!b) return;
+    const M = (typeof UI !== 'undefined') ? UI.match : null;
+    let proche = false;
+    if (M && M.fighters) {
+      const f = M.fighters.find(x => x.slot && x.slot.device === this.DEV) ||
+                M.fighters.find(x => x.slot && x.slot.kind === 'human');
+      proche = !!(f && f.itemProche);
+    }
+    if (proche !== b.proche) {
+      b.proche = proche;
+      b.el.classList.toggle('tc-item', proche);
+      if (proche) this.buzz(12);
+    }
+  },
+
   _tickSuper() {
     const b = this._sup;
     if (!b) return;
@@ -23399,6 +24696,9 @@ const Touch = {
       root.appendChild(el);
       const rec = { cfg, el, pid: null, down: false, seen: 0, latch: 0 };
       if (cfg.act === 'super') { this._sup = rec; rec.ready = false; rec.pct = -1; }
+      /* SAISIE sert aussi à ramasser : on garde une référence pour
+         pouvoir l'allumer quand un objet est à portée. */
+      if (cfg.act === 'grab') { this._grab = rec; rec.proche = false; }
       this._btns.push(rec);
     }
 
@@ -23914,11 +25214,20 @@ const Touch = {
   box-shadow:0 0 calc(var(--tc-u) * .3) rgba(255,190,80,.75);
 }
 @keyframes tcSpin{ to{ transform:rotate(360deg); } }
+/* SAISIE : un objet est a portee, il n'attend qu'un appui */
+#touchui .tc-btn.tc-item{
+  box-shadow:0 0 calc(var(--tc-u) * .34) rgba(255,235,150,.9),
+             inset 0 0 calc(var(--tc-u) * .18) rgba(255,235,150,.55);
+  border-color:rgba(255,235,150,.95);
+  animation:tcItem 1s ease-in-out infinite;
+}
+@keyframes tcItem{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.09); } }
 #touchui .tc-s.tc-pop{ animation:tcPop .5s cubic-bezier(.2,.9,.3,1.5); }
 @keyframes tcPop{ 0%{ transform:scale(1); } 42%{ transform:scale(1.28); } 100%{ transform:scale(1); } }
 @media (prefers-reduced-motion: reduce){
   #touchui .tc-s.tc-ready .tc-ring{ animation:none; }
   #touchui .tc-s.tc-pop{ animation:none; }
+  #touchui .tc-btn.tc-item{ animation:none; }
 }
 
 /* ---- pause ---- */
@@ -32225,6 +33534,888 @@ Object.assign(I18N.en, {
   background:linear-gradient(180deg, rgba(13,16,24,.98) 72%, rgba(13,16,24,0)); }
 `;
   document.head.appendChild(s);
+})();
+
+
+/* ===== 41-bilan.js ===== */
+/* ============================================================
+   SMASH PÉI — BILAN DE FIN DE PARTIE, ÉTAPE PAR ÉTAPE
+
+   Le problème : à la seconde où le match se terminait, tout
+   tombait d'un coup — le classement, la barre d'expérience, le
+   détail des points, les succès, les trophées, et par-dessus, les
+   petites bulles qui glissaient sur le côté. Sur un écran de
+   téléphone c'était illisible : on ne savait ni ce qu'on avait
+   gagné, ni où regarder.
+
+   La solution : on découpe le bilan en actes, et on ne montre
+   qu'un acte à la fois.
+
+     1. CLASSEMENT   — qui a gagné, et avec quels chiffres.
+     2. EXPÉRIENCE   — d'où viennent les points, puis la barre.
+     3. MAÎTRISE     — ce que chaque combattant utilisé a gagné
+                       (cette partie n'était affichée nulle part).
+     4. RÉCOMPENSES  — succès et trophées, un par un.
+
+   Sur téléphone, un seul acte occupe l'écran ; on avance en
+   touchant n'importe où ou avec le bouton SUIVANT. Sur grand
+   écran, les actes s'empilent au fur et à mesure : on garde la
+   progression sans perdre la vue d'ensemble. Un bouton TOUT VOIR
+   permet à tout moment de sauter directement à la fin, et les
+   boutons REVANCHE / MENU n'apparaissent qu'une fois le bilan
+   terminé pour qu'on ne parte pas sans avoir vu ses gains.
+
+   Aucune récompense ne dépend de ce module : il ne fait que
+   présenter ce que `awardXP`, `Achievements` et `Trophy` ont déjà
+   calculé. Si quoi que ce soit manque, on saute simplement l'acte.
+   ============================================================ */
+
+const Bilan = {
+  actes: [],
+  idx: -1,
+  actif: false,
+  trophees: [],
+  succes: [],
+
+  /* ---------- mise en place du décor ---------- */
+  prepare() {
+    const sc = document.getElementById('sc-results');
+    if (!sc || document.getElementById('bil-nav')) return;
+
+    /* bloc maîtrise : il n'existait pas, on l'ajoute après l'XP */
+    const xp = document.getElementById('res-xp');
+    const mast = document.createElement('div');
+    mast.id = 'res-mastery';
+    mast.className = 'bil-bloc';
+    if (xp && xp.parentNode) xp.parentNode.insertBefore(mast, xp.nextSibling);
+    else sc.appendChild(mast);
+
+    /* bloc trophées, juste après les succès */
+    const achv = document.getElementById('res-achv');
+    const tro = document.createElement('div');
+    tro.id = 'res-trophees';
+    tro.className = 'bil-bloc';
+    if (achv && achv.parentNode) achv.parentNode.insertBefore(tro, achv.nextSibling);
+    else sc.appendChild(tro);
+
+    /* barre de navigation : titre de l'acte, points de progression,
+       bouton SUIVANT et raccourci TOUT VOIR */
+    const nav = document.createElement('div');
+    nav.id = 'bil-nav';
+    nav.innerHTML =
+      '<div class="bil-titre"><span id="bil-nom"></span><i id="bil-pts"></i></div>' +
+      '<div class="bil-btns">' +
+        '<button type="button" class="btn primary" id="bil-suivant"></button>' +
+        '<button type="button" class="btn ghost sm" id="bil-tout"></button>' +
+      '</div>';
+    const row = sc.querySelector('.row.mt');
+    if (row) sc.insertBefore(nav, row); else sc.appendChild(nav);
+
+    document.getElementById('bil-suivant').onclick = e => { e.stopPropagation(); this.suivant(); };
+    document.getElementById('bil-tout').onclick = e => { e.stopPropagation(); this.tout(); };
+
+    /* toucher n'importe où fait avancer : c'est le geste naturel sur
+       téléphone, et il ne doit pas se déclencher sur un vrai bouton */
+    sc.addEventListener('pointerdown', e => {
+      if (!this.actif) return;
+      if (e.target.closest('button, a, input, .rank-row canvas')) return;
+      this.suivant();
+    });
+  },
+
+  /* ---------- construction des actes ---------- */
+  demarre() {
+    this.prepare();
+    const T = k => UI.t(k);
+    const a = UI.xpAnim;
+    const mg = (UI.masteryGains || []).filter(m => m && m.xp > 0);
+
+    this.actes = [];
+    this.actes.push({ id: 'rang', nom: T('bilRang'), els: ['rank'] });
+    if (a && a.gain > 0) this.actes.push({ id: 'xp', nom: T('bilXp'), els: ['res-xp'] });
+    if (mg.length) this.actes.push({ id: 'mast', nom: T('bilMaitrise'), els: ['res-mastery'] });
+    if (this.succes.length || this.trophees.length)
+      this.actes.push({ id: 'recomp', nom: T('bilRecomp'), els: ['res-achv', 'res-trophees'] });
+
+    /* on part de zéro : tout est masqué, y compris les boutons de fin */
+    for (const id of ['rank', 'res-xp', 'res-mastery', 'res-achv', 'res-trophees']) {
+      const el = document.getElementById(id);
+      if (el) { el.classList.add('bil-cache'); el.classList.remove('bil-in'); }
+    }
+    const sc = document.getElementById('sc-results');
+    if (sc) sc.classList.add('bil-on');
+    const row = sc && sc.querySelector('.row.mt');
+    if (row) row.classList.add('bil-cache');
+
+    this.remplitMaitrise(mg);
+    this.remplitSucces();
+    this.remplitTrophees();
+
+    this.idx = -1;
+    this.actif = true;
+    document.getElementById('bil-tout').textContent = T('bilTout');
+    this.suivant();
+  },
+
+  /* ---------- avancer d'un acte ---------- */
+  suivant() {
+    if (!this.actif) return;
+    this.idx++;
+    if (this.idx >= this.actes.length) { this.termine(); return; }
+
+    const A = this.actes[this.idx];
+    const mob = document.getElementById('app') &&
+                document.getElementById('app').classList.contains('mob');
+
+    /* Sur téléphone on ne garde que l'acte en cours : un seul sujet à
+       l'écran. Sur grand écran on empile, l'espace le permet. */
+    if (mob)
+      for (const act of this.actes)
+        for (const id of act.els) {
+          const el = document.getElementById(id);
+          if (el && act !== A) { el.classList.add('bil-cache'); el.classList.remove('bil-in'); }
+        }
+
+    for (const id of A.els) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      el.classList.remove('bil-cache');
+      requestAnimationFrame(() => el.classList.add('bil-in'));
+    }
+
+    /* On repart du haut de l'acte : sinon, sur un petit écran, on
+       arrive au milieu d'une liste sans savoir ce qu'on regarde. */
+    const sc2 = document.getElementById('sc-results');
+    if (sc2 && sc2.scrollTo) { try { sc2.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { sc2.scrollTop = 0; } }
+
+    document.getElementById('bil-nom').textContent = A.nom;
+    document.getElementById('bil-pts').innerHTML =
+      this.actes.map((x, i) => '<b class="' + (i <= this.idx ? 'on' : '') + '"></b>').join('');
+    const btn = document.getElementById('bil-suivant');
+    btn.textContent = this.idx >= this.actes.length - 1 ? UI.t('bilFin') : UI.t('bilSuivant');
+    document.getElementById('bil-tout').style.display =
+      this.idx >= this.actes.length - 1 ? 'none' : '';
+
+    try { Audio2.ui('move'); } catch (e) {}
+    if (A.id === 'xp') this.joueXp();
+    if (A.id === 'mast') this.anime('#res-mastery .bil-ligne', 'powerup');
+    if (A.id === 'recomp') this.anime('#res-achv .achv-toast, #res-trophees .bil-tro', 'powerup');
+  },
+
+  /* Fait apparaître une liste élément par élément, avec un son. */
+  anime(sel, son) {
+    const l = document.querySelectorAll(sel);
+    l.forEach((el, i) => setTimeout(() => {
+      el.classList.add('bil-in');
+      if (son) { try { Audio2.play(son); } catch (e) {} }
+    }, 90 + i * 240));
+  },
+
+  /* ---------- tout révéler d'un coup ---------- */
+  tout() {
+    if (!this.actif) return;
+    while (this.idx < this.actes.length - 1) {
+      this.idx++;
+      const A = this.actes[this.idx];
+      for (const id of A.els) {
+        const el = document.getElementById(id);
+        if (el) { el.classList.remove('bil-cache'); el.classList.add('bil-in'); }
+      }
+    }
+    document.querySelectorAll('#sc-results .bil-ligne, #sc-results .achv-toast, #sc-results .bil-tro')
+      .forEach(el => el.classList.add('bil-in'));
+    this.joueXp(true);
+    this.termine();
+  },
+
+  termine() {
+    this.actif = false;
+    const sc = document.getElementById('sc-results');
+    if (sc) sc.classList.remove('bil-on');
+    const nav = document.getElementById('bil-nav');
+    if (nav) nav.style.display = 'none';
+    const row = sc && sc.querySelector('.row.mt');
+    if (row) { row.classList.remove('bil-cache'); row.classList.add('bil-in'); }
+  },
+
+  /* ============================================================
+     LES CONTENUS
+     ============================================================ */
+
+  /* EXPÉRIENCE — les sources d'abord, la barre ensuite. */
+  remplitXp() {
+    const a = UI.xpAnim;
+    const el = document.getElementById('res-xp');
+    if (!el) return;
+    if (!a) { el.innerHTML = ''; return; }
+    const T = k => UI.t(k);
+    const parts = a.parts.filter(p => p[1] > 0);
+    el.innerHTML =
+      '<div class="xp-head">' +
+        '<span class="xp-t">' + T('xpGain') + '</span>' +
+        '<span class="xp-plus" id="bil-xp-total">+0 XP</span>' +
+      '</div>' +
+      '<div class="bil-lignes">' +
+        parts.map(p => '<div class="bil-ligne"><span>' + p[0] + '</span><b>+' + p[1] + '</b></div>').join('') +
+      '</div>' +
+      '<div class="xpbar big2" id="res-xp-bar"></div>' +
+      (a.res.levelUp ? '<div class="lvlup bil-ligne">' + T('levelUp') + ' ' + T('lvl2') + ' ' + a.res.to + '</div>' : '') +
+      (a.res.unlocked.length
+        ? '<div class="unlocks">' + a.res.unlocked.map(c =>
+            '<div class="unlock bil-ligne"><b>' + T('newItem') + '</b><span>' +
+            (UI.lang === 'en' ? c.en : c.fr) + '</span></div>').join('') + '</div>'
+        : '');
+    UI.renderXp('res-xp-bar', a.res.levelUp ? 0 : a.from);
+  },
+
+  /* Le compteur monte, les lignes tombent une à une, puis la barre. */
+  joueXp(immediat) {
+    const a = UI.xpAnim;
+    if (!a) return;
+    const tot = document.getElementById('bil-xp-total');
+    const lignes = document.querySelectorAll('#res-xp .bil-ligne');
+    if (immediat) {
+      if (tot) tot.textContent = '+' + a.gain + ' XP';
+      lignes.forEach(l => l.classList.add('bil-in'));
+      UI.renderXp('res-xp-bar', Progress.info().pct);
+      return;
+    }
+    lignes.forEach((l, i) => setTimeout(() => {
+      l.classList.add('bil-in');
+      try { Audio2.ui('move'); } catch (e) {}
+    }, 120 + i * 200));
+
+    /* le total grimpe pendant que les lignes arrivent */
+    const duree = 300 + lignes.length * 200;
+    const t0 = performance.now();
+    const monte = () => {
+      const k = Math.min(1, (performance.now() - t0) / duree);
+      if (tot) tot.textContent = '+' + Math.round(a.gain * (1 - Math.pow(1 - k, 3))) + ' XP';
+      if (k < 1 && UI.screen === 'results') requestAnimationFrame(monte);
+    };
+    monte();
+
+    /* puis la barre, une fois les lignes posées */
+    setTimeout(() => {
+      const cible = Progress.info().pct;
+      const start = a.res.levelUp ? 0 : a.from;
+      let k = 0;
+      const step = () => {
+        k += 0.022;
+        UI.renderXp('res-xp-bar', start + (cible - start) * easeOut(Math.min(1, k)));
+        if (k < 1 && UI.screen === 'results') requestAnimationFrame(step);
+      };
+      step();
+      if (a.res.levelUp) {
+        try { Audio2.play('powerup'); } catch (e) {}
+        setTimeout(() => { try { Audio2.play('ready'); } catch (e) {} }, 260);
+      }
+    }, duree);
+  },
+
+  /* MAÎTRISE — un gain par combattant utilisé. */
+  remplitMaitrise(mg) {
+    const el = document.getElementById('res-mastery');
+    if (!el) return;
+    if (!mg.length) { el.innerHTML = ''; return; }
+    const T = k => UI.t(k);
+    el.innerHTML =
+      '<div class="xp-head"><span class="xp-t">' + T('bilMaitrise') + '</span></div>' +
+      '<div class="bil-lignes">' + mg.map(m => {
+        const niv = (typeof Mastery !== 'undefined' && Mastery.level) ? Mastery.level(m.id) : 0;
+        return '<div class="bil-ligne">' +
+          '<span>' + m.name + '</span>' +
+          '<i class="bil-niv">' + T('bilNiv') + ' ' + niv + '</i>' +
+          '<b>+' + m.xp + '</b>' +
+          (m.up ? '<em class="bil-up">' + T('bilPalier') + '</em>' : '') +
+          '</div>';
+      }).join('') + '</div>';
+  },
+
+  /* SUCCÈS — mêmes bulles qu'avant, mais révélées une par une. */
+  remplitSucces() {
+    const el = document.getElementById('res-achv');
+    if (!el) return;
+    el.innerHTML = (this.succes || []).map(a =>
+      '<div class="achv-toast bil-ligne"><span>' + a.ic + '</span>' +
+      Achievements.name(a, UI.lang) + ' +' + a.xp + ' XP</div>').join('');
+  },
+
+  /* TROPHÉES — récupérés au passage plutôt que jetés à l'écran. */
+  remplitTrophees() {
+    const el = document.getElementById('res-trophees');
+    if (!el) return;
+    if (!this.trophees.length) { el.innerHTML = ''; return; }
+    const T = k => UI.t(k);
+    el.innerHTML = this.trophees.map(t =>
+      '<div class="bil-tro rar-' + t.rarity + '" data-id="' + t.id + '">' +
+        '<div class="bil-tro-ic">' + t.ic + '</div>' +
+        '<div class="bil-tro-tx">' +
+          '<span class="bil-tro-lbl">' + T('trNotifLabel') + '</span>' +
+          '<span class="bil-tro-nom">' + Trophy.name(t, UI.lang, true) + '</span>' +
+          '<span class="bil-tro-rar">' + T('trR_' + t.rarity) + '</span>' +
+        '</div>' +
+      '</div>').join('');
+    el.querySelectorAll('.bil-tro').forEach(d => {
+      d.onclick = e => {
+        e.stopPropagation();
+        try { Audio2.ui('move'); } catch (er) {}
+        UI.openTrophies(); UI.trOpenDetail(d.dataset.id);
+      };
+    });
+  }
+};
+
+/* ============================================================
+   BRANCHEMENT
+   On enveloppe les trois points d'entrée existants au lieu de les
+   réécrire : si un jour l'un d'eux change, le bilan suit.
+   ============================================================ */
+(function brancheBilan() {
+  if (typeof UI === 'undefined') return;
+
+  /* Les succès ne s'affichent plus tout seuls : on les met de côté. */
+  const achvOrig = UI.renderAchvToasts.bind(UI);
+  UI.renderAchvToasts = function (list) {
+    Bilan.succes = list || [];
+    const el = document.getElementById('res-achv');
+    if (el) el.innerHTML = '';
+    if (!Bilan.prepareOk) achvOrig([]);      // garde le comportement d'origine si le bilan échoue
+  };
+
+  /* Les trophées non plus : ils rejoignent le dernier acte. */
+  const troOrig = UI.trophyNotify ? UI.trophyNotify.bind(UI) : null;
+  UI.trophyNotify = function (list) {
+    if (UI.screen === 'results' || Bilan.actif || UI.resultsEnCours) {
+      Bilan.trophees = (Bilan.trophees || []).concat(list || []);
+      return;
+    }
+    if (troOrig) troOrig(list);
+  };
+
+  /* L'XP se dessine en lignes séparées, prêtes à tomber une à une. */
+  UI.renderXpResult = function () { Bilan.remplitXp(); };
+
+  const showOrig = UI.showResults.bind(UI);
+  UI.showResults = function () {
+    Bilan.trophees = []; Bilan.succes = [];
+    UI.resultsEnCours = true;
+    showOrig();
+    UI.resultsEnCours = false;
+    try { Bilan.prepareOk = true; Bilan.demarre(); }
+    catch (e) {
+      /* filet de sécurité : plutôt tout montrer d'un coup que rien */
+      Bilan.prepareOk = false;
+      console.warn('bilan', e);
+      document.querySelectorAll('#sc-results .bil-cache').forEach(el => el.classList.remove('bil-cache'));
+      Bilan.termine();
+    }
+  };
+})();
+
+/* ---------- habillage ---------- */
+(function styleBilan() {
+  const s = document.createElement('style');
+  s.id = 'bilan-style';
+  s.textContent = `
+#sc-results .bil-cache { display: none !important; }
+#sc-results .bil-bloc { width: min(1100px, 94%); }
+#res-mastery:empty, #res-trophees:empty { display: none; }
+
+/* apparition : on monte de quelques pixels en se révélant */
+#sc-results .bil-in { animation: bilMonte .34s cubic-bezier(.2,.9,.3,1) both; }
+#sc-results .bil-lignes .bil-ligne,
+#sc-results .achv-toast,
+#sc-results .bil-tro { opacity: 0; transform: translateY(10px); }
+#sc-results .bil-lignes .bil-ligne.bil-in,
+#sc-results .achv-toast.bil-in,
+#sc-results .bil-tro.bil-in {
+  opacity: 1; transform: none;
+  transition: opacity .3s ease, transform .3s cubic-bezier(.2,.9,.3,1);
+  animation: none;
+}
+@keyframes bilMonte { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+/* lignes de détail : libellé à gauche, valeur à droite */
+#sc-results .bil-lignes { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 10px; }
+#sc-results .bil-ligne {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 14px; border-radius: 10px;
+  background: rgba(255,255,255,.055);
+  border: 1px solid rgba(255,255,255,.09);
+  font-size: 14px;
+}
+#sc-results .bil-ligne > span { flex: 1; text-align: left; opacity: .9; }
+#sc-results .bil-ligne > b { color: var(--gold); font-variant-numeric: tabular-nums; }
+#sc-results .bil-niv { font-style: normal; opacity: .65; font-size: 12px; }
+#sc-results .bil-up {
+  font-style: normal; font-size: 11px; font-weight: 800; letter-spacing: .06em;
+  padding: 3px 8px; border-radius: 999px; color: #0b0d12;
+  background: linear-gradient(160deg, var(--gold), #ffb03c);
+}
+#sc-results .xp-plus { font-variant-numeric: tabular-nums; }
+
+/* trophées gagnés */
+#res-trophees { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+#sc-results .bil-tro {
+  display: flex; align-items: center; gap: 12px; text-align: left;
+  padding: 10px 14px; border-radius: 12px; cursor: pointer;
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+}
+#sc-results .bil-tro-ic { font-size: 26px; }
+#sc-results .bil-tro-tx { display: flex; flex-direction: column; line-height: 1.25; }
+#sc-results .bil-tro-lbl { font-size: 10px; letter-spacing: .12em; opacity: .6; }
+#sc-results .bil-tro-nom { font-weight: 800; }
+#sc-results .bil-tro-rar { font-size: 11px; opacity: .7; }
+
+/* barre de navigation du bilan */
+#bil-nav {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  width: min(1100px, 94%); margin-top: 14px;
+}
+#sc-results:not(.bil-on) #bil-nav { display: none; }
+#bil-nav .bil-titre { display: flex; align-items: center; gap: 12px; }
+#bil-nom { font-weight: 800; letter-spacing: .1em; font-size: 13px; opacity: .85; }
+#bil-pts { display: flex; gap: 6px; }
+#bil-pts b { width: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,.22); }
+#bil-pts b.on { background: var(--gold); }
+#bil-nav .bil-btns { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; }
+#bil-suivant { min-width: 190px; }
+
+/* téléphone : un seul acte à l'écran, boutons au pouce.
+   La barre reste collée en bas ; on réserve donc la place sous le
+   contenu pour qu'aucune ligne ne finisse cachée derrière elle. */
+#app.mob #sc-results .bil-bloc,
+#app.mob #sc-results .results { width: 100%; }
+#app.mob #sc-results.bil-on { padding-bottom: 104px; }
+#app.mob #bil-nav {
+  position: sticky; bottom: 0; z-index: 6; margin-top: 10px;
+  padding: 8px 0 10px; gap: 7px;
+  background: linear-gradient(180deg, rgba(9,11,16,0) 0%, rgba(9,11,16,.92) 26%, rgba(9,11,16,.98) 100%);
+}
+#app.mob #bil-suivant { min-height: 46px; min-width: 58vw; font-size: 15px; }
+#app.mob #bil-tout { min-height: 42px; }
+#app.mob #sc-results .bil-ligne { font-size: 13px; padding: 8px 12px; }
+#app.mob #sc-results .bil-lignes { gap: 5px; margin: 6px 0 8px; }
+#app.mob #sc-results .rank-row canvas { width: 54px; height: 54px; }
+
+/* écran bas (téléphone à l'horizontale) : on serre encore d'un cran */
+#app.fh-sm #sc-results .bil-ligne { font-size: 12px; padding: 6px 11px; }
+#app.fh-sm #sc-results .bil-lignes { gap: 4px; }
+#app.fh-sm #bil-nav { padding: 6px 0 8px; gap: 5px; }
+#app.fh-sm #bil-suivant { min-height: 40px; }
+#app.fh-sm #bil-nom { font-size: 11px; }
+#app.fh-sm #sc-results.bil-on { padding-bottom: 88px; }
+`;
+  document.head.appendChild(s);
+})();
+
+/* ---------- textes ---------- */
+Object.assign(I18N.fr, {
+  bilRang: 'CLASSEMENT', bilXp: 'EXPÉRIENCE', bilMaitrise: 'MAÎTRISE',
+  bilRecomp: 'RÉCOMPENSES', bilSuivant: 'SUIVANT', bilFin: 'TERMINER',
+  bilTout: 'Tout voir', bilNiv: 'Niv.', bilPalier: 'PALIER !'
+});
+Object.assign(I18N.cr, {
+  bilRang: 'KLASMAN', bilXp: 'EKSPÉRYANS', bilMaitrise: 'MÈTRIZ',
+  bilRecomp: 'REKONPANS', bilSuivant: 'APRÉ', bilFin: 'FINI',
+  bilTout: 'Wa tout', bilNiv: 'Niv.', bilPalier: 'PALYÉ !'
+});
+Object.assign(I18N.en, {
+  bilRang: 'RANKING', bilXp: 'EXPERIENCE', bilMaitrise: 'MASTERY',
+  bilRecomp: 'REWARDS', bilSuivant: 'NEXT', bilFin: 'DONE',
+  bilTout: 'Show all', bilNiv: 'Lv.', bilPalier: 'TIER UP!'
+});
+
+
+/* ===== 42-cosmetiques.js ===== */
+/* ============================================================
+   SMASH PÉI — COSMÉTIQUES : AJUSTEMENTS ET NOUVEAUTÉS
+
+   Deux choses ici.
+
+   1. LES RÉGLAGES FINS. Le rig ajuste déjà automatiquement les
+      accessoires à la forme de la tête (voir `cosFitTete`). Restaient
+      quelques combattants dont la silhouette sort du lot : un long
+      museau, une crête haute, une tête minuscule. On leur donne un
+      réglage manuel, exprimé en rayons de tête, qui vient s'ajouter à
+      l'ajustement automatique.
+
+   2. DIX-NEUF NOUVEAUX COSMÉTIQUES. Cinq chapeaux, trois pour le
+      visage, trois pour le dos, trois auras et cinq teintes. Ils se
+      débloquent par niveau, comme les autres, et se rangent tout seuls
+      dans le vestiaire.
+
+   Rien n'est modifié dans les cosmétiques existants : on ajoute à la
+   liste et on dessine dans les crochets prévus par le rig
+   (`COS_TETE`, `COS_VISAGE`, `COS_DOS`, `COS_AURA`).
+   ============================================================ */
+
+/* ============================================================
+   1) RÉGLAGES PAR COMBATTANT
+   dx / dy en rayons de tête, sx / sy en facteurs.
+   ============================================================ */
+(function reglagesGabarit() {
+  if (typeof CHAR_LIST === 'undefined') return;
+  const REGL = {
+    /* museaux longs : ce qu'on pose sur la tête doit reculer un peu,
+       sinon le chapeau part avec le nez */
+    requin:    { dx: -0.10, sx: 0.94 },
+    espadon:   { dx: -0.12, sx: 0.94 },
+    /* becs : les lunettes doivent rester sur les yeux, pas sur le bec */
+    dodo:      { dx: -0.05, dy: 0.03 },
+    paille:    { dx: -0.05, dy: 0.03 },
+    zoizo:     { dx: -0.04 },
+    nuitoiseau:{ dx: -0.04 },
+    /* têtes très grosses : on resserre pour ne pas déborder */
+    cari:      { sx: 0.92, sy: 0.94, dy: 0.04 },
+    bouchon:   { sx: 0.95, dy: 0.03 },
+    /* têtes menues : on grossit un peu, sinon le chapeau fait jouet */
+    tectec:    { sx: 1.08, sy: 1.06, dy: -0.03 },
+    piment:    { dy: -0.05 },
+    /* coiffes hautes déjà présentes sur le personnage */
+    volkan:    { dy: -0.08 },
+    granmer:   { dy: -0.05 },
+    gramoun:   { dy: -0.04 }
+  };
+  for (const c of CHAR_LIST) if (REGL[c.id]) c.cosFit = REGL[c.id];
+})();
+
+/* ============================================================
+   2) DESSIN DES NOUVEAUX ACCESSOIRES
+   Repère : centre de la tête, `r` = rayon. Le gabarit est déjà
+   appliqué par l'appelant.
+   ============================================================ */
+function COS_TETE(ctx, r, f, P, pose) {
+  switch (f.hatX) {
+
+    /* CAPELINE VANILLE — large bord souple et une fleur de vanille */
+    case 'capeline': {
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 0.78, r * 1.62, r * 0.34, 0, 0, Math.PI * 2);
+      const g = ctx.createLinearGradient(-r * 1.6, 0, r * 1.6, 0);
+      g.addColorStop(0, '#f3e6c8'); g.addColorStop(0.5, '#fbf3de'); g.addColorStop(1, '#e2d0aa');
+      ctx.fillStyle = g; ctx.fill();
+      ctx.strokeStyle = 'rgba(120,95,50,.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 1.06, r * 0.72, r * 0.42, 0, Math.PI, 0);
+      ctx.fillStyle = '#f7ecd2'; ctx.fill(); ctx.stroke();
+      /* la fleur */
+      ctx.fillStyle = '#fdfbf2';
+      for (let i = 0; i < 5; i++) {
+        const a = i / 5 * Math.PI * 2;
+        ctx.beginPath();
+        ctx.ellipse(r * 0.86 + Math.cos(a) * r * 0.15, -r * 0.98 + Math.sin(a) * r * 0.15,
+                    r * 0.16, r * 0.1, a, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = '#e5c76a';
+      ctx.beginPath(); ctx.arc(r * 0.86, -r * 0.98, r * 0.09, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+
+    /* CAPUCHE TANGUE — capuche piquante */
+    case 'tangue': {
+      ctx.beginPath();
+      ctx.moveTo(-r * 1.16, r * 0.35);
+      ctx.quadraticCurveTo(-r * 1.3, -r * 1.2, 0, -r * 1.28);
+      ctx.quadraticCurveTo(r * 1.3, -r * 1.2, r * 1.16, r * 0.35);
+      ctx.quadraticCurveTo(r * 0.72, -r * 0.05, 0, -r * 0.02);
+      ctx.quadraticCurveTo(-r * 0.72, -r * 0.05, -r * 1.16, r * 0.35);
+      ctx.closePath();
+      ctx.fillStyle = '#8a6540'; ctx.fill();
+      ctx.strokeStyle = 'rgba(40,25,10,.5)'; ctx.lineWidth = 1.6; ctx.stroke();
+      /* piquants courts et serrés : une brosse, pas une crête */
+      ctx.fillStyle = '#f2e6c8';
+      ctx.strokeStyle = 'rgba(60,40,15,.45)'; ctx.lineWidth = 1;
+      for (let i = -4; i <= 4; i++) {
+        const a = i * 0.2;
+        const bx = Math.sin(a) * r * 0.95, by = -r * 1.12 + Math.abs(i) * r * 0.045;
+        ctx.beginPath();
+        ctx.moveTo(bx - r * 0.09, by);
+        ctx.lineTo(bx + r * 0.02, by - r * 0.34);
+        ctx.lineTo(bx + r * 0.11, by);
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+      break;
+    }
+
+    /* CASQUE DE VOLCANOLOGUE — coque + lampe frontale allumée */
+    case 'volcano': {
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 0.22, r * 1.12, r * 1.0, 0, Math.PI, 0);
+      ctx.fillStyle = '#e8552f'; ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1.8; ctx.stroke();
+      ctx.beginPath();
+      ctx.roundRect(-r * 1.2, -r * 0.38, r * 2.4, r * 0.24, r * 0.1);
+      ctx.fillStyle = '#c53f1e'; ctx.fill();
+      ctx.beginPath();
+      ctx.roundRect(r * 0.35, -r * 1.06, r * 0.5, r * 0.34, r * 0.1);
+      ctx.fillStyle = '#2f333c'; ctx.fill();
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const gg = ctx.createRadialGradient(r * 0.86, -r * 0.9, 1, r * 0.86, -r * 0.9, r * 1.1);
+      gg.addColorStop(0, 'rgba(255,240,170,.85)'); gg.addColorStop(1, 'rgba(255,240,170,0)');
+      ctx.fillStyle = gg;
+      ctx.beginPath(); ctx.arc(r * 0.86, -r * 0.9, r * 1.1, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      break;
+    }
+
+    /* COURONNE DE LETCHIS — anneau de fruits rouges */
+    case 'letchi': {
+      ctx.strokeStyle = '#4f7a33'; ctx.lineWidth = r * 0.14;
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 0.86, r * 1.0, r * 0.3, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      for (let i = 0; i < 7; i++) {
+        const a = i / 7 * Math.PI * 2;
+        const x = Math.cos(a) * r, y = -r * 0.86 + Math.sin(a) * r * 0.3;
+        ctx.beginPath(); ctx.arc(x, y - r * 0.16, r * 0.2, 0, Math.PI * 2);
+        ctx.fillStyle = i % 2 ? '#d63b3b' : '#e75757'; ctx.fill();
+        ctx.strokeStyle = 'rgba(90,20,20,.5)'; ctx.lineWidth = 1.2; ctx.stroke();
+      }
+      break;
+    }
+
+    /* FOULARD NOUÉ — le vieux foulard de travail, noué derrière */
+    default: {
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 0.5, r * 1.04, r * 0.62, 0, Math.PI, 0);
+      ctx.fillStyle = P.accent || '#c0392b'; ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 1.4; ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,.35)';
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.arc(i * r * 0.38, -r * 0.78, r * 0.08, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.fillStyle = P.accent || '#c0392b';
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.98, -r * 0.55);
+      ctx.lineTo(-r * 1.42, -r * 0.2);
+      ctx.lineTo(-r * 1.1, -r * 0.86);
+      ctx.closePath(); ctx.fill();
+      break;
+    }
+  }
+}
+
+function COS_VISAGE(ctx, r, f, P) {
+  switch (f.faceX) {
+
+    /* PETITES LUNETTES RONDES — celles du gramoun qui lit son journal */
+    case 'rondes': {
+      ctx.strokeStyle = '#d8c48a'; ctx.lineWidth = r * 0.075;
+      ctx.beginPath(); ctx.arc(r * 0.2, -r * 0.16, r * 0.26, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(r * 0.88, -r * 0.16, r * 0.26, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(r * 0.46, -r * 0.16); ctx.lineTo(r * 0.62, -r * 0.16); ctx.stroke();
+      ctx.fillStyle = 'rgba(180,225,240,.34)';
+      ctx.beginPath(); ctx.arc(r * 0.2, -r * 0.16, r * 0.24, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(r * 0.88, -r * 0.16, r * 0.24, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+
+    /* BARBE DE PÊCHEUR — sel et poivre, taillée court */
+    case 'barbe': {
+      /* La barbe se pose sous la bouche et remonte le long des joues :
+         la bouche reste lisible, c'est elle qui porte l'expression. */
+      ctx.fillStyle = '#cdd2d8';
+      ctx.strokeStyle = 'rgba(60,65,75,.45)'; ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.34, r * 0.02);
+      ctx.quadraticCurveTo(-r * 0.24, r * 1.12, r * 0.44, r * 1.14);
+      ctx.quadraticCurveTo(r * 1.06, r * 1.0, r * 1.02, -r * 0.02);
+      ctx.quadraticCurveTo(r * 0.86, r * 0.42, r * 0.7, r * 0.5);
+      ctx.quadraticCurveTo(r * 0.44, r * 0.66, r * 0.18, r * 0.5);
+      ctx.quadraticCurveTo(-r * 0.06, r * 0.4, -r * 0.34, r * 0.02);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      /* la moustache, en deux touches */
+      ctx.beginPath();
+      ctx.ellipse(r * 0.3, r * 0.22, r * 0.24, r * 0.11, rad(-12), 0, Math.PI * 2);
+      ctx.ellipse(r * 0.62, r * 0.22, r * 0.24, r * 0.11, rad(12), 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+
+    /* TRAITS DE MALOYA — trois traits de chaux, comme au kabar */
+    default: {
+      /* Trois traits fins de chaux sur la joue, en évitant les yeux :
+         c'est un marquage, pas un masque. */
+      ctx.strokeStyle = 'rgba(248,248,240,.88)'; ctx.lineWidth = r * 0.055; ctx.lineCap = 'round';
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(r * (0.24 + i * 0.24), r * 0.16);
+        ctx.lineTo(r * (0.16 + i * 0.24), r * 0.66);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.22, -r * 0.56);
+      ctx.quadraticCurveTo(r * 0.42, -r * 0.8, r * 1.0, -r * 0.54);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+      break;
+    }
+  }
+}
+
+function COS_DOS(ctx, hx, hy, cx, cy, pose, P, kind, gab) {
+  const midX = (hx + cx) / 2, midY = (hy + cy) / 2;
+  ctx.save();
+  const k = gab || 1;
+  /* On recule l'objet derrière l'épaule : au centre du torse il
+     disparaissait purement et simplement derrière le corps. */
+  ctx.translate(midX - 22, midY + 2);
+  ctx.scale(k, k);
+  ctx.rotate(rad(pose.torso * 0.4));
+
+  switch (kind) {
+
+    /* FILET DE PÊCHE — roulé en travers du dos, avec deux flotteurs */
+    case 'filet': {
+      ctx.strokeStyle = 'rgba(220,225,210,.75)'; ctx.lineWidth = 1.3;
+      ctx.save();
+      ctx.rotate(rad(-24));
+      ctx.beginPath(); ctx.roundRect(-24, -12, 40, 24, 10);
+      ctx.fillStyle = 'rgba(190,200,180,.35)'; ctx.fill(); ctx.stroke();
+      for (let i = -4; i <= 4; i++) {
+        ctx.beginPath(); ctx.moveTo(-24 + (i + 4) * 5, -12); ctx.lineTo(-24 + (i + 4) * 5 - 6, 12); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(-24 + (i + 4) * 5 - 6, -12); ctx.lineTo(-24 + (i + 4) * 5, 12); ctx.stroke();
+      }
+      ctx.restore();
+      ctx.fillStyle = '#e8613c';
+      ctx.beginPath(); ctx.arc(-26, -6, 4.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(14, 12, 4.5, 0, Math.PI * 2); ctx.fill();
+      break;
+    }
+
+    /* PARAPLUIE — plié, glissé dans le dos, prêt pour l'averse */
+    case 'parapluie': {
+      ctx.save();
+      ctx.rotate(rad(-32));
+      ctx.strokeStyle = '#3c3f48'; ctx.lineWidth = 3.4;
+      ctx.beginPath(); ctx.moveTo(-6, 22); ctx.lineTo(2, -26); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(2, -26);
+      ctx.quadraticCurveTo(12, -14, 8, 12);
+      ctx.quadraticCurveTo(0, 4, -6, 12);
+      ctx.quadraticCurveTo(-8, -12, 2, -26);
+      ctx.closePath();
+      ctx.fillStyle = P.accent || '#2e6f8e'; ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1.4; ctx.stroke();
+      ctx.strokeStyle = '#8a6a3a'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(-6, 22); ctx.quadraticCurveTo(-14, 28, -14, 20); ctx.stroke();
+      ctx.restore();
+      break;
+    }
+
+    /* CALEBASSE — la gourde du randonneur, en bandoulière */
+    default: {
+      ctx.strokeStyle = '#8a6a3a'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(-18, -20); ctx.quadraticCurveTo(4, -6, 10, 14); ctx.stroke();
+      ctx.beginPath();
+      ctx.ellipse(6, 12, 11, 14, rad(12), 0, Math.PI * 2);
+      const g = ctx.createLinearGradient(-6, 0, 18, 24);
+      g.addColorStop(0, '#d5b070'); g.addColorStop(1, '#9d7736');
+      ctx.fillStyle = g; ctx.fill();
+      ctx.strokeStyle = 'rgba(60,42,14,.55)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(2, -2, 6, 7, rad(12), 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = '#5d4322';
+      ctx.beginPath(); ctx.roundRect(-2, -12, 8, 7, 2); ctx.fill();
+      break;
+    }
+  }
+  ctx.restore();
+}
+
+/* Auras supplémentaires : particules seulement, aucune boîte de dégâts,
+   donc aucun risque pour la synchronisation en ligne. */
+function COS_AURA(f, kind, px, py) {
+  switch (kind) {
+    case 'lucioles':
+      FX.spark(px, py, rnd(-0.5, 0.5), rnd(-0.5, 0.2), pick(['#d8ff8a', '#fff3a0']), 52, 4);
+      break;
+    case 'cendres':
+      FX.spark(px, py - rnd(0, 30), rnd(-0.3, 0.3), rnd(0.3, 1.1), pick(['#9aa0a8', '#c8c2b8']), 60, 3);
+      break;
+    case 'embrun':
+      FX.spark(px, f.y - rnd(0, 16), rnd(-1.2, 1.2), rnd(-1.6, -0.4), '#dff4ff', 34, 4);
+      break;
+  }
+}
+
+/* ============================================================
+   3) LES NOUVEAUX COSMÉTIQUES
+   ============================================================ */
+(function ajouteCosmetiques() {
+  if (typeof COSMETICS === 'undefined') return;
+
+  /* Les anciennes pièces doivent effacer les nouvelles, sinon on se
+     retrouverait avec deux chapeaux sur la tête. On enveloppe donc
+     leur `apply` au lieu de les réécrire. */
+  for (const c of COSMETICS) {
+    if (c.__x) continue;
+    const o = c.apply;
+    if (c.slot === 'hat')  c.apply = f => { delete f.hatX;  if (o) o(f); };
+    if (c.slot === 'face') c.apply = f => { delete f.faceX; if (o) o(f); };
+    if (c.slot === 'back') c.apply = f => { delete f.backX; if (o) o(f); };
+  }
+
+  const nouveaux = [
+    /* --- chapeaux --- */
+    { id: 'h_foulard', slot: 'hat', lvl: 2, fr: 'Foulard noué', en: 'Knotted headscarf', cr: 'Foular nwé',
+      apply: f => { delete f.hat; f.hatX = 'foulard'; } },
+    { id: 'h_letchi', slot: 'hat', lvl: 8, fr: 'Couronne de letchis', en: 'Lychee crown', cr: 'Kouronn letchi',
+      apply: f => { delete f.hat; f.hatX = 'letchi'; } },
+    { id: 'h_capeline', slot: 'hat', lvl: 12, fr: 'Capeline vanille', en: 'Vanilla sun hat', cr: 'Kaplin vani',
+      apply: f => { delete f.hat; f.hatX = 'capeline'; } },
+    { id: 'h_tangue', slot: 'hat', lvl: 19, fr: 'Capuche tangue', en: 'Tenrec hood', cr: 'Kapich tang',
+      apply: f => { delete f.hat; f.hatX = 'tangue'; } },
+    { id: 'h_volcano', slot: 'hat', lvl: 27, fr: 'Casque de volcanologue', en: 'Volcanologist helmet', cr: 'Kask volkan',
+      apply: f => { delete f.hat; f.hatX = 'volcano'; } },
+
+    /* --- visage --- */
+    { id: 'f_rondes', slot: 'face', lvl: 4, fr: 'Lunettes rondes', en: 'Round glasses', cr: 'Linèt ron',
+      apply: f => { delete f.face; delete f.shades; f.faceX = 'rondes'; } },
+    { id: 'f_maloya', slot: 'face', lvl: 9, fr: 'Traits de maloya', en: 'Maloya stripes', cr: 'Tré maloya',
+      apply: f => { delete f.face; delete f.shades; f.faceX = 'maloya'; } },
+    { id: 'f_barbe', slot: 'face', lvl: 25, fr: 'Barbe de pêcheur', en: "Fisherman's beard", cr: 'Barb pésèr',
+      apply: f => { delete f.face; delete f.shades; f.faceX = 'barbe'; } },
+
+    /* --- dos --- */
+    { id: 'b_calebasse', slot: 'back', lvl: 6, fr: 'Calebasse', en: 'Gourd flask', cr: 'Kalbas',
+      apply: f => { delete f.cape; delete f.wings; delete f.back; f.backX = 'calebasse'; } },
+    { id: 'b_filet', slot: 'back', lvl: 14, fr: 'Filet de pêche', en: 'Fishing net', cr: 'Filé pèsh',
+      apply: f => { delete f.cape; delete f.wings; delete f.back; f.backX = 'filet'; } },
+    { id: 'b_parapluie', slot: 'back', lvl: 24, fr: 'Parapluie', en: 'Umbrella', cr: 'Parapli',
+      apply: f => { delete f.cape; delete f.wings; delete f.back; f.backX = 'parapluie'; } },
+
+    /* --- auras --- */
+    { id: 'a_lucioles', slot: 'aura', lvl: 15, fr: 'Lucioles', en: 'Fireflies', cr: 'Lisyol',
+      apply: f => { f.aura = 'lucioles'; } },
+    { id: 'a_embrun', slot: 'aura', lvl: 21, fr: 'Embruns', en: 'Sea spray', cr: 'Anbrin',
+      apply: f => { f.aura = 'embrun'; } },
+    { id: 'a_cendres', slot: 'aura', lvl: 30, fr: 'Cendres du piton', en: 'Piton ash', cr: 'Sann piton',
+      apply: f => { f.aura = 'cendres'; } },
+
+    /* --- teintes --- */
+    { id: 's_bourbon', slot: 'skin', lvl: 3, fr: 'Vanille Bourbon', en: 'Bourbon vanilla', cr: 'Vani Bourbon',
+      hue: 38, light: 0.16 },
+    { id: 's_mangue', slot: 'skin', lvl: 7, fr: 'Mangue José', en: 'José mango', cr: 'Mang José', hue: 28, light: 0.1 },
+    { id: 's_cyclone', slot: 'skin', lvl: 14, fr: 'Ciel de cyclone', en: 'Cyclone sky', cr: 'Syèl siklòn',
+      hue: 215, dark: -0.14 },
+    { id: 's_corail', slot: 'skin', lvl: 22, fr: 'Corail', en: 'Coral', cr: 'Koray', hue: 8, light: 0.14 },
+    { id: 's_basalte', slot: 'skin', lvl: 35, fr: 'Basalte', en: 'Basalt', cr: 'Bazalt', hue: 220, dark: -0.42 }
+  ];
+  for (const c of nouveaux) { c.__x = true; COSMETICS.push(c); }
+
+  /* icônes du vestiaire */
+  if (typeof COS_ICON !== 'undefined') Object.assign(COS_ICON, {
+    h_foulard: '🧣', h_letchi: '🍒', h_capeline: '👒', h_tangue: '🦔', h_volcano: '⛑️',
+    f_rondes: '👓', f_maloya: '🥁', f_barbe: '🧔',
+    b_calebasse: '🫙', b_filet: '🕸️', b_parapluie: '☂️',
+    a_lucioles: '🪰', a_embrun: '🌊', a_cendres: '🌋',
+    s_bourbon: '🍦', s_mangue: '🥭', s_cyclone: '🌀', s_corail: '🪸', s_basalte: '🪨'
+  });
 })();
 
 </script>
