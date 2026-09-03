@@ -4436,11 +4436,24 @@ function drawChain(ctx, pts, ws, col, back) {
   chainPath(ctx, pts, ws, 0);
   if (back) ctx.fillStyle = shade(col, -0.34);
   else {
-    const g = ctx.createLinearGradient(pts[0][0] - ws[0], pts[0][1] - ws[0],
-                                       pts[n][0] + ws[n], pts[n][1] + ws[n]);
-    g.addColorStop(0, shade(col, 0.26));
-    g.addColorStop(0.45, col);
-    g.addColorStop(1, shade(col, -0.28));
+    /* Un membre est un cylindre : il s'éclaire EN TRAVERS, pas dans sa
+       longueur. L'ancien dégradé allait d'un bout à l'autre du bras,
+       ce qui ne veut rien dire physiquement — d'où l'impression de
+       découpe plate. On le prend maintenant perpendiculairement, dans
+       la direction de la lumière de l'arène. */
+    let mx = 0, my = 0;
+    for (let i = 0; i <= n; i++) { mx += pts[i][0]; my += pts[i][1]; }
+    mx /= n + 1; my /= n + 1;
+    const rad0 = Math.max(ws[0], ws[n]) * 1.15;
+    const g = (typeof LUM !== 'undefined' && LUM.niveau())
+      ? LUM.cyl(ctx, mx, my, rad0, col, 0.3, -0.34)
+      : (() => {
+          const g0 = ctx.createLinearGradient(pts[0][0] - ws[0], pts[0][1] - ws[0],
+                                              pts[n][0] + ws[n], pts[n][1] + ws[n]);
+          g0.addColorStop(0, shade(col, 0.26)); g0.addColorStop(0.45, col);
+          g0.addColorStop(1, shade(col, -0.28));
+          return g0;
+        })();
     ctx.fillStyle = g;
   }
   ctx.fill();
@@ -4672,10 +4685,27 @@ function drawTorso(ctx, hx, hy, cx, cy, shW, ch, pose, P) {
 
   // corps
   torsoPath(ctx, len, sw, ww, hw);
-  const g = ctx.createLinearGradient(-sw, topY, sw * 0.9, len * 0.2);
-  g.addColorStop(0, shade(P.skin, 0.30));
-  g.addColorStop(0.40, P.skin);
-  g.addColorStop(1, shade(P.skin, -0.32));
+  /* Le torse est dessiné dans un repère tourné (il suit l'inclinaison
+     du buste) : on annule cette rotation pour que la lumière reste
+     celle du MONDE, pas celle du personnage. */
+  const g = (typeof LUM !== 'undefined' && LUM.niveau())
+    ? (() => {
+        const c = Math.cos(-ang - Math.PI / 2), si = Math.sin(-ang - Math.PI / 2);
+        const lx = (LUM.vx * LUM.mir) * c - LUM.vy * si;
+        const ly = (LUM.vx * LUM.mir) * si + LUM.vy * c;
+        const R = sw * 1.25, k = LUM.force;
+        const g0 = ctx.createLinearGradient(lx * R, -len * 0.5 + ly * R, -lx * R, -len * 0.5 - ly * R);
+        g0.addColorStop(0, melange(shade(P.skin, 0.44 * k), LUM.chaud, 0.28 * k));
+        g0.addColorStop(0.42, P.skin);
+        g0.addColorStop(1, melange(shade(P.skin, -0.5 * k), LUM.froid, 0.32 * k));
+        return g0;
+      })()
+    : (() => {
+        const g0 = ctx.createLinearGradient(-sw, topY, sw * 0.9, len * 0.2);
+        g0.addColorStop(0, shade(P.skin, 0.30)); g0.addColorStop(0.40, P.skin);
+        g0.addColorStop(1, shade(P.skin, -0.32));
+        return g0;
+      })();
   ctx.fillStyle = g; ctx.fill();
 
   ctx.save();
@@ -5257,10 +5287,18 @@ function drawHead(ctx, x, y, r, pose, ch, P, opt) {
     ctx.quadraticCurveTo(r * 1.1, r * 0.95, -r * 0.3, r * 0.95);
     ctx.quadraticCurveTo(-r * 1.1, r * 0.4, -r * 0.2, -r);
   } else ctx.arc(0, 0, r, 0, Math.PI * 2);
-  const g = ctx.createRadialGradient(-r * 0.4, -r * 0.45, r * 0.15, 0, 0, r * 1.35);
-  g.addColorStop(0, shade(P.skin, 0.4));
-  g.addColorStop(0.55, P.skin);
-  g.addColorStop(1, shade(P.skin, -0.32));
+  /* Le point chaud du crâne était figé en haut à gauche. Il suit
+     maintenant la lumière : sur le Piton il vient d'en bas, au couchant
+     de côté. C'est ce détail qui fait qu'une tête ronde a l'air ronde
+     ET posée dans le décor. */
+  const g = (typeof LUM !== 'undefined' && LUM.niveau())
+    ? LUM.bille(ctx, 0, 0, r, P.skin, 0.52, -0.46)
+    : (() => {
+        const g0 = ctx.createRadialGradient(-r * 0.4, -r * 0.45, r * 0.15, 0, 0, r * 1.35);
+        g0.addColorStop(0, shade(P.skin, 0.4)); g0.addColorStop(0.55, P.skin);
+        g0.addColorStop(1, shade(P.skin, -0.32));
+        return g0;
+      })();
   ctx.fillStyle = g; ctx.fill();
   ctx.strokeStyle = rgba(shade(P.skin, -0.62), 0.85); ctx.lineWidth = 2.3; ctx.stroke();
 
@@ -5372,22 +5410,22 @@ function drawHead(ctx, x, y, r, pose, ch, P, opt) {
     ctx.strokeStyle = 'rgba(0,0,0,0.25)'; ctx.lineWidth = 1.6; ctx.stroke();
   } else if (f.hat === 'straw') {
     ctx.beginPath();
-    ctx.ellipse(0, -r * 0.72, r * 1.65, r * 0.4, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, -r * 0.94, r * 1.65, r * 0.36, 0, 0, Math.PI * 2);
     const hg = ctx.createLinearGradient(-r, -r, r, 0);
     hg.addColorStop(0, '#e8c98a'); hg.addColorStop(1, '#b98f4d');
     ctx.fillStyle = hg; ctx.fill();
     ctx.beginPath();
-    ctx.ellipse(0, -r * 1.05, r * 0.72, r * 0.5, 0, Math.PI, 0);
+    ctx.ellipse(0, -r * 1.14, r * 0.74, r * 0.52, 0, Math.PI, 0);
     ctx.fillStyle = '#dcb974'; ctx.fill();
     ctx.strokeStyle = 'rgba(0,0,0,0.28)'; ctx.lineWidth = 1.6; ctx.stroke();
   } else if (f.hat === 'bandana') {
     ctx.beginPath();
-    ctx.moveTo(-r * 1.02, -r * 0.42); ctx.lineTo(r * 1.02, -r * 0.42);
-    ctx.lineTo(r * 0.96, -r * 0.08); ctx.lineTo(-r * 0.96, -r * 0.08);
+    ctx.moveTo(-r * 1.0, -r * 0.86); ctx.lineTo(r * 1.0, -r * 0.86);
+    ctx.lineTo(r * 0.99, -r * 0.5); ctx.lineTo(-r * 0.99, -r * 0.5);
     ctx.closePath();
     ctx.fillStyle = P.accent || '#c0392b'; ctx.fill();
     ctx.beginPath();
-    ctx.moveTo(-r * 0.95, -r * 0.3); ctx.lineTo(-r * 1.7, -r * 0.05); ctx.lineTo(-r * 1.5, -r * 0.5);
+    ctx.moveTo(-r * 0.96, -r * 0.74); ctx.lineTo(-r * 1.74, -r * 0.46); ctx.lineTo(-r * 1.52, -r * 0.94);
     ctx.closePath(); ctx.fillStyle = shade(P.accent || '#c0392b', -0.2); ctx.fill();
   } else if (f.hat === 'witch') {
     ctx.beginPath();
@@ -5401,10 +5439,10 @@ function drawHead(ctx, x, y, r, pose, ch, P, opt) {
     ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 1.6; ctx.stroke();
   } else if (f.hat === 'cap') {
     ctx.beginPath();
-    ctx.ellipse(0, -r * 0.52, r * 1.02, r * 0.62, 0, Math.PI, 0);
+    ctx.ellipse(0, -r * 0.62, r * 1.04, r * 0.64, 0, Math.PI, 0);
     ctx.fillStyle = P.accent || '#2c6fbb'; ctx.fill();
     ctx.beginPath();
-    ctx.ellipse(r * 0.7, -r * 0.5, r * 0.75, r * 0.2, 0, 0, Math.PI * 2);
+    ctx.ellipse(r * 0.72, -r * 0.66, r * 0.78, r * 0.17, 0, 0, Math.PI * 2);
     ctx.fillStyle = shade(P.accent || '#2c6fbb', -0.25); ctx.fill();
   }
   if (f.hat === 'frangipane') {
@@ -5440,12 +5478,12 @@ function drawHead(ctx, x, y, r, pose, ch, P, opt) {
     }
   } else if (f.hat === 'helmet') {
     ctx.beginPath();
-    ctx.ellipse(0, -r * 0.5, r * 1.02, r * 0.86, 0, Math.PI, 0);
+    ctx.ellipse(0, -r * 0.64, r * 1.02, r * 0.86, 0, Math.PI, 0);
     const hg3 = ctx.createLinearGradient(-r, -r * 1.2, r, -r * 0.2);
     hg3.addColorStop(0, '#ffd166'); hg3.addColorStop(1, '#e07a1c');
     ctx.fillStyle = hg3; ctx.fill();
     ctx.strokeStyle = 'rgba(90,50,0,.5)'; ctx.lineWidth = 1.8; ctx.stroke();
-    ctx.beginPath(); ctx.ellipse(0, -r * 0.46, r * 1.28, r * 0.2, 0, 0, Math.PI * 2);
+    ctx.beginPath(); ctx.ellipse(0, -r * 0.62, r * 1.28, r * 0.18, 0, 0, Math.PI * 2);
     ctx.fillStyle = '#e8951f'; ctx.fill(); ctx.stroke();
     ctx.fillStyle = 'rgba(255,255,255,.45)';
     ctx.fillRect(-r * 0.12, -r * 1.28, r * 0.24, r * 0.78);
@@ -5453,7 +5491,7 @@ function drawHead(ctx, x, y, r, pose, ch, P, opt) {
     for (let i = 0; i < 9; i++) {
       const a = -Math.PI * 0.96 + (i / 8) * Math.PI * 0.92;
       ctx.save();
-      ctx.translate(Math.cos(a) * r * 0.9, -r * 0.42 + Math.sin(a) * r * 0.46);
+      ctx.translate(Math.cos(a) * r * 0.9, -r * 0.66 + Math.sin(a) * r * 0.4);
       ctx.rotate(a + Math.PI / 2);
       ctx.beginPath();
       ctx.moveTo(0, 0); ctx.quadraticCurveTo(r * 0.16, -r * 0.4, 0, -r * 0.78);
@@ -5464,13 +5502,13 @@ function drawHead(ctx, x, y, r, pose, ch, P, opt) {
       ctx.restore();
     }
     ctx.strokeStyle = '#7a5a2e'; ctx.lineWidth = r * 0.14;
-    ctx.beginPath(); ctx.ellipse(0, -r * 0.44, r * 0.94, r * 0.3, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(0, -r * 0.68, r * 0.94, r * 0.26, 0, 0, Math.PI * 2); ctx.stroke();
   }
   if (f.hat === 'flower') {
     const cols = ['#ff6f91', '#ffd166', '#7ee08a', '#7ee8fa', '#ffffff'];
     for (let i = 0; i < 7; i++) {
       const a = -Math.PI + (i / 6) * Math.PI;
-      const fx2 = Math.cos(a) * r * 0.98, fy2 = -r * 0.62 + Math.sin(a) * r * 0.5;
+      const fx2 = Math.cos(a) * r * 0.98, fy2 = -r * 0.8 + Math.sin(a) * r * 0.44;
       ctx.fillStyle = cols[i % cols.length];
       for (let k = 0; k < 5; k++) {
         const pa = k * Math.PI * 2 / 5;
@@ -5483,15 +5521,15 @@ function drawHead(ctx, x, y, r, pose, ch, P, opt) {
     }
   } else if (f.hat === 'cowboy') {
     ctx.beginPath();
-    ctx.ellipse(0, -r * 0.66, r * 1.5, r * 0.36, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, -r * 0.88, r * 1.5, r * 0.34, 0, 0, Math.PI * 2);
     const cg2 = ctx.createLinearGradient(-r, -r, r, 0);
     cg2.addColorStop(0, '#8a6a42'); cg2.addColorStop(1, '#5c4529');
     ctx.fillStyle = cg2; ctx.fill();
     ctx.beginPath();
-    ctx.moveTo(-r * 0.6, -r * 0.68);
-    ctx.quadraticCurveTo(0, -r * 1.62, r * 0.6, -r * 0.68);
+    ctx.moveTo(-r * 0.62, -r * 0.9);
+    ctx.quadraticCurveTo(0, -r * 1.76, r * 0.62, -r * 0.9);
     ctx.closePath(); ctx.fillStyle = '#6d5133'; ctx.fill();
-    ctx.fillStyle = '#3b2a18'; ctx.fillRect(-r * 0.6, -r * 0.82, r * 1.2, r * 0.14);
+    ctx.fillStyle = '#3b2a18'; ctx.fillRect(-r * 0.62, -r * 1.04, r * 1.24, r * 0.14);
   } else if (f.hat === 'crown') {
     ctx.beginPath();
     ctx.moveTo(-r * 0.86, -r * 0.62);
@@ -5665,6 +5703,125 @@ function drawProp(ctx, x, y, ang, kind, P, pose) {
       break;
   }
   ctx.restore();
+}
+
+
+/* ===== 00d-lumiere.js ===== */
+/* ============================================================
+   SMASH PÉI — LA LUMIÈRE DE LA SCÈNE
+
+   Ce fichier ne dessine rien. Il dit seulement D'OÙ VIENT LA LUMIÈRE,
+   et de quelle couleur elle est. Tout le reste du jeu s'y réfère :
+   le corps des combattants, leur tête, leur torse, les plateformes,
+   les objets au sol.
+
+   Pourquoi ça change tout : jusqu'ici chaque dégradé du rig partait
+   d'un coin arbitraire — en haut à gauche, toujours, quelle que soit
+   l'arène et quel que soit le sens du personnage. Résultat : des
+   aplats posés sur un décor, jamais éclairés par lui. En donnant à la
+   scène UNE lumière et en la faisant suivre à chaque partie du corps,
+   on obtient du volume sans rien coûter : ce sont les mêmes dégradés,
+   simplement orientés juste.
+
+   Et c'est bien plus juste qu'un éclairage plaqué sur la silhouette
+   entière : chaque membre est un cylindre, chaque cylindre reçoit sa
+   propre ombre. C'est exactement ce que fait Smash Bros.
+   ============================================================ */
+
+const LUM = {
+  /* dir : d'où vient la lumière, en degrés. 0 = de la droite,
+     -90 = du dessus, +90 = du dessous (une coulée de lave, une forge).
+     chaud : couleur de la lumière. froid : couleur de l'ombre. */
+  dir: -58, chaud: '#fff2d0', froid: '#101826', force: 1,
+  vx: 0.53, vy: -0.85,
+  /* -1 quand le dessin est en miroir : la lumière du monde arrive
+     alors de l'autre côté dans le repère local. */
+  mir: 1,
+
+  /* Réglages par arène. Le reste est déduit de la teinte et de
+     l'heure de la scène. */
+  PAR_ARENE: {
+    volcan:      { dir: 104, chaud: '#ffb066', froid: '#180a12', force: 1.25 },
+    tunnellave:  { dir: 96,  chaud: '#ff9a4d', froid: '#140810', force: 1.3 },
+    tunnel:      { dir: 96,  chaud: '#ff9a4d', froid: '#140810', force: 1.3 },
+    ermitage:    { dir: -14, chaud: '#ffd6a0', froid: '#1d1830', force: 1.15 },
+    lagon:       { dir: -66, chaud: '#fffbe8', froid: '#0f2c3a', force: 1.05 },
+    kabar:       { dir: 88,  chaud: '#ffc46b', froid: '#0d0b1a', force: 1.2 },
+    benare:      { dir: -40, chaud: '#ffffff', froid: '#1a2a3e', force: 1.1 },
+    littoral:    { dir: -72, chaud: '#f2f7ff', froid: '#141a24', force: 1 },
+    usinegol:    { dir: -104, chaud: '#ffd08a', froid: '#0e0d12', force: 1.2 },
+    maido:       { dir: -50, chaud: '#eaf4ff', froid: '#16243a', force: 1 },
+    cilaos:      { dir: -46, chaud: '#fff4dc', froid: '#182418', force: 1 },
+    batirai:     { dir: -84, chaud: '#cfe0ee', froid: '#0c1520', force: 0.95 },
+    bassin:      { dir: -70, chaud: '#e6fff4', froid: '#0a2028', force: 1 },
+    marche:      { dir: -34, chaud: '#fff0c8', froid: '#1e1a14', force: 1.05 },
+    marchepaul:  { dir: -30, chaud: '#fff0c8', froid: '#1e1a14', force: 1.05 }
+  },
+
+  pose(stage) {
+    const p = (stage && this.PAR_ARENE[stage.id]) || null;
+    if (p) {
+      this.dir = p.dir; this.chaud = p.chaud; this.froid = p.froid; this.force = p.force;
+    } else if (stage) {
+      this.dir = stage.night ? -34 : -58;
+      this.chaud = stage.night ? (stage.tint || '#cfe0ee') : '#fff2d0';
+      this.froid = stage.night ? '#0c1220' : '#131c2a';
+      this.force = stage.night ? 0.95 : 1;
+    } else {
+      this.dir = -58; this.chaud = '#fff2d0'; this.froid = '#101826'; this.force = 1;
+    }
+    const a = this.dir * Math.PI / 180;
+    this.vx = Math.cos(a); this.vy = Math.sin(a);
+  },
+
+  /* Niveau de détail. 0 = plat (comme avant), 1 = volume. */
+  niveau() {
+    const o = (typeof Save !== 'undefined' && Save.data && Save.data.opts) || {};
+    return o.volume === false ? 0 : 1;
+  },
+
+  /* ---------- l'outil de base ----------
+     Un dégradé orienté par la lumière, autour d'un centre et d'un
+     rayon. `col` est la couleur locale : elle est éclaircie et teintée
+     de chaud du côté de la source, assombrie et teintée de froid de
+     l'autre. Le milieu reste la couleur d'origine, ce qui garantit que
+     rien ne se délave.
+
+     C'est un remplacement direct des `createLinearGradient` du rig :
+     même coût, mais orienté juste. */
+  cyl(ctx, cx, cy, r, col, clair, sombre) {
+    const lx = this.vx * this.mir, ly = this.vy;
+    const g = ctx.createLinearGradient(cx + lx * r, cy + ly * r, cx - lx * r, cy - ly * r);
+    const k = this.force;
+    g.addColorStop(0, melange(shade(col, (clair === undefined ? 0.44 : clair) * k), this.chaud, 0.3 * k));
+    g.addColorStop(0.42, col);
+    g.addColorStop(1, melange(shade(col, (sombre === undefined ? -0.5 : sombre) * k), this.froid, 0.34 * k));
+    return g;
+  },
+
+  /* Même chose en radial : pour une tête, une bille, un fruit. Le point
+     chaud est placé du côté de la lumière. */
+  bille(ctx, cx, cy, r, col, clair, sombre) {
+    const lx = this.vx * this.mir, ly = this.vy;
+    const g = ctx.createRadialGradient(cx + lx * r * 0.44, cy + ly * r * 0.44, r * 0.1,
+                                       cx, cy, r * 1.32);
+    const k = this.force;
+    g.addColorStop(0, melange(shade(col, (clair === undefined ? 0.5 : clair) * k), this.chaud, 0.34 * k));
+    g.addColorStop(0.44, col);
+    g.addColorStop(1, melange(shade(col, (sombre === undefined ? -0.48 : sombre) * k), this.froid, 0.32 * k));
+    return g;
+  }
+};
+
+/* Mélange mis en cache : ces couleurs reviennent à l'identique des
+   milliers de fois par seconde (les mêmes membres, la même lumière),
+   il serait absurde de les recalculer à chaque image. */
+const _lumCache = Object.create(null);
+function melange(a, b, t) {
+  const k = a + '|' + b + '|' + t.toFixed(3);
+  const v = _lumCache[k];
+  if (v !== undefined) return v;
+  return (_lumCache[k] = mixc(a, b, t < 0 ? 0 : (t > 1 ? 1 : t)));
 }
 
 
@@ -13116,10 +13273,12 @@ class Fighter {
         if (full) {
           if (st !== ST.RUN && st !== ST.DASH && Math.abs(this.vx) < S.run * 0.6) { this.setState(ST.DASH); }
           else if (this.sf > 8 || st === ST.RUN) this.setState(ST.RUN);
-          this.vx = approach(this.vx, dir * S.run * spdMul, 0.9);
+          /* Accélération franche : dans Smash on est à pleine vitesse
+             en trois images, pas en huit. */
+          this.vx = approach(this.vx, dir * S.run * spdMul, 1.4);
         } else {
           this.setState(ST.WALK);
-          this.vx = approach(this.vx, dir * S.walk * spdMul, 0.5);
+          this.vx = approach(this.vx, dir * S.walk * spdMul, 0.8);
         }
       } else {
         if (st !== ST.IDLE && st !== ST.TURN) this.setState(ST.IDLE);
@@ -13152,7 +13311,7 @@ class Fighter {
     const target = (inp.ax || 0) * S.air * 2.9 * mul * (this.buffs.speed > 0 ? 1.3 : 1);
     if (Math.abs(inp.ax) > 0.2) {
       this.facing = this.state === ST.AIR && !this.move ? sign(inp.ax) : this.facing;
-      this.vx = approach(this.vx, target, 0.36 * mul);
+      this.vx = approach(this.vx, target, 0.46 * mul);
     } else this.vx *= PHYS.airFriction;
   }
 
@@ -18175,12 +18334,28 @@ class Match {
        rafales puis de longs vides), maximum simultané, pas d'apparition sur
        la tête d'un joueur, et pondération en faveur de celui qui est mené. */
     if (this.rules.items > 0 && this.intro <= 0 && !this.over) {
-      if (this.itemCd === undefined) this.itemCd = 240;
+      if (this.itemCd === undefined) this.itemCd = 180;
       const alive = this.fighters.filter(f => f.alive);
-      const maxItems = Math.min(4, 1 + this.rules.items);
+      /* CADENCE CALÉE SUR SMASH.
+         L'ancienne courbe donnait un objet toutes les sept à neuf
+         secondes quel que soit le réglage, et jamais plus de trois à
+         l'écran : on ne jouait jamais vraiment « avec » les objets.
+         On retrouve les trois vitesses du vrai jeu — rare, normale,
+         déchaînée — et le nombre simultané suit. */
+      const REGLAGE = [
+        null,
+        { cd: 640, max: 2, groupe: 0 },     // 1 · FAIBLE   ~ un objet / 10 s
+        { cd: 400, max: 4, groupe: 0.18 },  // 2 · NORMALE  ~ un objet / 6,5 s
+        { cd: 205, max: 6, groupe: 0.42 }   // 3 · ÉLEVÉE   ~ un objet / 3,5 s
+      ];
+      const R = REGLAGE[Math.min(3, this.rules.items)] || REGLAGE[2];
+      /* À quatre, ça se dispute plus vite : on en met un peu plus. */
+      const maxItems = R.max + (alive.length > 2 ? 1 : 0);
       if (this.items.length < maxItems && --this.itemCd <= 0) {
-        const base = 620 - this.rules.items * 90;
-        this.itemCd = Math.max(150, Math.round(base + rnd(-90, 130)));
+        this.itemCd = Math.max(90, Math.round(R.cd + rnd(-R.cd * 0.28, R.cd * 0.34)));
+        /* de temps en temps, deux objets tombent ensemble : c'est ce qui
+           crée les mêlées autour d'un même point */
+        this.itemGroupe = (Math.random() < R.groupe) ? 1 : 0;
         const main = this.mainPlat();
         // le joueur le plus en difficulté sert de référence pour la pondération
         let behind = 0, worst = null;
@@ -18201,6 +18376,27 @@ class Match {
         this.items.push(new ItemEnt(def, x, this.stage.bounds.top + 60));
         this.warn(x, main.y - 40, 34);
         Audio2.play('itemDrop');
+
+        /* le second de la paire, décalé, pour qu'ils ne tombent pas
+           l'un sur l'autre */
+        if (this.itemGroupe) {
+          const x2 = clamp(x + (Math.random() < 0.5 ? -1 : 1) * rnd(180, 340),
+                           main.x + 70, main.x + main.w - 70);
+          this.items.push(new ItemEnt(ITEMS.pick({ behind }), x2, this.stage.bounds.top + 130));
+          this.warn(x2, main.y - 40, 34);
+        }
+
+        /* Une fois sur cinq, l'objet ne tombe pas du ciel : il est
+           posé sur une plateforme en l'air. Ça oblige à monter le
+           chercher au lieu de camper au sol. */
+        else if (Math.random() < 0.2) {
+          const hautes = this.stage.plats.filter(pp => pp.y < -60 && pp.w > 120);
+          if (hautes.length) {
+            const pp = pick(hautes);
+            const px = pp.x + rnd(40, pp.w - 40);
+            this.items.push(new ItemEnt(ITEMS.pick({ behind }), px, pp.y - 40));
+          }
+        }
       }
     }
 
@@ -34513,25 +34709,25 @@ function COS_TETE(ctx, r, f, P, pose) {
     /* CAPELINE VANILLE — large bord souple et une fleur de vanille */
     case 'capeline': {
       ctx.beginPath();
-      ctx.ellipse(0, -r * 0.78, r * 1.62, r * 0.34, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, -r * 0.96, r * 1.62, r * 0.32, 0, 0, Math.PI * 2);
       const g = ctx.createLinearGradient(-r * 1.6, 0, r * 1.6, 0);
       g.addColorStop(0, '#f3e6c8'); g.addColorStop(0.5, '#fbf3de'); g.addColorStop(1, '#e2d0aa');
       ctx.fillStyle = g; ctx.fill();
       ctx.strokeStyle = 'rgba(120,95,50,.5)'; ctx.lineWidth = 1.5; ctx.stroke();
       ctx.beginPath();
-      ctx.ellipse(0, -r * 1.06, r * 0.72, r * 0.42, 0, Math.PI, 0);
+      ctx.ellipse(0, -r * 1.16, r * 0.74, r * 0.44, 0, Math.PI, 0);
       ctx.fillStyle = '#f7ecd2'; ctx.fill(); ctx.stroke();
       /* la fleur */
       ctx.fillStyle = '#fdfbf2';
       for (let i = 0; i < 5; i++) {
         const a = i / 5 * Math.PI * 2;
         ctx.beginPath();
-        ctx.ellipse(r * 0.86 + Math.cos(a) * r * 0.15, -r * 0.98 + Math.sin(a) * r * 0.15,
+        ctx.ellipse(r * 0.86 + Math.cos(a) * r * 0.15, -r * 1.14 + Math.sin(a) * r * 0.15,
                     r * 0.16, r * 0.1, a, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.fillStyle = '#e5c76a';
-      ctx.beginPath(); ctx.arc(r * 0.86, -r * 0.98, r * 0.09, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(r * 0.86, -r * 1.14, r * 0.09, 0, Math.PI * 2); ctx.fill();
       break;
     }
 
@@ -34541,8 +34737,8 @@ function COS_TETE(ctx, r, f, P, pose) {
       ctx.moveTo(-r * 1.16, r * 0.35);
       ctx.quadraticCurveTo(-r * 1.3, -r * 1.2, 0, -r * 1.28);
       ctx.quadraticCurveTo(r * 1.3, -r * 1.2, r * 1.16, r * 0.35);
-      ctx.quadraticCurveTo(r * 0.74, -r * 0.44, 0, -r * 0.4);
-      ctx.quadraticCurveTo(-r * 0.74, -r * 0.44, -r * 1.16, r * 0.35);
+      ctx.quadraticCurveTo(r * 0.78, -r * 0.62, 0, -r * 0.58);
+      ctx.quadraticCurveTo(-r * 0.78, -r * 0.62, -r * 1.16, r * 0.35);
       ctx.closePath();
       ctx.fillStyle = '#8a6540'; ctx.fill();
       ctx.strokeStyle = 'rgba(40,25,10,.5)'; ctx.lineWidth = 1.6; ctx.stroke();
@@ -34564,21 +34760,21 @@ function COS_TETE(ctx, r, f, P, pose) {
     /* CASQUE DE VOLCANOLOGUE — coque + lampe frontale allumée */
     case 'volcano': {
       ctx.beginPath();
-      ctx.ellipse(0, -r * 0.22, r * 1.12, r * 1.0, 0, Math.PI, 0);
+      ctx.ellipse(0, -r * 0.58, r * 1.1, r * 0.94, 0, Math.PI, 0);
       ctx.fillStyle = '#e8552f'; ctx.fill();
       ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1.8; ctx.stroke();
       ctx.beginPath();
-      ctx.roundRect(-r * 1.2, -r * 0.38, r * 2.4, r * 0.24, r * 0.1);
+      ctx.roundRect(-r * 1.2, -r * 0.74, r * 2.4, r * 0.22, r * 0.1);
       ctx.fillStyle = '#c53f1e'; ctx.fill();
       ctx.beginPath();
-      ctx.roundRect(r * 0.35, -r * 1.06, r * 0.5, r * 0.34, r * 0.1);
+      ctx.roundRect(r * 0.33, -r * 1.36, r * 0.5, r * 0.32, r * 0.1);
       ctx.fillStyle = '#2f333c'; ctx.fill();
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      const gg = ctx.createRadialGradient(r * 0.86, -r * 0.9, 1, r * 0.86, -r * 0.9, r * 1.1);
+      const gg = ctx.createRadialGradient(r * 0.84, -r * 1.2, 1, r * 0.84, -r * 1.2, r * 1.1);
       gg.addColorStop(0, 'rgba(255,240,170,.85)'); gg.addColorStop(1, 'rgba(255,240,170,0)');
       ctx.fillStyle = gg;
-      ctx.beginPath(); ctx.arc(r * 0.86, -r * 0.9, r * 1.1, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(r * 0.84, -r * 1.2, r * 1.1, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
       break;
     }
@@ -34587,11 +34783,11 @@ function COS_TETE(ctx, r, f, P, pose) {
     case 'letchi': {
       ctx.strokeStyle = '#4f7a33'; ctx.lineWidth = r * 0.14;
       ctx.beginPath();
-      ctx.ellipse(0, -r * 0.86, r * 1.0, r * 0.3, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, -r * 1.0, r * 1.0, r * 0.26, 0, 0, Math.PI * 2);
       ctx.stroke();
       for (let i = 0; i < 7; i++) {
         const a = i / 7 * Math.PI * 2;
-        const x = Math.cos(a) * r, y = -r * 0.86 + Math.sin(a) * r * 0.3;
+        const x = Math.cos(a) * r, y = -r * 1.0 + Math.sin(a) * r * 0.26;
         ctx.beginPath(); ctx.arc(x, y - r * 0.16, r * 0.2, 0, Math.PI * 2);
         ctx.fillStyle = i % 2 ? '#d63b3b' : '#e75757'; ctx.fill();
         ctx.strokeStyle = 'rgba(90,20,20,.5)'; ctx.lineWidth = 1.2; ctx.stroke();
@@ -34602,19 +34798,19 @@ function COS_TETE(ctx, r, f, P, pose) {
     /* FOULARD NOUÉ — le vieux foulard de travail, noué derrière */
     default: {
       ctx.beginPath();
-      ctx.ellipse(0, -r * 0.5, r * 1.04, r * 0.62, 0, Math.PI, 0);
+      ctx.ellipse(0, -r * 0.64, r * 1.04, r * 0.6, 0, Math.PI, 0);
       ctx.fillStyle = P.accent || '#c0392b'; ctx.fill();
       ctx.strokeStyle = 'rgba(0,0,0,.3)'; ctx.lineWidth = 1.4; ctx.stroke();
       ctx.fillStyle = 'rgba(255,255,255,.35)';
       for (let i = -2; i <= 2; i++) {
         ctx.beginPath();
-        ctx.arc(i * r * 0.38, -r * 0.78, r * 0.08, 0, Math.PI * 2); ctx.fill();
+        ctx.arc(i * r * 0.38, -r * 0.9, r * 0.08, 0, Math.PI * 2); ctx.fill();
       }
       ctx.fillStyle = P.accent || '#c0392b';
       ctx.beginPath();
-      ctx.moveTo(-r * 0.98, -r * 0.55);
-      ctx.lineTo(-r * 1.42, -r * 0.2);
-      ctx.lineTo(-r * 1.1, -r * 0.86);
+      ctx.moveTo(-r * 0.98, -r * 0.68);
+      ctx.lineTo(-r * 1.42, -r * 0.36);
+      ctx.lineTo(-r * 1.1, -r * 1.0);
       ctx.closePath(); ctx.fill();
       break;
     }
@@ -35251,6 +35447,857 @@ Object.assign(I18N.en, {
   mz_dmg: 'Damage', mz_range: 'Reach', mz_run: 'Run',
   mz_jump: 'Jump', mz_air: 'Air control', mz_weight: 'Weight'
 });
+
+
+/* ===== 44-lumiere.js ===== */
+/* ============================================================
+   SMASH PÉI — LUMIÈRE, VOLUME ET PROFONDEUR
+
+   Disons-le franchement : ce jeu dessine des vecteurs sur un canevas
+   2D. On ne va pas y coller de la vraie 3D — pas de maillages, pas de
+   moteur d'éclairage. Ce n'est d'ailleurs pas ce que fait Smash Bros :
+   son rendu doit sa lisibilité à trois choses très simples, et c'est
+   celles-là qu'il nous manquait.
+
+   1. UNE SEULE LUMIÈRE, PARTOUT LA MÊME.
+      Chaque arène a désormais sa direction et sa couleur de lumière.
+      Sur le Piton, elle monte de la lave, orange, par en dessous. Sur
+      la plage au couchant, elle vient de côté, chaude et rasante. Dans
+      le tunnel de lave, elle tombe du plafond, froide. Les combattants,
+      les objets et les plateformes reçoivent TOUS cette même lumière,
+      et c'est ce qui fait qu'ils appartiennent enfin à la même scène
+      au lieu d'être des découpes posées sur un fond.
+
+   2. DU VOLUME SUR LA SILHOUETTE.
+      Le combattant est rendu dans un tampon hors écran, puis on peint
+      par-dessus — et uniquement sur lui — un dégradé directionnel et un
+      liseré de contre-jour. Un aplat devient un corps : côté lumière
+      clair, côté ombre profond, et une arête brillante qui le détache
+      du décor. C'est un travail par-dessus le dessin existant : aucune
+      pose, aucun cosmétique, aucun personnage n'est modifié.
+
+   3. DES PLATEFORMES QUI ONT UNE ÉPAISSEUR.
+      Une dalle avec une face supérieure éclairée, une face avant en
+      ombre, un rebond de lumière sous le nez et une ombre portée au
+      sol : on lit un bloc, plus un rectangle. Comme tout passe par
+      `Paint.rockPlatform`, les vingt-neuf arènes en profitent d'un
+      coup.
+
+   Le tout est réglable : le curseur QUALITÉ coupe l'étage le plus
+   coûteux, et l'option se désactive complètement si besoin.
+   ============================================================ */
+
+/* ============================================================
+   1) LE SENS DE LA LUMIÈRE SUR UN PERSONNAGE RETOURNÉ
+
+   Le rig est dessiné en miroir quand le combattant regarde à gauche.
+   Sans correction, sa lumière se retournerait avec lui : deux
+   combattants face à face seraient éclairés de deux côtés opposés,
+   ce qui saute aux yeux. On relève donc le miroir dans la matrice du
+   canevas juste avant de dessiner, et `LUM` l'applique à ses dégradés.
+
+   Une seule lecture de matrice par combattant et par image — le
+   volume ne coûte rien de plus que les dégradés qui existaient déjà.
+   ============================================================ */
+(function sensDeLaLumiere() {
+  if (typeof drawFighterRig !== 'function') return;
+  const dessine = drawFighterRig;
+  window.drawFighterRig = function (ctx, ch, pose, opt) {
+    const av = LUM.mir;
+    try {
+      const M = ctx.getTransform();
+      LUM.mir = (M.a < 0) !== (M.d < 0) ? -1 : 1;
+    } catch (e) { LUM.mir = 1; }
+    try { return dessine(ctx, ch, pose, opt); }
+    finally { LUM.mir = av; }
+  };
+})();
+
+/* ============================================================
+   2) DES PLATEFORMES EN VOLUME
+   ============================================================ */
+(function volumePlateformes() {
+  if (typeof Paint === 'undefined' || typeof Paint.rockPlatform !== 'function') return;
+  const orig = Paint.rockPlatform.bind(Paint);
+
+  Paint.rockPlatform = function (ctx, p, base, top, accent) {
+    const x = p.x + (p.dx || 0), y = p.y + (p.dy || 0);
+    const w = p.w, h = p.h || 26;
+
+    /* L'ombre portée : elle part du côté opposé à la lumière et
+       s'écrase au sol. Sans elle, une dalle flotte. */
+    /* Seules les dalles EN L'AIR portent une ombre : un socle posé au
+       sol n'a rien en dessous, et son ellipse débordait sous la scène
+       comme une grosse tache noire. */
+    if (LUM.niveau() && y < -30 && h <= 90) {
+      ctx.save();
+      ctx.globalAlpha = 0.26;
+      ctx.fillStyle = '#000';
+      const dec = LUM.vx * Math.min(40, h * 0.9);
+      ctx.beginPath();
+      ctx.ellipse(x + w / 2 - dec, y + h + 8, Math.min(w * 0.48, 260), Math.min(14, h * 0.3),
+                  0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    orig(ctx, p, base, top, accent);
+
+    if (!LUM.niveau()) return;
+
+    ctx.save();
+    /* La face supérieure prend la lumière ; la face avant s'assombrit
+       vers le bas. Deux bandes suffisent : l'œil complète le volume. */
+    const gt = ctx.createLinearGradient(0, y, 0, y + h);
+    gt.addColorStop(0, rgba(LUM.chaud, 0.24 * LUM.force));
+    gt.addColorStop(0.32, 'rgba(0,0,0,0)');
+    gt.addColorStop(0.72, rgba(LUM.froid, 0.16 * LUM.force));
+    gt.addColorStop(1, rgba(LUM.froid, 0.4 * LUM.force));
+    ctx.fillStyle = gt;
+    ctx.fillRect(x, y, w, h);
+
+    /* L'arête vive du dessus, du côté de la lumière. */
+    ctx.globalCompositeOperation = 'lighter';
+    const ga = ctx.createLinearGradient(x, 0, x + w, 0);
+    const k = clamp((LUM.vx + 1) / 2, 0, 1);
+    ga.addColorStop(Math.max(0, k - 0.45), 'rgba(0,0,0,0)');
+    ga.addColorStop(k, rgba(LUM.chaud, 0.5 * LUM.force));
+    ga.addColorStop(Math.min(1, k + 0.45), 'rgba(0,0,0,0)');
+    ctx.fillStyle = ga;
+    ctx.fillRect(x, y, w, Math.max(2.5, h * 0.09));
+
+    /* Le rebond sous le nez de la dalle : la lumière du sol remonte. */
+    ctx.globalAlpha = 0.3 * LUM.force;
+    ctx.fillStyle = rgba(accent || LUM.chaud, 0.5);
+    ctx.fillRect(x, y + h - Math.max(2, h * 0.06), w, Math.max(2, h * 0.06));
+    ctx.restore();
+  };
+})();
+
+/* ============================================================
+   3) PROFONDEUR DE LA SCÈNE ET OMBRE DE CONTACT
+   ============================================================ */
+(function profondeur() {
+  if (typeof Match === 'undefined' || !Match.prototype) return;
+
+  /* --- la lumière suit l'arène --- */
+  if (typeof UI !== 'undefined' && typeof UI.startMatch === 'function') {
+    const smOrig = UI.startMatch.bind(UI);
+    UI.startMatch = function (stage, forced) {
+      const r = smOrig(stage, forced);
+      try { LUM.pose(this.match ? this.match.stage : stage); } catch (e) {}
+      return r;
+    };
+  }
+
+  /* --- brume de profondeur entre les couches --- */
+  const drawOrig = Match.prototype.draw;
+  Match.prototype.draw = function (ctx) {
+    drawOrig.call(this, ctx);
+  };
+
+  /* On préfère se greffer sur les couches elles-mêmes : chaque plan
+     lointain reçoit un voile de la couleur de la lumière, d'autant plus
+     dense qu'il est loin. C'est ce qui creuse l'image. */
+  const voile = (ctx, a, col) => {
+    ctx.save();
+    ctx.setTransform(RS, 0, 0, RS, 0, 0);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = col;
+    ctx.fillRect(0, 0, VW, VH);
+    ctx.restore();
+  };
+  Match.prototype.voileProfondeur = function (ctx, a) {
+    if (!LUM.niveau()) return;
+    voile(ctx, a * LUM.force, LUM.chaud);
+  };
+
+  /* --- ombre de contact plus crédible --- */
+  const fOrig = Fighter.prototype.draw;
+  Fighter.prototype.draw = function (ctx) {
+    if (!LUM.niveau()) return fOrig.call(this, ctx);
+    const gy = this.M.groundBelow(this);
+    if (gy !== null && this.state !== ST.DEAD) {
+      /* Deux ombres : une large et floue qui dit « il est en l'air à
+         telle hauteur », une serrée et sombre qui dit « il touche ».
+         C'est ce couple qui plante un personnage au sol. */
+      const haut = gy - this.y;
+      const d = clamp(1 - haut / 520, 0.1, 1);
+      const dec = -LUM.vx * clamp(haut * 0.16, 0, 46);
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,' + (0.2 * d).toFixed(3) + ')';
+      ctx.beginPath();
+      ctx.ellipse(this.x + dec, gy + 3, this.w * 0.9 * d, this.w * 0.3 * d, 0, 0, Math.PI * 2);
+      ctx.fill();
+      if (haut < 40) {
+        ctx.fillStyle = 'rgba(0,0,0,' + (0.34 * (1 - haut / 40)).toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.ellipse(this.x, gy + 2, this.w * 0.5, this.w * 0.15, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+    /* L'ombre d'origine est neutralisée le temps de l'appel : on vient
+       de la remplacer par une meilleure. */
+    const gbOrig = this.M.groundBelow;
+    this.M.groundBelow = () => null;
+    try { fOrig.call(this, ctx); }
+    finally { this.M.groundBelow = gbOrig; }
+  };
+})();
+
+/* ============================================================
+   4) VOLUME SUR LES OBJETS
+   Une icône plate posée sur un décor éclairé jure. On lui ajoute une
+   ombre au sol et un reflet spéculaire, dans le sens de la lumière.
+   ============================================================ */
+(function volumeObjets() {
+  if (typeof ITEMS === 'undefined' || typeof ITEMS.drawIcon !== 'function') return;
+  const orig = ITEMS.drawIcon.bind(ITEMS);
+  ITEMS.drawIcon = function (ctx, d, x, y, s) {
+    if (!LUM.niveau()) return orig(ctx, d, x, y, s);
+    const R = 17 * (s || 1);
+    /* ombre au sol de l'objet */
+    ctx.save();
+    ctx.globalAlpha = 0.26;
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.ellipse(x - LUM.vx * R * 0.35, y + R * 0.95, R * 0.85, R * 0.26, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    orig(ctx, d, x, y, s);
+
+    /* reflet : un croissant clair du côté de la lumière */
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const g = ctx.createRadialGradient(x + LUM.vx * R * 0.5, y + LUM.vy * R * 0.5, 1,
+                                       x + LUM.vx * R * 0.5, y + LUM.vy * R * 0.5, R * 1.15);
+    g.addColorStop(0, rgba(LUM.chaud, 0.4 * LUM.force));
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, R * 1.15, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  };
+})();
+
+/* ---------- réglage ---------- */
+(function optionVolume() {
+  if (typeof Save === 'undefined' || !Save.data || !Save.data.opts) return;
+  if (Save.data.opts.volume === undefined) Save.data.opts.volume = true;
+})();
+
+
+/* ===== 45-camera.js ===== */
+/* ============================================================
+   SMASH PÉI — LA CAMÉRA
+
+   L'ancienne caméra cadrait correctement mais racontait mal. Elle
+   faisait une seule chose : englober tout le monde dans un rectangle,
+   à vitesse constante. Or dans Smash Bros la caméra est un
+   personnage à part entière, et elle applique quatre règles très
+   nettes :
+
+   1. ELLE SE RAPPROCHE QUAND ÇA SE RAPPROCHE. Deux combattants qui
+      s'échangent des coups à courte portée occupent tout l'écran.
+      C'est ce qui donne son poids à chaque impact. Notre marge fixe
+      de 540 pixels empêchait justement ce resserrement.
+
+   2. ELLE RECULE VITE, ELLE AVANCE LENTEMENT. Reculer est urgent :
+      quelqu'un vient d'être éjecté, il ne doit pas sortir du cadre.
+      Se rapprocher ne l'est pas : le faire trop vite donne la nausée.
+      Deux vitesses, donc, au lieu d'une.
+
+   3. ELLE REGARDE OÙ ÇA SE PASSE. Le centre géométrique n'est pas le
+      centre de l'action : la caméra penche vers le combattant qui
+      vient de frapper ou d'être frappé, et anticipe un peu sur la
+      trajectoire de celui qui vole.
+
+   4. ELLE NE RESTE JAMAIS PARFAITEMENT IMMOBILE. Une très légère
+      respiration suffit à faire vivre l'image.
+
+   Plus le coup de zoom sur le K.O., qui vient ponctuer.
+
+   Tout reste borné par les limites de l'arène et par le réglage
+   « ZOOM CAMÉRA » du joueur, qui garde le dernier mot.
+   ============================================================ */
+(function cameraSmash() {
+  if (typeof Camera === 'undefined' || !Camera.prototype) return;
+
+  Camera.prototype.update = function (M) {
+    const opt = (Save.data && Save.data.opts) || {};
+    const reglage = opt.cameraZoom !== undefined ? opt.cameraZoom : 1;
+
+    const alive = M.fighters.filter(f => f.alive && f.state !== ST.DEAD);
+    let minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+
+    /* --- 3) le centre de l'ACTION, pas le centre géométrique ---
+       Chaque combattant pèse dans le cadrage. Celui qui vient de
+       toucher ou d'être touché pèse davantage, et celui qui vole est
+       anticipé sur sa trajectoire : on cadre là où il SERA. */
+    let sx = 0, sy = 0, poids = 0;
+    if (alive.length) {
+      for (const f of alive) {
+        const vole = f.state === ST.HITSTUN || f.state === ST.TUMBLE;
+        const antX = f.x + (vole ? clamp(f.vx * 7, -260, 260) : clamp(f.vx * 2.5, -90, 90));
+        const antY = f.cy + (vole ? clamp(f.vy * 6, -240, 240) : 0);
+        minX = Math.min(minX, Math.min(f.x, antX)); maxX = Math.max(maxX, Math.max(f.x, antX));
+        minY = Math.min(minY, Math.min(f.top, antY)); maxY = Math.max(maxY, f.y);
+        let w = 1;
+        if (f === M.comboOwner && M.comboShow > 0) w += 0.9;
+        if (f.hitstun > 0 || f.hitlag > 0) w += 0.7;
+        if (f.enSuper) w += 1.6;
+        sx += antX * w; sy += antY * w; poids += w;
+      }
+    } else { minX = maxX = 0; minY = -200; maxY = 0; }
+
+    /* on garde toujours un morceau de sol visible */
+    const main = M.mainPlat();
+    if (main) {
+      const mt = main.y + (main.dy || 0);
+      if (maxX > main.x - 260 && minX < main.x + main.w + 260) maxY = Math.max(maxY, mt + 70);
+    }
+
+    const B = M.stage.bounds;
+    const geoX = (minX + maxX) / 2, geoY = (minY + maxY) / 2 - 30;
+    const actX = poids ? sx / poids : geoX, actY = poids ? sy / poids : geoY;
+    /* le cadrage est surtout géométrique : l'action ne fait qu'incliner */
+    let cx = lerp(geoX, actX, 0.34);
+    let cy = lerp(geoY, actY, 0.28) - 20;
+
+    /* --- 1) la marge s'ouvre et se ferme avec l'écartement ---
+       Serrés : très peu de marge, l'échange remplit l'écran. Éparpillés :
+       large marge, personne ne se perd hors cadre. */
+    const ecart = Math.max(maxX - minX, (maxY - minY) * 1.2);
+    const k = clamp(ecart / 900, 0, 1);
+    const marge = lerp(300, 660, k);
+    const spanX = (maxX - minX) + marge;
+    const spanY = (maxY - minY) + marge * 0.72;
+
+    let z = Math.min(VW / spanX, VH / spanY);
+    /* Plafond plus haut qu'avant : c'est lui qui autorise le vrai
+       gros plan de duel. */
+    z = clamp(z, 0.58, alive.length <= 2 ? 1.9 : 1.55) * reglage;
+    if (M.intro > 0) z = 0.8 * reglage;
+
+    /* coup de zoom sur le K.O. */
+    if (this.ko && this.ko.t > 0) {
+      this.ko.t--;
+      const kk = easeOut(clamp(this.ko.t / 26, 0, 1));
+      cx = lerp(cx, this.ko.x, kk * 0.5);
+      cy = lerp(cy, this.ko.y, kk * 0.5);
+      z *= 1 + kk * 0.2;
+    }
+
+    /* cinématique finale : la caméra vient cadrer le vainqueur */
+    if (M.finale && M.finale.f) {
+      const F = M.finale.f, kf = easeOut(clamp(M.finale.t / 46, 0, 1));
+      cx = lerp(cx, F.x, kf * 0.92);
+      cy = lerp(cy, F.cy - 30, kf * 0.92);
+      z = lerp(z, 1.5 * reglage, kf * 0.92);
+    }
+
+    /* --- 2) reculer est urgent, se rapprocher ne l'est pas --- */
+    this.tz = z;
+    const dez = this.tz < this.zoom;                     // on recule
+    this.zoom += (this.tz - this.zoom) * (dez ? 0.19 : 0.055);
+
+    const halfW = VW / (2 * this.zoom), halfH = VH / (2 * this.zoom);
+    const tx = clamp(cx, B.left + halfW * 0.55, B.right - halfW * 0.55);
+    const ty = clamp(cy, B.top + halfH * 0.7, B.bottom - halfH * 0.55);
+
+    /* Suivi proportionnel : plus la cible est loin, plus on rattrape
+       vite. Une caméra à vitesse fixe traîne toujours derrière une
+       éjection, et on perd de vue celui qui part. */
+    const dx = tx - this.x, dy = ty - this.y;
+    const rx = clamp(Math.abs(dx) / 420, 0, 1), ry = clamp(Math.abs(dy) / 380, 0, 1);
+    this.x += dx * lerp(0.1, 0.28, rx);
+    this.y += dy * lerp(0.085, 0.26, ry);
+
+    /* --- 4) la respiration --- */
+    this.souffle = (this.souffle || 0) + 1;
+    if (!M.over && M.intro <= 0) {
+      this.x += Math.sin(this.souffle * 0.011) * 1.5;
+      this.y += Math.cos(this.souffle * 0.009) * 1.1;
+    }
+
+    if (this.punch > 0) { this.zoom *= 1 + this.punch * 0.07; this.punch *= 0.85; if (this.punch < 0.01) this.punch = 0; }
+    this.zoom *= 1 + Groove.cameraPulse(M);   // le décor respire sur la mesure
+    if (this.shake > 0) { this.shake *= 0.86; if (this.shake < 0.4) this.shake = 0; }
+  };
+
+  /* Le K.O. déclenche le coup de zoom. On se greffe sur `onKO` pour ne
+     pas toucher à la logique de match. */
+  if (typeof Match !== 'undefined' && Match.prototype.onKO) {
+    const koOrig = Match.prototype.onKO;
+    Match.prototype.onKO = function (f, killer, dir) {
+      try {
+        this.cam.ko = { x: f.x, y: f.cy, t: 26 };
+      } catch (e) {}
+      return koOrig.call(this, f, killer, dir);
+    };
+  }
+})();
+
+
+/* ===== 46-rythme.js ===== */
+/* ============================================================
+   SMASH PÉI — LE RYTHME
+
+   Le jeu était juste, mais lent. Deux mesures le disaient :
+
+   · Traverser la plateforme principale demandait près de quatre
+     secondes. Sur Battlefield, dans le vrai Smash, il en faut moins
+     de deux. Une scène qu'on met quatre secondes à traverser n'est
+     pas une arène de combat, c'est un couloir.
+
+   · Les coups se terminaient longtemps après avoir touché. Cette
+     queue d'animation, invisible, est ce qui donne l'impression de
+     jouer « dans la mélasse » : on a appuyé, ça a touché, et on
+     attend encore.
+
+   Ce fichier ne réécrit aucun personnage ni aucun coup. Il applique
+   un jeu de facteurs, une fois, après l'équilibrage :
+
+   1. DÉPLACEMENT plus vif — course, marche, contrôle aérien.
+   2. GRAVITÉ ET CHUTE plus fortes, sauts très légèrement plus hauts :
+      on saute aussi haut qu'avant, mais on retombe plus tôt. C'est la
+      recette exacte de la nervosité aérienne de Smash Ultimate.
+   3. QUEUES D'ANIMATION raccourcies, départs des coups légers gagnés
+      d'une image. Les smashs, eux, gardent tout leur engagement : un
+      coup qui tue doit rester un pari.
+   4. ATTERRISSAGE d'aérien nettement moins pénalisant, pour que les
+      échanges en l'air s'enchaînent.
+   5. HITSTUN un peu plus long : sans lui, les enchaînements ne
+      tiennent pas et chaque coup repart de zéro.
+
+   Les écarts entre combattants sont préservés : tout est
+   multiplicatif, le lourd reste lourd et le vif reste vif.
+   ============================================================ */
+(function rythme() {
+  if (typeof CHAR_LIST === 'undefined') return;
+
+  /* ---------- 1 & 2 : le déplacement ---------- */
+  const MUL = {
+    walk: 1.5, run: 1.62, air: 1.34,
+    jump: 1.08, djump: 1.08,
+    grav: 1.14, fall: 1.16
+  };
+  for (const c of CHAR_LIST) {
+    const S = c.stats;
+    if (!S || S.__rythme) continue;
+    for (const k in MUL) if (typeof S[k] === 'number') S[k] *= MUL[k];
+    S.__rythme = true;
+  }
+
+  /* ---------- 3 & 4 : les images des coups ----------
+     `s` et `e` bornent la fenêtre active d'un coup, `total` sa durée
+     complète. On rogne la queue (total − fin d'activité) et on gagne
+     une image de départ sur les coups légers. */
+  const RAPIDE = { jab1: 1, jab2: 1, jab3: 1, ftilt: 1, utilt: 1, dtilt: 1,
+                   nair: 1, fair: 1, bair: 1, uair: 1, dair: 1, dashAtk: 1 };
+  const ENGAGE = { fsmash: 1, usmash: 1, dsmash: 1 };   // on ne touche pas au départ
+
+  function alege(mv, key) {
+    if (!mv || mv.__rythme) return;
+    mv.__rythme = true;
+
+    const gagne = RAPIDE[key] ? 1 : 0;
+    let finActive = 0;
+    if (mv.hits) {
+      for (const h of mv.hits) {
+        if (typeof h.s === 'number') h.s = Math.max(2, h.s - gagne);
+        if (typeof h.e === 'number') {
+          h.e = Math.max(h.s + 1, h.e - gagne);
+          finActive = Math.max(finActive, h.e);
+        }
+      }
+    }
+    if (typeof mv.total === 'number') {
+      /* La queue, c'est ce qui reste après le dernier moment actif.
+         On en enlève un tiers pour les coups vifs, un sixième pour les
+         smashs — qui doivent rester punissables. */
+      const queue = Math.max(0, mv.total - finActive);
+      const coupe = ENGAGE[key] ? queue * 0.16 : queue * 0.34;
+      mv.total = Math.max(finActive + 3, Math.round(mv.total - coupe));
+    }
+    /* l'atterrissage après un aérien */
+    if (typeof mv.land === 'number') mv.land = Math.max(2, Math.round(mv.land * 0.62));
+  }
+
+  for (const c of CHAR_LIST) {
+    if (!c.moves) continue;
+    for (const key in c.moves) alege(c.moves[key], key);
+  }
+
+  /* ---------- 5 : le liant ---------- */
+  if (typeof PHYS !== 'undefined') {
+    /* Un hitstun trop court coupe les enchaînements : l'adversaire
+       reprend la main avant même que le second coup parte. */
+    PHYS.hitstunMul = 0.46;
+    /* On garde son élan en l'air et pendant une attaque : c'est ce qui
+       permet de bouger EN frappant, comme dans Smash. */
+    PHYS.airFriction = 0.963;
+    PHYS.attackFriction = 0.86;
+    /* Réactivité au sol : demi-tour et arrêt plus francs. */
+    PHYS.groundFriction = 0.72;
+    PHYS.pivotKeep = 0.24;
+  }
+
+  /* ---------- confort : la course démarre tout de suite ----------
+     L'état DASH imposait un temps mort avant d'atteindre la vitesse de
+     course. On le raccourcit : dans Smash, on part au quart de tour. */
+  if (typeof ST !== 'undefined' && typeof Fighter !== 'undefined' && Fighter.prototype.control) {
+    /* rien à réécrire ici : la vivacité vient des facteurs ci-dessus.
+       Ce commentaire reste pour dire où regarder si un jour le départ
+       de course redevient mou. */
+  }
+})();
+
+
+/* ===== 47-coups.js ===== */
+/* ============================================================
+   SMASH PÉI — LA PERSONNALITÉ DES COUPS
+
+   Jusqu'ici, deux combattants du même archétype avaient exactement
+   le même jeu de coups normaux : mêmes fenêtres, mêmes angles, même
+   comportement. Seuls les dégâts et la portée changeaient. C'est la
+   principale raison pour laquelle le combat se ressemblait d'un
+   personnage à l'autre — ce qui distingue les combattants de Smash,
+   ce n'est pas leur barème de dégâts, c'est ce que FAIT chaque coup.
+
+   Ce fichier ajoute deux choses.
+
+   1. LE POINT IDÉAL (le « tipper »).
+      Tous les smashs avant ont désormais deux zones : le bout de
+      l'arme, qui envoie beaucoup plus loin, et la base, qui touche à
+      peine. Frapper à la bonne distance devient une compétence, et
+      espacer son adversaire prend enfin un sens.
+
+   2. UNE SIGNATURE PAR COMBATTANT.
+      Chaque personnage reçoit trois traits tirés d'une liste de
+      mécaniques classiques — aérien multi-coups, pique météore,
+      lanceur, coup qui fait trébucher, glissade, rafale de jabs… Le
+      tirage est DÉTERMINISTE (il découle de l'identifiant), donc un
+      combattant a toujours la même signature, pour tout le monde, y
+      compris en ligne. Il est aussi orienté par l'archétype : un
+      poids lourd reçoit des traits qui récompensent l'engagement, un
+      aérien des traits de jonglage.
+
+   Rien n'est retiré : chaque trait modifie des coups existants.
+   ============================================================ */
+(function coups() {
+  if (typeof CHAR_LIST === 'undefined' || typeof H !== 'function') return;
+
+  /* ---------- 1) le point idéal des smashs avant ---------- */
+  function tipper(mv, R) {
+    if (!mv || !mv.hits || !mv.hits.length || mv.__tip) return;
+    const h = mv.hits[0];
+    if (h.dmg <= 0) return;
+    mv.__tip = true;
+    const larg = h.w;
+    /* la base du coup : même fenêtre, moitié intérieure, nettement
+       plus faible — c'est la punition de celui qui frappe trop près */
+    const base = H(Object.assign({}, h, {
+      x: h.x - larg * 0.28, w: larg * 0.56,
+      dmg: h.dmg * 0.62, bkb: h.bkb * 0.7, kbg: h.kbg * 0.66,
+      hitlag: (h.hitlag || 1) * 0.8, sfx: 'hit', fx: 'punch', priority: 0
+    }));
+    /* le bout : plus étroit, plus fort, son propre son */
+    h.x = h.x + larg * 0.3; h.w = larg * 0.62;
+    h.dmg *= 1.16; h.bkb *= 1.14; h.kbg *= 1.1;
+    h.priority = 2;
+    /* la base est testée après le bout : le bout gagne toujours */
+    mv.hits.push(base);
+  }
+
+  /* ---------- 2) les traits ----------
+     Chacun est une petite transformation d'un ou deux coups. */
+  const TRAITS = {
+    /* un aérien neutre qui touche plusieurs fois, comme une hélice */
+    nairMulti: { fr: 'Aérien neutre multi-coups', ok: mv => !!mv.nair, appl(mv) {
+      const h = mv.nair.hits[0];
+      mv.nair.hits = [];
+      for (let i = 0; i < 4; i++) mv.nair.hits.push(H(Object.assign({}, h, {
+        s: h.s + i * 4, e: h.s + i * 4 + 3,
+        dmg: h.dmg * 0.34, ang: 361, bkb: 8, kbg: 24, hitlag: 0.5, fx: 'ring', sfx: 'hitLight'
+      })));
+      mv.nair.hits.push(H(Object.assign({}, h, {
+        s: h.s + 16, e: h.s + 20, dmg: h.dmg * 0.7, bkb: h.bkb * 1.2, kbg: h.kbg, fx: 'impact'
+      })));
+      mv.nair.total = Math.max(mv.nair.total, h.s + 26);
+    } },
+
+    /* un aérien bas qui pique vers le sol : le coup de grâce hors scène */
+    dairMeteore: { fr: 'Aérien bas météore', ok: mv => !!mv.dair, appl(mv) {
+      const h = mv.dair.hits[0];
+      h.spike = true; h.ang = -88; h.bkb *= 1.18; h.kbg *= 0.9;
+      h.dmg *= 1.08; h.hitlag = 1.9; h.sfx = 'smashHit'; h.fx = 'spike';
+      /* le point idéal est court : rater, c'est se retrouver dessous */
+      h.e = h.s + Math.max(2, Math.round((h.e - h.s) * 0.6));
+    } },
+
+    /* un aérien bas en vrille : plusieurs petits coups qui aspirent */
+    dairVrille: { fr: 'Aérien bas en vrille', ok: mv => !!mv.dair, appl(mv) {
+      const h = mv.dair.hits[0];
+      mv.dair.hits = [];
+      for (let i = 0; i < 5; i++) mv.dair.hits.push(H(Object.assign({}, h, {
+        s: h.s + i * 3, e: h.s + i * 3 + 2,
+        dmg: h.dmg * 0.26, ang: 270, bkb: 6, kbg: 12, hitlag: 0.4, fx: 'ring', sfx: 'hitLight', spike: false
+      })));
+      mv.dair.hits.push(H(Object.assign({}, h, {
+        s: h.s + 16, e: h.s + 19, dmg: h.dmg * 0.6, ang: 40, bkb: h.bkb, kbg: h.kbg, fx: 'impact'
+      })));
+    } },
+
+    /* un aérien haut qui relance : de quoi jongler */
+    uairLanceur: { fr: 'Aérien haut lanceur', ok: mv => !!mv.uair, appl(mv) {
+      const h = mv.uair.hits[0];
+      h.ang = 92; h.bkb *= 0.72; h.kbg *= 1.22; h.dmg *= 0.9;
+      h.h *= 1.25; h.hitlag = 0.7;
+      mv.uair.total = Math.max(6, Math.round(mv.uair.total * 0.88));
+    } },
+
+    /* un aérien arrière qui claque : le finisseur de dos */
+    bairFinisseur: { fr: 'Aérien arrière finisseur', ok: mv => !!mv.bair, appl(mv) {
+      const h = mv.bair.hits[0];
+      h.dmg *= 1.18; h.bkb *= 1.16; h.kbg *= 1.12; h.hitlag = 1.6;
+      h.sfx = 'smashHit'; h.fx = 'bigSlash';
+      h.s += 2; h.e = h.s + 3;                       // plus lent, plus tranchant
+    } },
+
+    /* une inclinée avant en deux temps */
+    ftiltDouble: { fr: 'Inclinée avant en deux temps', ok: mv => !!mv.ftilt, appl(mv) {
+      const h = mv.ftilt.hits[0];
+      h.dmg *= 0.56; h.bkb *= 0.5; h.kbg *= 0.4; h.ang = 361; h.hitlag = 0.6;
+      mv.ftilt.hits.push(H(Object.assign({}, h, {
+        s: h.e + 4, e: h.e + 8, x: h.x * 1.1, w: h.w * 1.05,
+        dmg: h.dmg * 1.5, bkb: h.bkb * 2.4, kbg: h.kbg * 2.6, hitlag: 1.2, fx: 'impact'
+      })));
+      mv.ftilt.total += 8;
+    } },
+
+    /* une inclinée basse qui fait trébucher : on enchaîne derrière */
+    dtiltTrebuche: { fr: 'Inclinée basse déséquilibrante', ok: mv => !!mv.dtilt, appl(mv) {
+      const h = mv.dtilt.hits[0];
+      h.ang = 8; h.bkb *= 0.5; h.kbg *= 0.42; h.dmg *= 0.86;
+      h.hitlag = 0.6; h.fx = 'dust';
+      mv.dtilt.total = Math.max(6, Math.round(mv.dtilt.total * 0.84));
+    } },
+
+    /* une attaque en course qui glisse loin */
+    dashGlisse: { fr: 'Attaque en course glissée', ok: mv => !!mv.dashAtk, appl(mv) {
+      mv.dashAtk.moveX = { s: 3, e: 16, v: 12 };
+      const h = mv.dashAtk.hits[0];
+      h.e += 4; h.dmg *= 0.92; h.ang = 45;
+    } },
+
+    /* une rafale de jabs, comme les personnages à mitraille */
+    jabRafale: { fr: 'Rafale de jabs', ok: mv => !!mv.jab3, appl(mv) {
+      const h = mv.jab3.hits[0];
+      mv.jab3.hits = [];
+      for (let i = 0; i < 6; i++) mv.jab3.hits.push(H(Object.assign({}, h, {
+        s: h.s + i * 3, e: h.s + i * 3 + 2,
+        dmg: h.dmg * 0.22, ang: 361, bkb: 5, kbg: 8, hitlag: 0.35, fx: 'punch', sfx: 'hitLight'
+      })));
+      mv.jab3.hits.push(H(Object.assign({}, h, {
+        s: h.s + 19, e: h.s + 22, dmg: h.dmg * 0.7, bkb: h.bkb * 1.25, kbg: h.kbg, fx: 'impact'
+      })));
+      mv.jab3.total = Math.max(mv.jab3.total, h.s + 28);
+    } },
+
+    /* une inclinée haute anti-aérien franche */
+    utiltAntiAir: { fr: 'Inclinée haute anti-aérienne', ok: mv => !!mv.utilt, appl(mv) {
+      const h = mv.utilt.hits[0];
+      h.h *= 1.35; h.y -= 14; h.ang = 88; h.kbg *= 1.16;
+      h.s = Math.max(2, h.s - 1);
+    } },
+
+    /* un smash bas qui envoie très à plat : idéal pour dégager le rebord */
+    dsmashRasant: { fr: 'Smash bas rasant', ok: mv => !!mv.dsmash, appl(mv) {
+      for (const h of mv.dsmash.hits) { h.ang = h.ang > 90 ? 172 : 8; h.kbg *= 1.1; h.bkb *= 1.05; }
+    } },
+
+    /* un smash haut qui couvre large au-dessus */
+    usmashDome: { fr: 'Smash haut en dôme', ok: mv => !!mv.usmash, appl(mv) {
+      const h = mv.usmash.hits[0];
+      h.w *= 1.3; h.h *= 1.18; h.dmg *= 0.94;
+    } }
+  };
+
+  /* Traits favorisés par archétype : un lourd n'a pas la même palette
+     qu'un aérien. Le tirage reste déterministe, seul l'ordre change. */
+  const GOUT = {
+    heavy:    ['bairFinisseur', 'dairMeteore', 'dsmashRasant', 'ftiltDouble', 'utiltAntiAir', 'usmashDome'],
+    rushdown: ['jabRafale', 'dtiltTrebuche', 'dashGlisse', 'nairMulti', 'uairLanceur', 'ftiltDouble'],
+    aerial:   ['uairLanceur', 'nairMulti', 'dairVrille', 'bairFinisseur', 'utiltAntiAir', 'dashGlisse'],
+    swordie:  ['bairFinisseur', 'ftiltDouble', 'dairMeteore', 'usmashDome', 'utiltAntiAir', 'dsmashRasant'],
+    zoner:    ['dtiltTrebuche', 'usmashDome', 'nairMulti', 'uairLanceur', 'jabRafale', 'dsmashRasant'],
+    balanced: ['ftiltDouble', 'uairLanceur', 'dashGlisse', 'bairFinisseur', 'dtiltTrebuche', 'nairMulti']
+  };
+
+  const emp = typeof empreinte === 'function'
+    ? empreinte
+    : (t) => { let h = 0; const s = String(t); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; };
+
+  for (const c of CHAR_LIST) {
+    if (!c.moves || c.__coups) continue;
+    c.__coups = true;
+
+    tipper(c.moves.fsmash, 1);
+
+    const liste = (GOUT[c.arch] || GOUT.balanced).slice();
+    const h = emp(c.id + '|coups');
+    /* trois traits, pris à des pas différents dans la liste : deux
+       personnages du même archétype n'ont jamais le même trio */
+    const pris = [];
+    for (let i = 0; i < 3; i++) {
+      const idx = (h >>> (i * 5)) % liste.length;
+      const cle = liste.splice(idx, 1)[0];
+      const T = TRAITS[cle];
+      if (!T) continue;
+      if (!T.ok(c.moves)) continue;
+      try { T.appl(c.moves); pris.push(cle); } catch (e) {}
+    }
+    /* On garde la trace : la fiche technique peut l'afficher. */
+    c.traits = pris;
+  }
+
+  /* ---------- noms lisibles, pour la fiche ---------- */
+  window.TRAIT_NOM = function (cle, lang) {
+    const T = TRAITS[cle];
+    if (!T) return cle;
+    return T.fr;
+  };
+})();
+
+
+/* ===== 48-anim.js ===== */
+/* ============================================================
+   SMASH PÉI — LISIBILITÉ DES COUPS : LES TRAÎNÉES
+
+   Dans Smash Bros, on reconnaît un coup avant même qu'il touche,
+   parce qu'il laisse une trace dans l'air : l'arc lumineux qui suit
+   la lame, le poing ou le pied. Cette traînée n'est pas décorative,
+   elle est INFORMATIVE — elle montre où la zone de dégâts est
+   passée, et donc où elle va passer la prochaine fois.
+
+   Ici, la traînée est calquée sur la vérité du moteur : on suit le
+   centre de la boîte de dégâts réellement active, image par image.
+   Ce qu'on voit est donc exactement ce qui touche. Un coup au bout
+   de la lame et un coup à la base ne dessinent pas le même arc, ce
+   qui rend le nouveau « point idéal » lisible à l'œil.
+
+   Trois épaisseurs, trois couleurs :
+     · les smashs et les coups lourds tracent large et doré ;
+     · les aériens tracent fin et clair ;
+     · les rafales ne tracent presque rien, pour ne pas saturer.
+
+   Coût : un tableau de huit points par combattant et un tracé de
+   ligne. C'est la mise en scène la moins chère du jeu.
+   ============================================================ */
+(function trainees() {
+  if (typeof Fighter === 'undefined' || !Fighter.prototype) return;
+
+  /* Largeur et éclat selon le type de coup. */
+  const PROFIL = {
+    fsmash: [13, 1],  usmash: [13, 1],  dsmash: [12, 1],
+    fair:   [9, 0.9], bair:   [9, 0.9], uair: [8, 0.85], dair: [9, 0.9], nair: [7, 0.75],
+    ftilt:  [7, 0.7], utilt:  [7, 0.7], dtilt: [6, 0.62],
+    dashAtk: [9, 0.8], weapon: [11, 0.95],
+    jab1:   [4, 0.42], jab2: [4, 0.42], jab3: [4, 0.4]
+  };
+
+  const majOrig = Fighter.prototype.updateMove;
+  Fighter.prototype.updateMove = function () {
+    const r = majOrig.call(this);
+    if (!this.arc) this.arc = [];
+
+    const prof = PROFIL[this.moveKey];
+    let pris = false;
+    const mv = this.move;
+    if (prof && mv && mv.hits && mv.hits.length && !this.charging && this.hitlag <= 0) {
+      /* La boîte de dégâts, elle, ne bouge pas pendant les trois ou
+         quatre images actives : la suivre telle quelle ne donnait
+         qu'un point, donc aucune traînée. Ce qu'il faut dessiner,
+         c'est le GESTE — le trajet parcouru par le coup depuis
+         l'armé jusqu'à l'impact.
+
+         On le reconstruit : la boîte finale donne le rayon et
+         l'angle d'arrivée, et on remonte l'arc en arrière sur les
+         images d'élan. Le tracé colle donc au coup réel, sans qu'on
+         ait à animer quoi que ce soit à la main. */
+      const h = mv.hits[0];
+      const deb = Math.max(0, h.s - 5), fin = h.e;
+      if (this.mf >= deb && this.mf <= fin) {
+        const dirX = h.mirror ? -this.facing : this.facing;
+        const bx = this.x + dirX * h.x, by = this.y + h.y;
+        const dx = bx - this.x, dy = by - this.cy;
+        const R = Math.max(26, Math.hypot(dx, dy));
+        const base = Math.atan2(dy, dx);
+        const sens = Math.cos(base) >= 0 ? 1 : -1;
+        const u = clamp((this.mf - deb) / Math.max(1, fin - deb), 0, 1);
+        /* l'ampleur du geste : un smash balaie large, un jab pique */
+        const ampleur = prof[0] > 10 ? 1.7 : (prof[0] > 6 ? 1.25 : 0.8);
+        const ang = base - sens * (1 - u) * ampleur;
+        this.arc.push({
+          x: this.x + Math.cos(ang) * R,
+          y: this.cy + Math.sin(ang) * R,
+          a: 1, w: prof[0], e: prof[1]
+        });
+        if (this.arc.length > 10) this.arc.shift();
+        pris = true;
+      }
+    }
+    if (!pris && this.arc.length && this.hitlag <= 0) this.arc.shift();
+    for (const p of this.arc) p.a *= 0.87;
+    return r;
+  };
+
+  /* Le tracé, juste avant le combattant : la traînée passe derrière
+     lui, comme le sillage d'un geste. */
+  const drawOrig = Fighter.prototype.draw;
+  Fighter.prototype.draw = function (ctx) {
+    const A = this.arc;
+    if (A && A.length > 2 && this.state !== ST.DEAD) {
+      const col = (this.char.pal && this.char.pal.accent) || this.color || '#ffd166';
+      /* le coeur du trait reste blanc : c'est ce qui le fait exister
+         sur n'importe quel fond, clair comme sombre */
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      /* deux passes : un large halo teinté, un cœur clair */
+      for (let pass = 0; pass < 2; pass++) {
+        ctx.beginPath();
+        ctx.moveTo(A[0].x, A[0].y);
+        for (let i = 1; i < A.length; i++) {
+          const p = A[i - 1], q = A[i];
+          ctx.quadraticCurveTo(p.x, p.y, (p.x + q.x) / 2, (p.y + q.y) / 2);
+        }
+        const der = A[A.length - 1];
+        ctx.lineWidth = der.w * (pass ? 0.5 : 1.9);
+        ctx.strokeStyle = rgba(pass ? '#ffffff' : col, (pass ? 0.72 : 0.5) * der.e * der.a);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    return drawOrig.call(this, ctx);
+  };
+
+  /* On repart d'une traînée vierge à chaque nouveau coup : sinon le
+     dernier arc se raccroche au suivant et dessine un trait qui
+     traverse tout l'écran. */
+  const startOrig = Fighter.prototype.startMove;
+  Fighter.prototype.startMove = function (key) {
+    if (this.arc) this.arc.length = 0;
+    return startOrig.call(this, key);
+  };
+  const dieOrig = Fighter.prototype.die;
+  Fighter.prototype.die = function (dir) {
+    if (this.arc) this.arc.length = 0;
+    return dieOrig.call(this, dir);
+  };
+})();
 
 </script>
 </body>
