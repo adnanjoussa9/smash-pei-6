@@ -2433,7 +2433,21 @@ const PHYS = {
   superGainTempo: 3,        // prime de frappe sur le tempo maloya
   superDecayDelay: 480,     // images pleines avant que la fuite commence
   superDecay: 0.045,        // fuite par image ensuite
-  superDecayFloor: 0.7      // la fuite s'arrête à 70 % : on ne repart pas de zéro
+  superDecayFloor: 0.7,     // la fuite s'arrête à 70 % : on ne repart pas de zéro
+
+  /* ---------- Vent d'arène ----------
+     L'ancien vent ajoutait sa force à la vitesse horizontale à chaque
+     image, sans plafond. Avec le frottement de l'air (0.955), une
+     rafale de 0.38 finissait par emporter tout le monde à plus de huit
+     pixels par image — plus vite que la course. En l'air, c'était une
+     condamnation : ni le joueur ni le bot ne pouvaient revenir, et
+     c'était la première cause de morts absurdes.
+
+     Le vent VISE désormais une vitesse de dérive et s'y tient : il
+     pousse fort au début, puis ne fait plus que maintenir. On sent la
+     rafale, on lutte contre, mais on n'est plus emporté. */
+  windDrift: 7,             // vitesse de dérive visée = puissance × ceci
+  windPull: 0.07            // vivacité avec laquelle on l'atteint
 };
 
 /* ---------- Enchaînements ----------
@@ -4566,7 +4580,7 @@ function drawFighterRig(ctx, ch, pose, opt = {}) {
     drawTail(ctx, hipX, hipY, pose, P, ch.features.tail);
   }
   if (ch.features && ch.features.cape) {
-    drawCape(ctx, cx, cy, hipX, hipY, pose, P);
+    drawCape(ctx, cx, cy, hipX, hipY, pose, P, (bw + bh) / 2);
   }
   if (ch.features && ch.features.back) {
     /* Le sac, le roulèr ou la botte de cannes étaient dessinés à une
@@ -4824,7 +4838,9 @@ function drawBackItem(ctx, hx, hy, cx, cy, pose, P, kind, gab) {
   if (k !== 1) { ctx.translate(midX, midY); ctx.scale(k, k); ctx.translate(-midX, -midY); }
   switch (kind) {
     case 'bertel': {                       // sac traditionnel en vacoa
-      ctx.translate(midX - 14, midY + 4);
+      /* plus haut et plus en arriere : un sac se porte sur le dos, pas
+         sur la hanche, et il doit depasser de la silhouette */
+      ctx.translate(midX - 26, midY - 6);
       ctx.rotate(rad(pose.torso * 0.4));
       ctx.beginPath(); ctx.roundRect(-20, -16, 34, 34, 6);
       const g = ctx.createLinearGradient(-20, -16, 14, 18);
@@ -5039,20 +5055,31 @@ function drawWings(ctx, cx, cy, headR, pose, P, back) {
   ctx.restore();
 }
 
-function drawCape(ctx, cx, cy, hx, hy, pose, P) {
+function drawCape(ctx, cx, cy, hx, hy, pose, P, gab) {
+  /* L'ancienne cape tenait dans trente pixels : entierement cachee
+     derriere le torse, on ne voyait qu'un liseré. Une cape, ca se voit
+     — elle part des epaules, elle descend sous les hanches et elle
+     flotte derriere. Elle suit aussi le gabarit du porteur. */
   const col = P.cape || shade(P.cloth || '#7b1f2e', -0.28);
-  const sway = (pose.lean || 0) * 0.8 + Math.sin((pose.hipX || 0) * 0.6) * 2;
+  const sway = (pose.lean || 0) * 1.1 + Math.sin((pose.hipX || 0) * 0.6) * 3;
+  const k = gab || 1;
   ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(k, k);
+  const H = (hy - cy) / k;                     // longueur du dos, a l'echelle
   ctx.beginPath();
-  ctx.moveTo(cx - 4, cy - 8);
-  ctx.quadraticCurveTo(cx - 26 - sway, (cy + hy) / 2, cx - 16 - sway * 1.4, hy + 16);
-  ctx.quadraticCurveTo(cx - 2, hy + 22, cx + 6, hy + 4);
-  ctx.quadraticCurveTo(cx + 8, cy - 2, cx - 4, cy - 8);
+  ctx.moveTo(-2, -14);
+  ctx.quadraticCurveTo(-30 - sway, H * 0.35, -44 - sway * 1.6, H + 26);
+  ctx.quadraticCurveTo(-20 - sway * 0.6, H + 40, 4, H + 14);
+  ctx.quadraticCurveTo(12, H * 0.4, 8, -12);
   ctx.closePath();
-  const g = ctx.createLinearGradient(cx - 40, cy, cx + 10, hy);
-  g.addColorStop(0, shade(col, -0.4)); g.addColorStop(1, shade(col, 0.05));
+  const g = ctx.createLinearGradient(-48, 0, 12, H);
+  g.addColorStop(0, shade(col, -0.42)); g.addColorStop(1, shade(col, 0.06));
   ctx.fillStyle = g; ctx.fill();
   ctx.strokeStyle = rgba('#000', 0.35); ctx.lineWidth = 2; ctx.stroke();
+  /* l'attache sur les epaules */
+  ctx.fillStyle = shade(col, 0.25);
+  ctx.beginPath(); ctx.roundRect(-8, -18, 20, 7, 3); ctx.fill();
   ctx.restore();
 }
 
@@ -5065,36 +5092,148 @@ function drawCape(ctx, cx, cy, hx, hy, pose, P) {
    dedans ; sur un bec, les lunettes tombaient à côté des yeux. D'où
    l'impression de cosmétiques mal posés.
 
-   On calcule donc, pour chaque combattant, un petit décalage et une
-   mise à l'échelle qui collent à la forme de sa tête, à sa chevelure
-   et à sa crête. Un personnage peut affiner le résultat avec un champ
-   facultatif `cosFit` (valeurs exprimées en rayons de tête).
+   On mesure donc chaque silhouette de tête — centre, sommet,
+   demi-largeur — et l'ajustement n'est que la différence avec la tête
+   ronde, pour laquelle tous les accessoires ont été dessinés. Un
+   personnage peut affiner le résultat avec un champ facultatif
+   `cosFit` (valeurs exprimées en rayons de tête).
 
    Rien n'est retiré : sans forme particulière, l'ajustement est neutre
    et le rendu est exactement celui d'avant.
    ============================================================ */
+/* Mesures des silhouettes de tête, relevées sur le tracé de
+   `drawHead`. `cx` = centre horizontal, `top` = sommet, `hw` =
+   demi-largeur — le tout en rayons de tête. La tête ronde est la
+   référence : c'est pour elle que tous les accessoires ont été
+   dessinés. */
+const MESURES_TETE = {
+  round: { cx: 0.00, top: -1.00, hw: 1.00 },
+  oval:  { cx: 0.00, top: -1.10, hw: 0.94 },
+  wide:  { cx: 0.00, top: -0.90, hw: 1.18 },
+  drop:  { cx: 0.00, top: -1.20, hw: 1.02 },
+  /* le museau part vers l'avant : le crâne, lui, est décalé à droite */
+  shark: { cx: 0.22, top: -1.00, hw: 1.12 }
+};
+
 function cosFitTete(ch, r, kind, f) {
-  let dx = 0, dy = 0, sx = 1, sy = 1;
-  switch (kind) {
-    /* large et basse : le sommet est plus bas, il faut descendre et élargir */
-    case 'wide':  sx = 1.20; sy = 0.94; dy =  r * 0.11; break;
-    /* ovale : plus haute que large, on remonte et on resserre */
-    case 'oval':  sx = 0.95; sy = 1.05; dy = -r * 0.09; break;
-    /* goutte : pointe nettement plus haut */
-    case 'drop':  sx = 1.03; sy = 1.08; dy = -r * 0.17; break;
-    /* museau allongé vers l'avant : tout glisse vers le nez */
-    case 'shark': sx = 1.14; sy = 0.98; dx =  r * 0.18; dy = r * 0.03; break;
-  }
-  /* une chevelure ou une crête surélève ce qu'on pose dessus */
-  if (f.hair) dy -= r * 0.13;
-  if (f.crest || f.finHead) dy -= r * 0.07;
-  /* un bec décale le visage vers l'avant */
-  if (f.beak) dx += r * 0.07;
+  /* On ne devine plus : chaque forme de tête est décrite par trois
+     mesures prises DANS le tracé de `drawHead` ci-dessous —
+     le centre horizontal, le sommet, et la demi-largeur, toutes en
+     rayons. Le tracé de référence des accessoires est la tête ronde
+     (centre 0, sommet -1, demi-largeur 1), donc l'ajustement est la
+     simple différence entre la forme courante et elle. */
+  const M = MESURES_TETE[kind] || MESURES_TETE.round;
+  let dx = M.cx * r;
+  let dy = (M.top + 1) * r;          // sommet plus haut => valeur négative
+  let sx = M.hw, sy = 1;
+
+  /* Un accessoire ne se soulève PAS pour laisser passer une crête, une
+     tignasse ou un aileron : il se pose sur le crâne et le trait du
+     personnage le traverse, comme dans n'importe quel jeu de combat.
+     C'est exactement ce décalage qui faisait flotter les chapeaux au-
+     dessus du vide sur Ti Piment et le Requin Bouledogue. */
+
   /* réglage manuel éventuel, en rayons de tête */
   const o = ch.cosFit;
   if (o) { dx += (o.dx || 0) * r; dy += (o.dy || 0) * r; sx *= (o.sx || 1); sy *= (o.sy || 1); }
   return { dx, dy, sx, sy };
 }
+
+/* ============================================================
+   TRAITS DE TÊTE — crête, feuille, tignasse, aileron, cornes, flamme.
+
+   Un même trait peut venir de deux endroits : du personnage
+   lui-même (le Requin Bouledogue a son aileron) ou du vestiaire
+   (n'importe qui peut équiper « Aileron de requin »). Le dessin est
+   le même, mais pas la place dans la pile : le trait NATIF passe
+   sous les accessoires, celui du VESTIAIRE passe par-dessus et
+   profite de l'ajustement au gabarit.
+
+   Avant cette séparation, un chapeau posé sur le Requin disparaissait
+   derrière son aileron, et une crête équipée sur un personnage qui en
+   avait déjà une ne se voyait pas du tout.
+   ============================================================ */
+function drawTraitTete(ctx, r, P, quoi) {
+  switch (quoi) {
+    case 'horns': {
+      ctx.fillStyle = P.horn || '#e6d5b8';
+      for (const sg of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(sg * r * 0.5, -r * 0.72);
+        ctx.quadraticCurveTo(sg * r * 1.15, -r * 1.5, sg * r * 0.72, -r * 1.72);
+        ctx.quadraticCurveTo(sg * r * 0.72, -r * 1.15, sg * r * 0.3, -r * 0.78);
+        ctx.closePath(); ctx.fill();
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1.4; ctx.stroke();
+      }
+      break;
+    }
+    case 'crest': {
+      ctx.fillStyle = P.accent || '#e74c3c';
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.1, -r * 0.95);
+      for (let i = 0; i < 3; i++) {
+        ctx.lineTo(-r * 0.1 + i * r * 0.3, -r * (1.55 + (i % 2) * 0.25));
+        ctx.lineTo(-r * 0.1 + i * r * 0.3 + r * 0.18, -r * 0.95);
+      }
+      ctx.closePath(); ctx.fill();
+      break;
+    }
+    case 'leaf': {
+      ctx.save();
+      ctx.translate(0, -r * 0.95);
+      ctx.rotate(rad(-18));
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 0.4, r * 0.24, r * 0.6, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#4caf50'; ctx.fill();
+      ctx.strokeStyle = '#2f6f33'; ctx.lineWidth = 1.4; ctx.stroke();
+      ctx.restore();
+      break;
+    }
+    case 'flame': {
+      const fl = (Date.now() % 600) / 600;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 3; i++) {
+        const sc = 1 - i * 0.26, o = Math.sin((fl + i * 0.3) * Math.PI * 2) * 3;
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.4 * sc, -r * 0.9);
+        ctx.quadraticCurveTo(-r * 0.5 * sc + o, -r * 1.7, o * 0.5, -r * (2.1 + i * 0.1) * sc);
+        ctx.quadraticCurveTo(r * 0.5 * sc + o, -r * 1.7, r * 0.4 * sc, -r * 0.9);
+        ctx.closePath();
+        ctx.fillStyle = ['rgba(255,90,20,0.75)', 'rgba(255,170,30,0.8)', 'rgba(255,240,140,0.85)'][i];
+        ctx.fill();
+      }
+      ctx.restore();
+      break;
+    }
+    case 'hair': {
+      ctx.fillStyle = P.hair || '#2b2118';
+      ctx.beginPath();
+      ctx.ellipse(0, -r * 0.62, r * 1.02, r * 0.62, 0, Math.PI, 0);
+      ctx.fill();
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * r * 0.34, -r * 0.9);
+        ctx.quadraticCurveTo(i * r * 0.42, -r * 1.5, i * r * 0.2, -r * 1.35);
+        ctx.quadraticCurveTo(i * r * 0.28, -r * 1.05, i * r * 0.34 - r * 0.2, -r * 0.86);
+        ctx.closePath(); ctx.fill();
+      }
+      break;
+    }
+    case 'finHead': {
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.2, -r * 0.86);
+      ctx.lineTo(r * 0.25, -r * 1.85);
+      ctx.lineTo(r * 0.6, -r * 0.7);
+      ctx.closePath();
+      ctx.fillStyle = shade(P.skin, -0.2); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1.6; ctx.stroke();
+      break;
+    }
+  }
+}
+
+const TRAITS_TETE = ['horns', 'crest', 'leaf', 'flame', 'hair', 'finHead'];
 
 function drawHead(ctx, x, y, r, pose, ch, P, opt) {
   const f = ch.features || {};
@@ -5206,6 +5345,12 @@ function drawHead(ctx, x, y, r, pose, ch, P, opt) {
       ctx.strokeStyle = shade(P.skin, -0.55); ctx.lineWidth = 2; ctx.stroke();
     }
   }
+
+  /* Traits NATIFS du personnage : sous les accessoires. Celui que le
+     vestiaire fournit est mis de côté (`cosTete`) et sera dessiné plus
+     bas, par-dessus et ajusté au gabarit. */
+  for (const k of TRAITS_TETE)
+    if (f[k] && f.cosTete !== k) drawTraitTete(ctx, r, P, k);
 
   // accessoires de tête
   /* Tout ce qui vient du vestiaire (chapeau, visage, lunettes) passe
@@ -5452,80 +5597,11 @@ function drawHead(ctx, x, y, r, pose, ch, P, opt) {
   /* Accessoires ajoutés après coup : plutôt que d'allonger encore
      cette fonction, on appelle un dessinateur externe s'il existe.
      Il travaille dans le même repère, déjà ajusté au gabarit. */
+  if (f.cosTete) drawTraitTete(ctx, r, P, f.cosTete);
   if (f.hatX && typeof COS_TETE === 'function') COS_TETE(ctx, r, f, P, pose);
   if (f.faceX && typeof COS_VISAGE === 'function') COS_VISAGE(ctx, r, f, P, pose);
 
   ctx.restore();     // fin de l'ajustement des accessoires cosmétiques
-
-  if (f.horns) {
-    ctx.fillStyle = P.horn || '#e6d5b8';
-    for (const s of [-1, 1]) {
-      ctx.beginPath();
-      ctx.moveTo(s * r * 0.5, -r * 0.72);
-      ctx.quadraticCurveTo(s * r * 1.15, -r * 1.5, s * r * 0.72, -r * 1.72);
-      ctx.quadraticCurveTo(s * r * 0.72, -r * 1.15, s * r * 0.3, -r * 0.78);
-      ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 1.4; ctx.stroke();
-    }
-  }
-  if (f.crest) {
-    ctx.fillStyle = P.accent || '#e74c3c';
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.1, -r * 0.95);
-    for (let i = 0; i < 3; i++) {
-      ctx.lineTo(-r * 0.1 + i * r * 0.3, -r * (1.55 + (i % 2) * 0.25));
-      ctx.lineTo(-r * 0.1 + i * r * 0.3 + r * 0.18, -r * 0.95);
-    }
-    ctx.closePath(); ctx.fill();
-  }
-  if (f.leaf) {
-    ctx.save();
-    ctx.translate(0, -r * 0.95);
-    ctx.rotate(rad(-18));
-    ctx.beginPath();
-    ctx.ellipse(0, -r * 0.4, r * 0.24, r * 0.6, 0, 0, Math.PI * 2);
-    ctx.fillStyle = '#4caf50'; ctx.fill();
-    ctx.strokeStyle = '#2f6f33'; ctx.lineWidth = 1.4; ctx.stroke();
-    ctx.restore();
-  }
-  if (f.flame) {
-    const fl = (Date.now() % 600) / 600;
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (let i = 0; i < 3; i++) {
-      const s = 1 - i * 0.26, o = Math.sin((fl + i * 0.3) * Math.PI * 2) * 3;
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.4 * s, -r * 0.9);
-      ctx.quadraticCurveTo(-r * 0.5 * s + o, -r * 1.7, 0 + o * 0.5, -r * (2.1 + i * 0.1) * s);
-      ctx.quadraticCurveTo(r * 0.5 * s + o, -r * 1.7, r * 0.4 * s, -r * 0.9);
-      ctx.closePath();
-      ctx.fillStyle = ['rgba(255,90,20,0.75)', 'rgba(255,170,30,0.8)', 'rgba(255,240,140,0.85)'][i];
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-  if (f.hair) {
-    ctx.fillStyle = P.hair || '#2b2118';
-    ctx.beginPath();
-    ctx.ellipse(0, -r * 0.62, r * 1.02, r * 0.62, 0, Math.PI, 0);
-    ctx.fill();
-    for (let i = -2; i <= 2; i++) {
-      ctx.beginPath();
-      ctx.moveTo(i * r * 0.34, -r * 0.9);
-      ctx.quadraticCurveTo(i * r * 0.42, -r * 1.5, i * r * 0.2, -r * 1.35);
-      ctx.quadraticCurveTo(i * r * 0.28, -r * 1.05, i * r * 0.34 - r * 0.2, -r * 0.86);
-      ctx.closePath(); ctx.fill();
-    }
-  }
-  if (f.finHead) {
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.2, -r * 0.86);
-    ctx.lineTo(r * 0.25, -r * 1.85);
-    ctx.lineTo(r * 0.6, -r * 0.7);
-    ctx.closePath();
-    ctx.fillStyle = shade(P.skin, -0.2); ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 1.6; ctx.stroke();
-  }
   ctx.restore();
 }
 
@@ -8059,9 +8135,9 @@ STAGES.maido = makeStage({
     if (Math.random() < 0.05) fx.bird(rnd(-1100, 1100), rnd(-600, -200));
   },
   hazard(M, t) {
-    if (t % 520 === 0) {
+    if (t % 640 === 0) {
       const dir = Math.random() < 0.5 ? -1 : 1;
-      M.wind = { dir, frames: 190, power: 0.32 };
+      M.wind = { dir, frames: 170, power: 0.30 };
       M.banner(M.lang === 'en' ? 'GUST !' : 'RAFALE !', '#cfe3f0');
       Audio2.play('whooshBig');
     }
@@ -8946,16 +9022,16 @@ STAGES.barachois = makeStage({
     if (Math.random() < 0.2) fx.spark(rnd(-1000, 1000), 380, rnd(-.6, .6), rnd(-1.6, -.4), '#9fd8ef', rnd(30, 70), 2);
   },
   hazard(M, t) {
-    if (t % 500 === 0) {
+    if (t % 700 === 0) {
       const cx = Math.random() < 0.5 ? -330 : 330;
-      M.warn(cx, 0, 40);
-      M.timers.push({ f: 40, run: () => {
+      M.warn(cx, 0, 56);
+      M.timers.push({ f: 56, run: () => {
         Audio2.play('explode');
         M.shake(14);
         const dir = cx < 0 ? 1 : -1;
         M.spawnProjectile(null, {
-          x: cx, y: -60, vx: dir * 13, vy: -3, grav: 0.16, dmg: 15, ang: 55, bkb: 46, kbg: 70,
-          w: 34, h: 34, life: 130, kind: 'ball', color: '#2b333d', explode: 90, reflectable: true, trail: true
+          x: cx, y: -60, vx: dir * 11, vy: -3, grav: 0.16, dmg: 11, ang: 55, bkb: 40, kbg: 62,
+          w: 34, h: 34, life: 120, kind: 'ball', color: '#2b333d', explode: 60, reflectable: true, trail: true
         });
       } });
     }
@@ -9665,12 +9741,12 @@ STAGES.mafate = makeStage({
   },
   hazard(M, t) {
     // souffle du rotor : l'hélico décroche une rafale latérale
-    if (t % 520 === 0) {
+    if (t % 660 === 0) {
       const h = this.plats[6];
       const dir = (h.dx || 0) >= 0 ? 1 : -1;
       M.warn(h.x + h.w / 2 + (h.dx || 0), h.y, 60);
       M.timers.push({ f: 60, run: () => {
-        M.wind = { dir, frames: 200, power: 0.34 };
+        M.wind = { dir, frames: 180, power: 0.30 };
         for (let i = 0; i < 26; i++)
           FX.streak(rnd(-1200, 1200), rnd(-700, 100), dir * rnd(9, 16), rnd(-1, 1), '#e8f6ff', rndi(20, 40), 3);
         Audio2.play('whooshBig', { power: 1 });
@@ -9853,11 +9929,11 @@ STAGES.pitonneiges = makeStage({
   },
   hazard(M, t) {
     // bourrasque d'altitude : le vent balaie l'arête
-    if (t % 480 === 0) {
+    if (t % 700 === 0) {
       const dir = Math.random() < 0.5 ? -1 : 1;
       M.warn(dir * 900, -240, 66);
       M.timers.push({ f: 66, run: () => {
-        M.wind = { dir, frames: 230, power: 0.38 };
+        M.wind = { dir, frames: 190, power: 0.32 };
         for (let i = 0; i < 34; i++)
           FX.streak(-dir * 1300, rnd(-800, 200), dir * rnd(12, 22), rnd(-1.5, 1.5), '#ffffff', rndi(24, 46), 3);
         Audio2.play('whooshBig', { power: 1 });
@@ -10091,12 +10167,12 @@ STAGES.stdenis = makeStage({
   },
   hazard(M, t) {
     // paquet de mer par-dessus le garde-corps
-    if (t % 540 === 0) {
+    if (t % 760 === 0) {
       const dir = Math.random() < 0.5 ? -1 : 1;
-      M.warn(dir * 760, -70, 68);
-      M.timers.push({ f: 68, run: () => {
-        M.spawnHazard({ x: dir * 1480 - (dir > 0 ? 0 : 210), y: -130, w: 210, h: 200, life: 76,
-          dmg: 12, ang: 40, bkb: 34, kbg: 54, kind: 'wave', color: '#7ee8fa', vx: -dir * 17 });
+      M.warn(dir * 760, -70, 84);
+      M.timers.push({ f: 84, run: () => {
+        M.spawnHazard({ x: dir * 1480 - (dir > 0 ? 0 : 210), y: -130, w: 210, h: 200, life: 70,
+          dmg: 9, ang: 40, bkb: 30, kbg: 48, kind: 'wave', color: '#7ee8fa', vx: -dir * 14 });
         Audio2.play('water', { power: 1 });
       } });
     }
@@ -10571,11 +10647,11 @@ STAGES.plainesables = makeStage({
       } });
     }
     // rafale d'altitude qui balaie la plaine
-    if (t % 620 === 300) {
+    if (t % 720 === 300) {
       const dir = Math.random() < 0.5 ? -1 : 1;
       M.warn(dir * 900, -300, 64);
       M.timers.push({ f: 64, run: () => {
-        M.wind = { dir, frames: 210, power: 0.30 };
+        M.wind = { dir, frames: 180, power: 0.28 };
         for (let i = 0; i < 24; i++)
           FX.streak(-dir * 1300, rnd(-700, 100), dir * rnd(9, 16), rnd(-1, 1), '#f0c99a', rndi(20, 40), 3);
         Audio2.play('whooshBig', { power: 1 });
@@ -10793,7 +10869,7 @@ STAGES.bebour = makeStage({
       } });
     }
     // bourrasque qui secoue la canopée
-    if (t % 640 === 0) {
+    if (t % 700 === 0) {
       const dir = Math.random() < 0.5 ? -1 : 1;
       M.warn(dir * 800, -600, 60);
       M.timers.push({ f: 60, run: () => {
@@ -11013,11 +11089,11 @@ STAGES.rolandgarros = makeStage({
   },
   hazard(M, t) {
     // souffle réacteur d'un avion qui remonte le taxiway
-    if (t % 540 === 0) {
+    if (t % 680 === 0) {
       const dir = Math.random() < 0.5 ? -1 : 1;
       M.warn(dir * 900, -30, 62);
       M.timers.push({ f: 62, run: () => {
-        M.wind = { dir, frames: 200, power: 0.36 };
+        M.wind = { dir, frames: 180, power: 0.30 };
         for (let i = 0; i < 24; i++)
           FX.streak(-dir * 1400, rnd(-100, 80), dir * rnd(10, 18), rnd(-1, 1), '#dfeef6', rndi(18, 36), 3);
         Audio2.play('whooshBig', { power: 1 });
@@ -11818,26 +11894,26 @@ STAGES.littoral = makeStage({
 
   hazard(M, t) {
     /* ÉBOULEMENT : la falaise lâche trois blocs. On les voit venir. */
-    if (t % 520 === 120) {
+    if (t % 700 === 160) {
       const base = rnd(-800, 500);
       M.banner(M.lang === 'en' ? 'ROCKFALL !' : 'ÉBOULEMENT !', '#c8bda8');
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 2; i++) {
         const x = base + i * 190;
         M.warn(x, 0, 52);
         M.timers.push({ f: 52 + i * 8, run: () => {
-          M.spawnFalling({ x, y: -1100, r: 34, dmg: 15, ang: 78, bkb: 44, kbg: 72, color: '#6b5a4a' });
+          M.spawnFalling({ x, y: -1100, r: 32, dmg: 12, ang: 78, bkb: 40, kbg: 68, color: '#6b5a4a' });
         } });
       }
     }
     /* LAME DE FOND : la houle passe par-dessus la digue et pousse
        tout le monde vers la falaise. Un mur d'eau, pas un mur tout
        court : on peut sauter au-dessus. */
-    if (t % 700 === 400) {
+    if (t % 880 === 420) {
       M.banner(M.lang === 'en' ? 'BIG SWELL !' : 'LAME DE FOND !', '#bfe9ff');
       try { Audio2.play('water', { power: 1 }); } catch (e) {}
       M.timers.push({ f: 46, run: () => {
-        M.spawnHazard({ x: 900, y: -230, w: 300, h: 300, vx: -13, life: 130,
-          dmg: 10, ang: 168, bkb: 40, kbg: 34, kind: 'wave', color: '#bfe9ff' });
+        M.spawnHazard({ x: 900, y: -230, w: 300, h: 300, vx: -11, life: 120,
+          dmg: 8, ang: 168, bkb: 36, kbg: 30, kind: 'wave', color: '#bfe9ff' });
       } });
     }
   }
@@ -11854,8 +11930,8 @@ STAGES.usinegol = makeStage({
     /* le plancher de l'atelier */
     { x: -820, y: 0, w: 1640, h: 150 },
     /* les deux tapis roulants, sens opposés */
-    { x: -840, y: -230, w: 620, h: 30, pass: true, tapis: 1.9 },
-    { x: 220, y: -230, w: 620, h: 30, pass: true, tapis: -1.9 },
+    { x: -840, y: -230, w: 620, h: 30, pass: true, tapis: 1.45 },
+    { x: 220, y: -230, w: 620, h: 30, pass: true, tapis: -1.45 },
     /* la passerelle centrale, sous la presse */
     { x: -230, y: -400, w: 460, h: 26, pass: true },
     /* les deux paliers hauts */
@@ -11932,7 +12008,7 @@ STAGES.usinegol = makeStage({
 
     /* LA PRESSE, suspendue au-dessus du centre. Sa hauteur suit le
        même cycle que le danger : on la voit descendre. */
-    const cyc = 480, k = (t % cyc) / cyc;
+    const cyc = 780, k = (t % cyc) / cyc;
     let py = -980;
     if (k > 0.72) py = -980 + Math.min(1, (k - 0.72) / 0.1) * 560;
     else if (k > 0.86) py = -420;
@@ -12014,24 +12090,24 @@ STAGES.usinegol = makeStage({
   hazard(M, t) {
     /* LA PRESSE : elle s'abat sur le centre. Le décor la montre
        descendre, donc l'avertissement est visuel autant que sonore. */
-    if (t % 480 === 320) {
-      M.warn(0, -400, 26);
+    if (t % 780 === 560) {
+      M.warn(0, -400, 34);
       M.banner(M.lang === 'en' ? 'PRESS !' : 'LA PRESSE !', '#f0b840');
     }
-    if (t % 480 === 346) {
+    if (t % 780 === 594) {
       try { Audio2.play('explode'); } catch (e) {}
       M.shake(18);
-      M.spawnHazard({ x: -230, y: -420, w: 460, h: 130, life: 26,
-        dmg: 20, ang: 78, bkb: 56, kbg: 86, kind: 'geyser', color: '#8a7f6d' });
+      M.spawnHazard({ x: -230, y: -420, w: 460, h: 130, life: 22,
+        dmg: 12, ang: 78, bkb: 46, kbg: 74, kind: 'geyser', color: '#8a7f6d' });
     }
     /* LES ÉVENTS DE VAPEUR : ils soulèvent plus qu'ils ne blessent,
        et servent de remontée express vers les paliers hauts. */
-    if (t % 300 === 150) {
+    if (t % 460 === 230) {
       const x = pick([-620, 620]);
       M.warn(x, 0, 40);
       M.timers.push({ f: 40, run: () => {
-        M.spawnHazard({ x: x - 60, y: -560, w: 120, h: 580, life: 60,
-          dmg: 4, ang: 90, bkb: 54, kbg: 16, kind: 'geyser', color: '#dfe6ea' });
+        M.spawnHazard({ x: x - 60, y: -560, w: 120, h: 580, life: 54,
+          dmg: 3, ang: 90, bkb: 50, kbg: 14, kind: 'geyser', color: '#dfe6ea' });
         try { Audio2.play('whooshBig'); } catch (e) {}
       } });
     }
@@ -12184,15 +12260,15 @@ STAGES.benare = makeStage({
     /* RAFALES D'ALTITUDE : elles changent de sens sans prévenir et
        durent longtemps. À cette hauteur, le retour sur scène devient
        une vraie décision. */
-    if (t % 470 === 0) {
+    if (t % 640 === 0) {
       const dir = (Math.floor(t / 470) % 2) ? 1 : -1;
-      M.wind = { dir, frames: 240, power: 0.38 };
+      M.wind = { dir, frames: 175, power: 0.30 };
       M.banner(M.lang === 'en' ? 'HIGH WIND !' : 'RAFALE D’ALTITUDE !', '#cfe3f0');
       try { Audio2.play('whooshBig'); } catch (e) {}
     }
     /* GRÊLE : quelques grêlons, plus gênants que dangereux, mais ils
        cassent une remontée mal négociée. */
-    if (t % 640 === 300) {
+    if (t % 820 === 320) {
       M.ticker(M.lang === 'en' ? 'HAIL' : 'GRÊLE', '#dff0ff');
       for (let i = 0; i < 5; i++) {
         const x = rnd(-700, 700);
@@ -14737,8 +14813,12 @@ class Fighter {
     }
 
     // vent de stage
-    if (this.M.wind && this.M.wind.frames > 0 && !this.grounded)
-      this.vx += this.M.wind.dir * this.M.wind.power;
+    if (this.M.wind && this.M.wind.frames > 0 && !this.grounded) {
+      /* Le vent pousse vers une vitesse de dérive, il n'accélère pas
+         indéfiniment : voir PHYS.windDrift. */
+      const derive = this.M.wind.dir * this.M.wind.power * PHYS.windDrift;
+      this.vx += (derive - this.vx) * PHYS.windPull;
+    }
 
     const px = this.x, py = this.y;
     this.x += this.vx;
@@ -16298,14 +16378,21 @@ class Trap {
    sort, elle se bat pour vous pendant quelques secondes, puis elle
    repart. C'est ce qui manquait ici.
 
-   Cinq compagnons péi, tous invoqués par un objet à ramasser
-   manuellement, tous alliés de celui qui les a appelés :
+   Dix compagnons péi. On ramasse la capsule à la main, on la LANCE,
+   et la créature sort là où elle atterrit — au profit de celui qui a
+   lancé. La capsule ne blesse pas et se rattrape au vol : n'importe
+   quel joueur peut donc s'en emparer et s'en servir.
 
-     • LE TANGUE     — fonce au sol, coup de tête, revient.
+     • LE TANGUE          — fonce au sol, coup de tête, revient.
      • LE PAILLE-EN-QUEUE — tourne en l'air et plonge en piqué.
-     • GRAND-MÈRE KAL — flotte et jette des sorts à distance.
-     • LE BŒUF MOKA  — charge lourde qui envoie loin.
-     • LE ZANDOLI    — colle sa langue à l'ennemi et le ramène.
+     • GRAND-MÈRE KAL     — flotte et jette des sorts à distance.
+     • LE BŒUF MOKA       — charge lourde qui envoie loin.
+     • LE ZANDOLI         — colle sa langue à l'ennemi et le ramène.
+     • SITARANE           — spectre lent qui traverse et glace.
+     • LE BABOUK          — l'araignée : toile qui cloue sur place.
+     • LES BICHIQUES      — un banc qui bouscule sans faire mal.
+     • LE CABRI MASSALÉ   — petit, vif, coups de tête à répétition.
+     • L'ÉCLAT DU PITON   — orbe de lave, rare et brutal.
 
    Règles communes, pour que ça reste équilibré :
      - une invocation ne peut pas encaisser de dégâts, mais elle a
@@ -16313,8 +16400,8 @@ class Trap {
      - elle ne touche jamais son invocateur ni ses coéquipiers,
        parce que ses coups passent par `spawnHitbox` avec lui comme
        propriétaire ;
-     - un seul compagnon par combattant à la fois : en invoquer un
-       second renvoie le premier ;
+     - aucune limite par joueur : on plafonne seulement le total à
+       l'écran, pour la lisibilité ;
      - aucun tirage aléatoire dans ce qui décide d'une boîte de
        dégâts, pour que le jeu en ligne reste synchrone.
    ============================================================ */
@@ -16324,14 +16411,14 @@ const INVOCS = {
   tangue: {
     nFR: 'Tangue', nCR: 'Tang', nEN: 'Tenrec',
     vie: 330, w: 46, h: 40, sol: true, vitesse: 5.2, portee: 92,
-    couleur: '#a97c50', cadence: 46,
+    couleur: '#a97c50', cadence: 36,
     frappe: { dmg: 7, ang: 42, bkb: 34, kbg: 62, w: 100, h: 70 }
   },
   paille: {
     nFR: 'Paille-en-queue', nCR: 'Pay-an-ké', nEN: 'Tropicbird',
     vie: 400, w: 58, h: 40, sol: false, vitesse: 6.4, portee: 130,
-    couleur: '#eef4ff', cadence: 46,
-    frappe: { dmg: 11, ang: 76, bkb: 38, kbg: 66, w: 120, h: 120 }
+    couleur: '#eef4ff', cadence: 64,
+    frappe: { dmg: 9, ang: 76, bkb: 38, kbg: 66, w: 120, h: 120 }
   },
   kal: {
     nFR: 'Grand-mère Kal', nCR: 'Granmèr Kal', nEN: 'Granny Kal',
@@ -16341,7 +16428,7 @@ const INVOCS = {
   },
   boeuf: {
     nFR: 'Bœuf moka', nCR: 'Bèf moka', nEN: 'Moka Ox',
-    vie: 300, w: 92, h: 66, sol: true, vitesse: 7.4, portee: 110,
+    vie: 300, w: 92, h: 66, sol: true, vitesse: 7.4, portee: 145,
     couleur: '#5a4636', cadence: 62,
     frappe: { dmg: 16, ang: 38, bkb: 62, kbg: 82, w: 130, h: 90 }
   },
@@ -16350,6 +16437,37 @@ const INVOCS = {
     vie: 340, w: 44, h: 32, sol: true, vitesse: 4.6, portee: 300,
     couleur: '#6fbf4f', cadence: 44, langue: true,
     frappe: { dmg: 6, ang: 16, bkb: 14, kbg: 24, w: 60, h: 30 }
+  },
+  /* ---------- la seconde fournée ---------- */
+  sitarane: {
+    nFR: 'Sitarane', nCR: 'Sitaran', nEN: 'Sitarane',
+    vie: 420, w: 54, h: 84, sol: false, vitesse: 2.4, portee: 150,
+    couleur: '#7a86a8', cadence: 72, gele: true,
+    frappe: { dmg: 9, ang: 70, bkb: 24, kbg: 52, w: 110, h: 140 }
+  },
+  babouk: {
+    nFR: 'Babouk', nCR: 'Babouk', nEN: 'Huntsman',
+    vie: 360, w: 60, h: 34, sol: true, vitesse: 5.8, portee: 380,
+    couleur: '#4d3a2c', cadence: 66, tire: true, colle: true,
+    frappe: { dmg: 5, ang: 90, bkb: 8, kbg: 10, w: 34, h: 34 }
+  },
+  bichique: {
+    nFR: 'Banc de bichiques', nCR: 'Bann bishik', nEN: 'Bichique Shoal',
+    vie: 300, w: 70, h: 34, sol: false, vitesse: 7.2, portee: 120,
+    couleur: '#7fd4e8', cadence: 26,
+    frappe: { dmg: 3, ang: 60, bkb: 16, kbg: 22, w: 110, h: 90 }
+  },
+  cabri: {
+    nFR: 'Cabri massalé', nCR: 'Kabri masalé', nEN: 'Massalé Goat',
+    vie: 330, w: 54, h: 46, sol: true, vitesse: 6.6, portee: 100,
+    couleur: '#d8cbb0', cadence: 30,
+    frappe: { dmg: 6, ang: 46, bkb: 26, kbg: 56, w: 96, h: 74 }
+  },
+  soleil: {
+    nFR: 'Éclat du Piton', nCR: 'Éklat Piton', nEN: 'Piton Shard',
+    vie: 260, w: 48, h: 48, sol: false, vitesse: 4.2, portee: 200,
+    couleur: '#ffcf5c', cadence: 58,
+    frappe: { dmg: 14, ang: 62, bkb: 48, kbg: 78, w: 130, h: 130 }
   }
 };
 
@@ -16423,10 +16541,17 @@ class Allie {
       /* un compagnon ne tombe pas dans le vide : il rebondit vers la scène */
       if (this.y > M.stage.bounds.bottom - 260) { this.vy = -14; this.x -= this.facing * 30; }
     } else {
-      /* vol : approche douce, sans à-coups */
-      const cibleY = vy - (this.kind === 'paille' ? 120 : 90);
-      this.vx += clamp(dx * 0.012, -0.8, 0.8);
-      this.vy += clamp((cibleY - this.y) * 0.012, -0.7, 0.7);
+      /* Vol : approche douce, sans à-coups. La hauteur de vol se
+         déduit de la portée — un compagnon qui plane plus haut que son
+         bras ne toucherait jamais rien, ce qui était le cas du
+         paille-en-queue, de Sitarane et des bichiques. */
+      const cibleY = vy - Math.min(120, D.portee * 0.55);
+      /* Ressort AMORTI : sans le terme de frottement, le compagnon
+         volant dépassait sa cible, revenait, redépassait, et n'était
+         pour ainsi dire jamais à portée — il tournait autour sans
+         jamais frapper. */
+      this.vx += clamp(dx * 0.016, -0.9, 0.9) - this.vx * 0.09;
+      this.vy += clamp((cibleY - this.y) * 0.016, -0.8, 0.8) - this.vy * 0.09;
       this.vx = clamp(this.vx, -D.vitesse, D.vitesse);
       this.vy = clamp(this.vy, -D.vitesse, D.vitesse);
       this.x += this.vx; this.y += this.vy;
@@ -16438,7 +16563,7 @@ class Allie {
     this.y = clamp(this.y, B.top + 120, B.bottom - 120);
 
     /* ---------- la frappe ---------- */
-    if (t && this.cd <= 0 && adx < D.portee && ady < D.portee * 0.9) {
+    if (t && this.cd <= 0 && adx < D.portee && ady < Math.max(90, D.portee * 0.9)) {
       this.attaquer(M, t);
       this.cd = D.cadence;
     }
@@ -16454,6 +16579,16 @@ class Allie {
     const dir = this.facing;
     this.frappeT = 16;
 
+    /* Où poser la boîte de dégâts.
+       Au sol, devant soi : c'est un coup de tête, une ruade, ça part
+       du corps. En vol, à MI-CHEMIN entre le compagnon et sa cible :
+       un oiseau qui plane cent trente pixels au-dessus d'un adversaire
+       ne le touche jamais si sa boîte reste centrée sur lui — c'est
+       exactement ce qui rendait le paille-en-queue, Sitarane et
+       l'Éclat du Piton parfaitement inoffensifs. */
+    const bx = D.sol ? this.x + (dir > 0 ? 0 : -F.w) : (this.x + t.cx) / 2 - F.w / 2;
+    const by = D.sol ? this.cy - F.h / 2 : (this.cy + t.cy) / 2 - F.h / 2;
+
     if (D.tire) {
       /* Grand-mère Kal jette un sort : un projectile lent qui suit sa
          trajectoire, propriété de l'invocateur pour que les règles
@@ -16466,6 +16601,34 @@ class Allie {
         reflectable: true, fxHit: 'ring', sfxHit: 'hitLight'
       });
       Audio2.play('whoosh', { pan: clamp(this.x / 900, -1, 1), power: 0.4 });
+      return;
+    }
+
+    if (D.colle) {
+      /* Le babouk tisse : la cible est ralentie et clouée un instant.
+         Aucun dégât notable — c'est un outil de contrôle. */
+      M.spawnProjectile(this.maitre, {
+        x: this.x, y: this.cy, w: 26, h: 26,
+        vx: (t.cx - this.x) * 0.06, vy: (t.cy - this.cy) * 0.06 - 1,
+        grav: 0.1, dmg: F.dmg, ang: F.ang, bkb: F.bkb, kbg: F.kbg,
+        life: 80, color: '#e8e4d8', dir: this.facing,
+        reflectable: true, fxHit: 'ring', sfxHit: 'hitLight'
+      });
+      if (t.buffs) t.buffs.glue = Math.max(t.buffs.glue || 0, 90);
+      try { Audio2.play('whoosh', { pan: clamp(this.x / 900, -1, 1), power: 0.35 }); } catch (e) {}
+      return;
+    }
+
+    if (D.gele) {
+      /* Sitarane glace : peu de dégâts, mais la cible reste plantée. */
+      M.spawnHitbox(this.maitre, {
+        x: bx, y: by, w: F.w, h: F.h,
+        dmg: F.dmg, ang: F.ang, bkb: F.bkb, kbg: F.kbg,
+        life: 8, fx: 'ring', color: D.couleur, sfx: 'hitLight',
+        id: 'spectre' + this.age
+      });
+      if (t.buffs) t.buffs.blind = Math.max(t.buffs.blind || 0, 60);
+      FX.ring(this.x, this.cy, 90, D.couleur, 22, 6, 1.4);
       return;
     }
 
@@ -16487,7 +16650,7 @@ class Allie {
     }
 
     M.spawnHitbox(this.maitre, {
-      x: this.x + (dir > 0 ? 0 : -F.w), y: this.cy - F.h / 2,
+      x: bx, y: by,
       w: F.w, h: F.h,
       dmg: F.dmg, ang: F.ang, bkb: F.bkb, kbg: F.kbg,
       life: 6, fx: 'impact', color: D.couleur,
@@ -16601,6 +16764,98 @@ class Allie {
         ctx.beginPath(); ctx.arc(50, -46, 2.8, 0, Math.PI * 2); ctx.fill();
         break;
       }
+      case 'sitarane': {
+        /* le spectre : une silhouette en chapeau, presque transparente */
+        const flot = Math.sin(this.anim * 0.06) * 5;
+        ctx.globalAlpha = 0.72;
+        ctx.fillStyle = c;
+        ctx.beginPath();
+        ctx.moveTo(-20, -6 + flot);
+        ctx.quadraticCurveTo(-24, -66, 0, -78);
+        ctx.quadraticCurveTo(24, -66, 20, -6 + flot);
+        ctx.quadraticCurveTo(10, 4 + flot, 0, -4 + flot);
+        ctx.quadraticCurveTo(-10, 4 + flot, -20, -6 + flot);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#1b1f2a';
+        ctx.beginPath(); ctx.ellipse(0, -62, 15, 13, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#e8f0ff';
+        ctx.beginPath(); ctx.arc(-4, -64, 2.6, 0, Math.PI * 2); ctx.arc(6, -64, 2.6, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#2b3346';
+        ctx.beginPath(); ctx.ellipse(0, -76, 26, 5, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.roundRect(-11, -94, 22, 20, 4); ctx.fill();
+        ctx.globalAlpha = 1;
+        break;
+      }
+      case 'babouk': {
+        ctx.fillStyle = c; ctx.strokeStyle = o; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(-6, -18, 20, 14, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(16, -18, 11, 9, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = o; ctx.lineWidth = 3.4; ctx.lineCap = 'round';
+        for (let i = 0; i < 4; i++) {
+          const ph = Math.sin(this.anim * 0.22 + i) * 7;
+          for (const sg of [-1, 1]) {
+            ctx.beginPath();
+            ctx.moveTo(-4 + i * 4 * sg, -20);
+            ctx.quadraticCurveTo(-4 + sg * (22 + i * 5), -32 - ph, -4 + sg * (30 + i * 6), -2 + ph);
+            ctx.stroke();
+          }
+        }
+        ctx.lineCap = 'butt';
+        ctx.fillStyle = '#f0e0a0';
+        ctx.beginPath(); ctx.arc(20, -21, 2.6, 0, Math.PI * 2); ctx.arc(20, -15, 2.2, 0, Math.PI * 2); ctx.fill();
+        break;
+      }
+      case 'bichique': {
+        /* un banc : une dizaine de petits poissons serrés */
+        for (let i = 0; i < 11; i++) {
+          const px = -30 + (i % 4) * 20 + Math.sin(this.anim * 0.2 + i) * 4;
+          const py = -34 + Math.floor(i / 4) * 15 + Math.cos(this.anim * 0.18 + i) * 3;
+          ctx.fillStyle = i % 3 ? c : '#ffffff';
+          ctx.beginPath(); ctx.ellipse(px, py, 8, 4.2, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(px - 8, py); ctx.lineTo(px - 14, py - 4); ctx.lineTo(px - 14, py + 4);
+          ctx.closePath(); ctx.fill();
+          ctx.fillStyle = '#0e2a33';
+          ctx.beginPath(); ctx.arc(px + 4, py - 1, 1.2, 0, Math.PI * 2); ctx.fill();
+        }
+        break;
+      }
+      case 'cabri': {
+        ctx.fillStyle = c; ctx.strokeStyle = o; ctx.lineWidth = 2.2;
+        ctx.beginPath(); ctx.roundRect(-26, -34, 50, 26, 10); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.roundRect(16, -44, 24, 22, 7); ctx.fill(); ctx.stroke();
+        ctx.strokeStyle = '#efe3c8'; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(22, -44); ctx.quadraticCurveTo(26, -58, 38, -54); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(30, -44); ctx.quadraticCurveTo(36, -56, 44, -46); ctx.stroke();
+        ctx.strokeStyle = o; ctx.lineWidth = 5; ctx.lineCap = 'round';
+        const pj = Math.sin(this.anim * 0.34) * 7;
+        ctx.beginPath(); ctx.moveTo(-16, -10); ctx.lineTo(-16 + pj, 0); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(10, -10); ctx.lineTo(10 - pj, 0); ctx.stroke();
+        ctx.lineCap = 'butt';
+        ctx.fillStyle = '#1b1b1b';
+        ctx.beginPath(); ctx.arc(33, -36, 2.4, 0, Math.PI * 2); ctx.fill();
+        break;
+      }
+      case 'soleil': {
+        /* une braise en lévitation, cerclée d'un anneau qui tourne */
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const gs = ctx.createRadialGradient(0, -24, 3, 0, -24, 44);
+        gs.addColorStop(0, 'rgba(255,240,180,.95)');
+        gs.addColorStop(0.5, 'rgba(255,150,40,.6)');
+        gs.addColorStop(1, 'rgba(255,90,20,0)');
+        ctx.fillStyle = gs;
+        ctx.beginPath(); ctx.arc(0, -24, 44, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        ctx.fillStyle = '#ffe9a8';
+        ctx.beginPath(); ctx.arc(0, -24, 13, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(255,190,80,.9)'; ctx.lineWidth = 3;
+        ctx.save();
+        ctx.translate(0, -24); ctx.rotate(this.anim * 0.06); ctx.scale(1, 0.42);
+        ctx.beginPath(); ctx.arc(0, 0, 28, 0, Math.PI * 2); ctx.stroke();
+        ctx.restore();
+        break;
+      }
       default: {   // zandoli
         ctx.fillStyle = c; ctx.strokeStyle = o; ctx.lineWidth = 2;
         ctx.beginPath(); ctx.ellipse(0, -14, 22, 10, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
@@ -16637,45 +16892,109 @@ class Allie {
 
 /* ============================================================
    LES OBJETS QUI INVOQUENT
-   Ramassés à la main comme tous les autres, ils se consomment
-   aussitôt : le compagnon apparaît à côté de vous.
+
+   La capsule ne se consomme plus au ramassage. On la ramasse à la
+   main comme n'importe quel objet, puis on la LANCE : c'est là
+   qu'elle s'ouvre, à l'endroit où elle touche. Trois conséquences
+   voulues :
+
+   · N'IMPORTE QUI PEUT S'EN SERVIR. La capsule n'appartient à
+     personne tant qu'elle n'est pas lancée. Celui qui la ramasse
+     peut la lancer ; celui qui la rattrape au vol la lui vole, et
+     c'est lui qui aura le compagnon.
+   · ON CHOISIT SON MOMENT ET SON ENDROIT. Lancée au bord de la
+     scène, la créature apparaît là-bas.
+   · AUCUNE LIMITE. On peut avoir plusieurs compagnons à la fois :
+     c'est la rareté des capsules qui régule, pas une règle
+     artificielle.
    ============================================================ */
+function invoqueAllie(f, kind, x, y) {
+  const M = f && f.M;
+  if (!M || !INVOCS[kind]) return null;
+  if (!M.allies) M.allies = [];
+  /* Un garde-fou, mais généreux : on plafonne le nombre total de
+     compagnons sur le terrain pour que l'écran reste lisible, sans
+     jamais brider un joueur en particulier. */
+  if (M.allies.length >= 8) {
+    const vieux = M.allies.reduce((a, b) => (a && a.age > b.age ? a : b), null);
+    if (vieux) vieux.partir(M);
+  }
+  const D = INVOCS[kind];
+  const a = new Allie(f, kind, x !== undefined ? x : f.cx + f.facing * 70,
+                      y !== undefined ? y : f.y);
+  M.allies.push(a);
+  FX.ring(a.x, a.y - 30, 80, D.couleur, 26, 8, 2.1);
+  FX.burst(a.x, a.y - 30, 60, D.couleur, 20);
+  try { Audio2.play('powerup', { pan: f.sfxPan }); } catch (e) {}
+  M.ticker(
+    (M.lang === 'en' ? D.nEN : (M.lang === 'cr' ? D.nCR : D.nFR)) +
+    (M.lang === 'en' ? ' JOINS YOU !' : ' VIENT T\u2019AIDER !'),
+    D.couleur);
+  Stat.bump(f, 'invocations');
+  return a;
+}
+
 (function ajouteInvocations() {
   if (typeof ITEMS === 'undefined' || !ITEMS.defs) return;
 
-  function invoque(f, kind) {
-    const M = f.M;
-    if (!M) return;
-    if (!M.allies) M.allies = [];
-    /* un seul compagnon par combattant : le précédent s'en va */
-    for (const a of M.allies) if (a.maitre === f) a.partir(M);
-    const a = new Allie(f, kind, f.cx + f.facing * 70, f.y);
-    M.allies.push(a);
-    FX.ring(a.x, a.y - 30, 80, INVOCS[kind].couleur, 26, 8, 2.1);
-    FX.burst(a.x, a.y - 30, 60, INVOCS[kind].couleur, 20);
-    Audio2.play('powerup', { pan: f.sfxPan });
-    M.ticker(
-      (M.lang === 'en' ? INVOCS[kind].nEN : (M.lang === 'cr' ? INVOCS[kind].nCR : INVOCS[kind].nFR)) +
-      (M.lang === 'en' ? ' JOINS YOU !' : ' VIENT T’AIDER !'),
-      INVOCS[kind].couleur);
-    Stat.bump(f, 'invocations');
+  /* Toutes les capsules partagent la même trajectoire : un lancer
+     franc, un peu de poids, et surtout AUCUN dégât. Une capsule n'est
+     pas une arme — la toucher au vol doit rester tentant. */
+  const TRAJ = { vx: 13, vy: -5, grav: 0.44, dmg: 0, ang: 361, bkb: 0, kbg: 0,
+                 w: 34, h: 34, life: 100, bounce: 1, reflectable: true, noKb: true };
+
+  const CAPSULES = [
+    { id: 'capsuletangue',   nFR: 'Panier tangue',            nCR: 'Panyé tang',        nEN: 'Tenrec Basket',       weight: 6, color: '#a97c50', invoc: 'tangue' },
+    { id: 'capsulepaille',   nFR: 'Plume paille-en-queue',    nCR: 'Plim pay-an-ké',    nEN: 'Tropicbird Feather',  weight: 5, color: '#eef4ff', invoc: 'paille' },
+    { id: 'capsulekal',      nFR: 'Grigri Grand-mère Kal',    nCR: 'Grigri Granmèr Kal',nEN: 'Granny Kal Charm',    weight: 4, color: '#9b6bd6', invoc: 'kal' },
+    { id: 'capsuleboeuf',    nFR: 'Cloche à bœuf',            nCR: 'Klosh bèf',         nEN: 'Ox Bell',             weight: 4, color: '#5a4636', invoc: 'boeuf' },
+    { id: 'capsulezandoli',  nFR: 'Boîte à zandoli',          nCR: 'Bwat zandoli',      nEN: 'Anole Box',           weight: 5, color: '#6fbf4f', invoc: 'zandoli' },
+    { id: 'capsulesitarane', nFR: 'Lanterne Sitarane',        nCR: 'Lantern Sitaran',   nEN: 'Sitarane Lantern',    weight: 3, color: '#7a86a8', invoc: 'sitarane' },
+    { id: 'capsulebabouk',   nFR: 'Bocal à babouk',           nCR: 'Bokal babouk',      nEN: 'Huntsman Jar',        weight: 4, color: '#4d3a2c', invoc: 'babouk' },
+    { id: 'capsulebichique', nFR: 'Vouve à bichiques',        nCR: 'Vouv bishik',       nEN: 'Bichique Trap',       weight: 4, color: '#7fd4e8', invoc: 'bichique' },
+    { id: 'capsulecabri',    nFR: 'Sonnaille de cabri',       nCR: 'Sonay kabri',       nEN: 'Goat Bell',           weight: 5, color: '#d8cbb0', invoc: 'cabri' },
+    { id: 'capsulesoleil',   nFR: 'Éclat du Piton',           nCR: 'Éklat Piton',       nEN: 'Piton Shard',         weight: 2, color: '#ffcf5c', invoc: 'soleil' }
+  ];
+  for (const d of CAPSULES) {
+    d.throwable = true;
+    d.uses = 1;
+    /* la trajectoire porte l'invocation : c'est le projectile qui,
+       en mourant, ouvrira la capsule */
+    d.proj = Object.assign({}, TRAJ, { color: d.color, invoc: d.invoc, kind: 'capsule' });
+    ITEMS.defs.push(d);
   }
 
-  const nouveaux = [
-    { id: 'capsuletangue', nFR: 'Panier tangue', nCR: 'Panyé tang', nEN: 'Tenrec Basket',
-      instant: true, weight: 6, color: '#a97c50', invoc: 'tangue' },
-    { id: 'capsulepaille', nFR: 'Plume paille-en-queue', nCR: 'Plim pay-an-ké', nEN: 'Tropicbird Feather',
-      instant: true, weight: 5, color: '#eef4ff', invoc: 'paille' },
-    { id: 'capsulekal', nFR: 'Grigri Grand-mère Kal', nCR: 'Grigri Granmèr Kal', nEN: 'Granny Kal Charm',
-      instant: true, weight: 4, color: '#9b6bd6', invoc: 'kal' },
-    { id: 'capsuleboeuf', nFR: 'Cloche à bœuf', nCR: 'Klosh bèf', nEN: 'Ox Bell',
-      instant: true, weight: 4, color: '#5a4636', invoc: 'boeuf' },
-    { id: 'capsulezandoli', nFR: 'Boîte à zandoli', nCR: 'Bwat zandoli', nEN: 'Anole Box',
-      instant: true, weight: 5, color: '#6fbf4f', invoc: 'zandoli' }
-  ];
-  for (const d of nouveaux) {
-    d.apply = (function (kind) { return function (f) { invoque(f, kind); }; })(d.invoc);
-    ITEMS.defs.push(d);
+  /* ---------- l'ouverture ----------
+     Un projectile de capsule ne blesse pas : quand il s'arrête — au
+     contact d'un adversaire, en touchant le sol ou en fin de course —
+     il libère la créature, au profit de celui qui l'a lancé (ou de
+     celui qui l'a renvoyée : `owner` suit le dernier lanceur). */
+  if (typeof Projectile !== 'undefined') {
+    const dieOrig = Projectile.prototype.die;
+    Projectile.prototype.die = function (M) {
+      const ouvre = !this.dead && this.invoc;
+      const kind = this.invoc, ox = this.x, oy = this.y, maitre = this.owner;
+      dieOrig.call(this, M);
+      if (ouvre && maitre && maitre.M) invoqueAllie(maitre, kind, ox, oy + 20);
+    };
+
+    /* Une capsule qui touche le sol s'ouvre aussi : sans ça, un lancer
+       raté la faisait simplement disparaître au bout de sa vie. */
+    const upOrig = Projectile.prototype.update;
+    Projectile.prototype.update = function (M) {
+      if (this.invoc && !this.dead) {
+        for (const p of M.stage.plats) {
+          if (p.pass) continue;
+          const top = p.y + (p.dy || 0), l = p.x + (p.dx || 0);
+          if (this.x > l && this.x < l + p.w &&
+              this.y + this.h / 2 >= top && this.y + this.h / 2 <= top + 40 && this.vy >= 0) {
+            this.die(M);
+            return;
+          }
+        }
+      }
+      return upOrig.call(this, M);
+    };
   }
 
   /* Icônes : le dessin d'origine ne connaît pas ces objets, on greffe
@@ -16783,6 +17102,15 @@ class Brain {
         if (nearEdge && sign(o.ax) === -toStage) {
           if (o.shield) o.ax = toStage * 0.9;      // on esquive VERS la scène
           else o.ax = 0;
+        }
+        /* DÉJÀ DEHORS : plus aucune décision ne peut nous éloigner
+           encore. On rentre, point. C'est le dernier filet avant la
+           chute, et il ne coûte rien quand tout va bien. */
+        const dehors = f.x < main.x || f.x > main.x + main.w;
+        if (dehors) {
+          if (sign(o.ax) !== toStage) o.ax = toStage;
+          o.special = o.special && o.ay < 0;       // pas de ruée latérale dans le vide
+          if (o.ay > 0) o.ay = 0;                  // jamais de chute rapide hors scène
         }
       }
     }
@@ -16931,7 +17259,13 @@ class Brain {
       if (o.ax < 0 && f.x < main.x + margin) { o.ax = 0.25; atLedge = true; }
       if (o.ax > 0 && f.x > main.x + main.w - margin) { o.ax = -0.25; atLedge = true; }
     }
-    if (this.plan === 'edgeguard' && f.upUsed) this.plan = 'approach';
+    /* Le garde-rebord abandonne dès qu'il quitte lui-même la scène, ou
+       dès qu'il a brûlé son spécial haut. Poursuivre un adversaire
+       dans le vide, c'est échanger un K.O. contre une vie : mauvais
+       calcul, et surtout spectacle absurde. */
+    if (this.plan === 'edgeguard' &&
+        (f.upUsed || !f.grounded && (f.x < main.x || f.x > main.x + main.w)))
+      this.plan = 'approach';
 
     // saut : cible en hauteur, ou trou franchissable devant
     const gap = !atLedge && this.gapAhead(sign(o.ax || dir));
@@ -16971,13 +17305,28 @@ class Brain {
     return d < 190 && t.mf < 20;
   }
 
+  /* Hors scène : on déclenche la récupération BEAUCOUP plus tôt
+     qu'avant. L'ancien seuil (90 px sous le sol, 20 px au-delà du
+     bord) laissait le bot dériver jusqu'à ce qu'il soit trop tard —
+     surtout sur les scènes étroites et par vent de travers, où près
+     de la moitié des morts n'étaient pas des K.O. mais des chutes
+     bêtes. Mieux vaut remonter pour rien que mourir pour rien. */
   isOffstage() {
     const f = this.f, M = f.M;
-    if (f.grounded) return false;
+    if (f.grounded || f.state === ST.LEDGE) return false;
     const main = M.stage.plats.find(p => !p.pass);
     if (!main) return false;
-    const on = f.x > main.x - 20 && f.x < main.x + main.w + 20;
-    return !on || f.y > main.y + 90;
+    const on = f.x > main.x + 6 && f.x < main.x + main.w - 6;
+    if (!on) return true;
+    if (f.y > main.y + 30) return true;
+    /* le vent compte : s'il souffle vers l'extérieur et qu'on tombe
+       déjà, on ne parie pas sur la chance */
+    const W = M.wind;
+    if (W && W.frames > 0 && f.vy > 2) {
+      const versDehors = sign(f.x - (main.x + main.w / 2)) === W.dir;
+      if (versDehors && f.y > main.y - 40) return true;
+    }
+    return false;
   }
 
   enemyOffstage(t) {
@@ -17025,26 +17374,44 @@ class Brain {
 
     const below = f.y > top - 30;
     const far = Math.abs(f.x - clamp(f.x, main.x, main.x + main.w));
-    const hesitate = Math.random() > L.recover;                    // les bots faibles hésitent…
-    if (hesitate) return;                                          // …mais dérivent quand même
 
-    if ((below || far > 70) && f.jumps < f.char.stats.jumps && this.jumpCd <= 0) {
-      o.jump = true; this.jumpCd = 9;
+    /* COMPENSATION DU VENT. Une rafale de travers annulait purement
+       et simplement la dérive du bot vers la scène : il ramait sur
+       place et tombait. S'il doit remonter contre le vent, on ne
+       relâche jamais la direction. */
+    const W = f.M.wind;
+    const contreVent = W && W.frames > 0 && W.dir !== dir;
+
+    const hesitate = !contreVent && !below && Math.random() > L.recover;
+    if (hesitate) return;                                          // …mais on dérive quand même
+
+    /* Le saut part dès qu'on est SORTI, pas seulement quand on est
+       déjà sous le sol : plus tôt on repart, plus la remontée est
+       facile. */
+    /* Le saut de récupération n'est JAMAIS retardé par le délai
+       anti-rebond. Ce délai existe pour éviter qu'un bot ne saute en
+       boucle au sol ; en pleine chute, il faisait simplement sauter la
+       branche « je saute » au profit de « je brûle mon spécial haut »,
+       et le bot finissait la course impuissant, un saut inutilisé en
+       poche. C'était la première cause de chute évitable. */
+    if ((below || far > 24 || contreVent) && f.jumps < f.char.stats.jumps) {
+      o.jump = true; this.jumpCd = 6;
       return;
     }
     // le spécial haut est gardé pour la fin : on le garde tant qu'on monte encore
     // (sinon le bot le gâche à 300 px du bord et retombe dans le vide)
     const rising = f.vy < -1;
-    const doomed = f.y > top + 110 || far > 380;
-    if (!f.upUsed && !rising && (below || f.vy > 3.5 || doomed)) {
+    const doomed = f.y > top + 50 || far > 260 || contreVent;
+
+    if (!f.upUsed && !rising && (below || f.vy > 2.5 || doomed)) {
       o.ax = dir * 0.25; o.ay = -1; o.special = true;
       return;
     }
     // dernier recours : esquive aérienne vers la scène, uniquement sous le niveau
     // du sol et à portée raisonnable (sinon le bot se jette lui-même dans le vide)
-    if (f.upUsed && !f.grounded && !this.dodgedBack && this.level >= 2 &&
+    if (f.upUsed && !f.grounded && !this.dodgedBack && this.level >= 1 &&
         f.state !== ST.AIRDODGE && f.state !== ST.HELPLESS &&
-        f.y > top + 20 && far > 30 && far < 340) {
+        f.y > top - 10 && far > 20 && far < 400) {
       this.dodgedBack = true;
       o.ax = dir; o.ay = -0.3; o.shield = true;
     }
@@ -25214,14 +25581,22 @@ const Touch = {
   box-shadow:0 0 calc(var(--tc-u) * .3) rgba(255,190,80,.75);
 }
 @keyframes tcSpin{ to{ transform:rotate(360deg); } }
-/* SAISIE : un objet est a portee, il n'attend qu'un appui */
-#touchui .tc-btn.tc-item{
-  box-shadow:0 0 calc(var(--tc-u) * .34) rgba(255,235,150,.9),
-             inset 0 0 calc(var(--tc-u) * .18) rgba(255,235,150,.55);
-  border-color:rgba(255,235,150,.95);
-  animation:tcItem 1s ease-in-out infinite;
+/* SAISIE : un objet est a portee, il n'attend qu'un appui.
+   Le bouton ne bouge pas et ne grossit pas : il respire en lumiere.
+   Agrandir un bouton tactile, c'est deplacer sa zone de touche et
+   empieter sur ses voisins au pire moment - en pleine partie. */
+#touchui .tc-btn.tc-item{ border-color:rgba(255,235,150,.95); }
+#touchui .tc-btn.tc-item .tc-face{
+  animation:tcItem 1.1s ease-in-out infinite;
 }
-@keyframes tcItem{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.09); } }
+@keyframes tcItem{
+  0%,100%{ box-shadow:0 0 0 rgba(255,235,150,0),
+                      inset 0 0 calc(var(--tc-u) * .06) rgba(255,235,150,.18);
+           filter:brightness(1); }
+  50%    { box-shadow:0 0 calc(var(--tc-u) * .34) rgba(255,235,150,.85),
+                      inset 0 0 calc(var(--tc-u) * .2) rgba(255,235,150,.5);
+           filter:brightness(1.35); }
+}
 #touchui .tc-s.tc-pop{ animation:tcPop .5s cubic-bezier(.2,.9,.3,1.5); }
 @keyframes tcPop{ 0%{ transform:scale(1); } 42%{ transform:scale(1.28); } 100%{ transform:scale(1); } }
 @media (prefers-reduced-motion: reduce){
@@ -33582,21 +33957,34 @@ const Bilan = {
     const sc = document.getElementById('sc-results');
     if (!sc || document.getElementById('bil-nav')) return;
 
-    /* bloc maîtrise : il n'existait pas, on l'ajoute après l'XP */
-    const xp = document.getElementById('res-xp');
+    /* L'écran devient une colonne à trois étages : un en-tête fixe, un
+       CORPS qui défile, une barre de navigation qui ne défile pas.
+
+       Sans ce corps séparé, la barre était « collante » : elle restait
+       visible en glissant par-dessus le contenu, et sur un téléphone à
+       l'horizontale les dernières lignes d'expérience finissaient
+       cachées dessous. Un écran à trois étages n'a pas ce problème :
+       rien ne peut passer sous rien. */
+    const corps = document.createElement('div');
+    corps.id = 'bil-corps';
+    const apres = document.getElementById('rank');
+    if (apres && apres.parentNode) apres.parentNode.insertBefore(corps, apres);
+    else sc.appendChild(corps);
+
+    /* bloc maîtrise : il n'existait pas */
     const mast = document.createElement('div');
     mast.id = 'res-mastery';
     mast.className = 'bil-bloc';
-    if (xp && xp.parentNode) xp.parentNode.insertBefore(mast, xp.nextSibling);
-    else sc.appendChild(mast);
 
-    /* bloc trophées, juste après les succès */
-    const achv = document.getElementById('res-achv');
+    /* bloc trophées */
     const tro = document.createElement('div');
     tro.id = 'res-trophees';
     tro.className = 'bil-bloc';
-    if (achv && achv.parentNode) achv.parentNode.insertBefore(tro, achv.nextSibling);
-    else sc.appendChild(tro);
+
+    /* on range tout dans le corps, dans l'ordre des actes */
+    for (const el of [document.getElementById('rank'), document.getElementById('res-xp'), mast,
+                      document.getElementById('res-achv'), tro])
+      if (el) corps.appendChild(el);
 
     /* barre de navigation : titre de l'acte, points de progression,
        bouton SUIVANT et raccourci TOUT VOIR */
@@ -33685,8 +34073,8 @@ const Bilan = {
 
     /* On repart du haut de l'acte : sinon, sur un petit écran, on
        arrive au milieu d'une liste sans savoir ce qu'on regarde. */
-    const sc2 = document.getElementById('sc-results');
-    if (sc2 && sc2.scrollTo) { try { sc2.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { sc2.scrollTop = 0; } }
+    const corps = document.getElementById('bil-corps');
+    if (corps) { try { corps.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { corps.scrollTop = 0; } }
 
     document.getElementById('bil-nom').textContent = A.nom;
     document.getElementById('bil-pts').innerHTML =
@@ -33955,6 +34343,27 @@ const Bilan = {
 }
 #sc-results .xp-plus { font-variant-numeric: tabular-nums; }
 
+/* Déblocages : une rangée de pastilles qui s'enroule, pas une file de
+   grosses cartes. Six cosmétiques débloqués d'un coup débordaient de
+   l'écran et se faisaient couper en deux. */
+#sc-results .unlocks {
+  display: flex; flex-wrap: wrap; justify-content: center;
+  gap: 6px; margin-top: 6px; width: 100%;
+}
+#sc-results .unlocks .unlock {
+  display: flex; flex-direction: row; align-items: baseline; gap: 6px;
+  padding: 5px 10px; border-radius: 999px; animation: none;
+  background: rgba(255,209,102,.12);
+  border: 1px solid rgba(255,209,102,.4);
+  font-size: 12px; white-space: nowrap;
+}
+#sc-results .unlocks .unlock b {
+  font-size: 9px; letter-spacing: .1em; color: var(--gold); opacity: .9;
+}
+#sc-results .unlocks .unlock span { font-size: 12px; font-weight: 700; }
+#app.fh-sm #sc-results .unlocks .unlock span { font-size: 11px; }
+#app.fh-sm #sc-results .unlocks .unlock { font-size: 11px; padding: 4px 8px; }
+
 /* trophées gagnés */
 #res-trophees { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 #sc-results .bil-tro {
@@ -33967,6 +34376,19 @@ const Bilan = {
 #sc-results .bil-tro-lbl { font-size: 10px; letter-spacing: .12em; opacity: .6; }
 #sc-results .bil-tro-nom { font-weight: 800; }
 #sc-results .bil-tro-rar { font-size: 11px; opacity: .7; }
+
+/* trois étages : en-tête, corps qui défile, barre fixe */
+#sc-results.bil-on { display: flex; flex-direction: column; overflow: hidden; }
+#sc-results.bil-on > h2, #sc-results.bil-on > #t-winner,
+#sc-results.bil-on > #bil-nav, #sc-results.bil-on > .row { flex: 0 0 auto; }
+#bil-corps {
+  flex: 1 1 auto; min-height: 0; width: 100%;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  overflow-y: auto; overflow-x: hidden;
+  padding: 2px 0 6px;
+  scrollbar-width: thin;
+}
+#sc-results:not(.bil-on) #bil-corps { overflow: visible; }
 
 /* barre de navigation du bilan */
 #bil-nav {
@@ -33987,11 +34409,9 @@ const Bilan = {
    contenu pour qu'aucune ligne ne finisse cachée derrière elle. */
 #app.mob #sc-results .bil-bloc,
 #app.mob #sc-results .results { width: 100%; }
-#app.mob #sc-results.bil-on { padding-bottom: 104px; }
 #app.mob #bil-nav {
-  position: sticky; bottom: 0; z-index: 6; margin-top: 10px;
-  padding: 8px 0 10px; gap: 7px;
-  background: linear-gradient(180deg, rgba(9,11,16,0) 0%, rgba(9,11,16,.92) 26%, rgba(9,11,16,.98) 100%);
+  margin-top: 6px; padding: 6px 0 8px; gap: 7px;
+  border-top: 1px solid rgba(255,255,255,.09);
 }
 #app.mob #bil-suivant { min-height: 46px; min-width: 58vw; font-size: 15px; }
 #app.mob #bil-tout { min-height: 42px; }
@@ -34005,7 +34425,18 @@ const Bilan = {
 #app.fh-sm #bil-nav { padding: 6px 0 8px; gap: 5px; }
 #app.fh-sm #bil-suivant { min-height: 40px; }
 #app.fh-sm #bil-nom { font-size: 11px; }
-#app.fh-sm #sc-results.bil-on { padding-bottom: 88px; }
+#app.fh-sm #bil-nav { padding: 4px 0 6px; }
+/* Écran vraiment bas : on récupère chaque pixel. Le grand titre
+   « RÉSULTATS » fait doublon avec le nom de l'acte affiché juste
+   au-dessus du bouton, on le retire ; le reste se resserre. Le but
+   est qu'un acte tienne d'un seul coup d'œil, sans défilement. */
+#app.fh-sm #sc-results.bil-on > h2 { display: none; }
+#app.fh-sm #sc-results.bil-on > #t-winner { margin: 2px 0 4px; }
+#app.fh-sm #sc-results .bil-ligne { font-size: 11.5px; padding: 5px 10px; }
+#app.fh-sm #sc-results .xp-head { margin-bottom: 2px; }
+#app.fh-sm #sc-results .bil-tro { padding: 6px 10px; }
+#app.fh-sm #sc-results .bil-tro-ic { font-size: 20px; }
+#app.fh-sm #bil-corps { gap: 4px; padding-top: 0; }
 `;
   document.head.appendChild(s);
 })();
@@ -34057,28 +34488,18 @@ Object.assign(I18N.en, {
    ============================================================ */
 (function reglagesGabarit() {
   if (typeof CHAR_LIST === 'undefined') return;
+  /* L'ajustement automatique traite déjà la forme de la tête. Il ne
+     reste ici que les cas vraiment particuliers : les têtes très
+     grosses, où un chapeau à l'échelle déborde du crâne, et les têtes
+     menues, où il ferait jouet. Rien de plus : chaque valeur ajoutée
+     ici se cumule à l'ajustement, et c'est en empilant les corrections
+     que les accessoires finissaient par flotter dans le vide. */
   const REGL = {
-    /* museaux longs : ce qu'on pose sur la tête doit reculer un peu,
-       sinon le chapeau part avec le nez */
-    requin:    { dx: -0.10, sx: 0.94 },
-    espadon:   { dx: -0.12, sx: 0.94 },
-    /* becs : les lunettes doivent rester sur les yeux, pas sur le bec */
-    dodo:      { dx: -0.05, dy: 0.03 },
-    paille:    { dx: -0.05, dy: 0.03 },
-    zoizo:     { dx: -0.04 },
-    nuitoiseau:{ dx: -0.04 },
-    /* têtes très grosses : on resserre pour ne pas déborder */
-    cari:      { sx: 0.92, sy: 0.94, dy: 0.04 },
-    bouchon:   { sx: 0.95, dy: 0.03 },
-    /* têtes menues : on grossit un peu, sinon le chapeau fait jouet */
-    tectec:    { sx: 1.08, sy: 1.06, dy: -0.03 },
-    piment:    { dy: -0.05 },
-    /* coiffes hautes déjà présentes sur le personnage */
-    volkan:    { dy: -0.08 },
-    granmer:   { dy: -0.05 },
-    gramoun:   { dy: -0.04 }
+    cari:      { sx: 0.94, sy: 0.96 },
+    bouchon:   { sx: 0.96 },
+    tectec:    { sx: 1.07, sy: 1.05 }
   };
-  for (const c of CHAR_LIST) if (REGL[c.id]) c.cosFit = REGL[c.id];
+  for (const c of CHAR_LIST) { delete c.cosFit; if (REGL[c.id]) c.cosFit = REGL[c.id]; }
 })();
 
 /* ============================================================
@@ -34120,8 +34541,8 @@ function COS_TETE(ctx, r, f, P, pose) {
       ctx.moveTo(-r * 1.16, r * 0.35);
       ctx.quadraticCurveTo(-r * 1.3, -r * 1.2, 0, -r * 1.28);
       ctx.quadraticCurveTo(r * 1.3, -r * 1.2, r * 1.16, r * 0.35);
-      ctx.quadraticCurveTo(r * 0.72, -r * 0.05, 0, -r * 0.02);
-      ctx.quadraticCurveTo(-r * 0.72, -r * 0.05, -r * 1.16, r * 0.35);
+      ctx.quadraticCurveTo(r * 0.74, -r * 0.44, 0, -r * 0.4);
+      ctx.quadraticCurveTo(-r * 0.74, -r * 0.44, -r * 1.16, r * 0.35);
       ctx.closePath();
       ctx.fillStyle = '#8a6540'; ctx.fill();
       ctx.strokeStyle = 'rgba(40,25,10,.5)'; ctx.lineWidth = 1.6; ctx.stroke();
@@ -34352,10 +34773,21 @@ function COS_AURA(f, kind, px, py) {
   /* Les anciennes pièces doivent effacer les nouvelles, sinon on se
      retrouverait avec deux chapeaux sur la tête. On enveloppe donc
      leur `apply` au lieu de les réécrire. */
+  /* Ces deux-là passaient par un trait natif du personnage : on les
+     reroute vers le dessinateur du vestiaire pour qu'ils profitent de
+     l'ajustement au gabarit et ne soient plus masqués. */
+  const REROUTE = { h_horns: 'horns', h_flame: 'flame', h_crest: 'crest',
+                    h_leaf: 'leaf', h_hair: 'hair', h_finhead: 'finHead' };
   for (const c of COSMETICS) {
+    if (REROUTE[c.id]) {
+      const k = REROUTE[c.id];
+      c.apply = f => { delete f.hat; delete f.hatX; f.cosTete = k; };
+      c.__x = true;
+      continue;
+    }
     if (c.__x) continue;
     const o = c.apply;
-    if (c.slot === 'hat')  c.apply = f => { delete f.hatX;  if (o) o(f); };
+    if (c.slot === 'hat')  c.apply = f => { delete f.hatX; delete f.cosTete; if (o) o(f); };
     if (c.slot === 'face') c.apply = f => { delete f.faceX; if (o) o(f); };
     if (c.slot === 'back') c.apply = f => { delete f.backX; if (o) o(f); };
   }
@@ -34408,8 +34840,27 @@ function COS_AURA(f, kind, px, py) {
   ];
   for (const c of nouveaux) { c.__x = true; COSMETICS.push(c); }
 
-  /* icônes du vestiaire */
+  /* Icônes du vestiaire. Vingt-sept pièces n'en avaient aucune et
+     retombaient sur l'icône générique de l'emplacement : dans une
+     grille, trois casiers identiques ne se distinguent plus. */
   if (typeof COS_ICON !== 'undefined') Object.assign(COS_ICON, {
+    /* pièces qui réutilisent un trait du personnage */
+    h_crest: '🐓', h_leaf: '🌿', h_hair: '🦁', h_finhead: '🦈',
+    f_snout: '🦎', f_beak: '🦤', f_jaws: '🦷',
+    b_tailf: '🪶', b_fins: '🐟', b_shell: '🐢', b_tent: '🐙',
+    /* teintes */
+    s_orig: '🎨', s_braise: '🔥', s_lagon: '🩵', s_foret: '🌲', s_nuit: '🌙',
+    s_vanille: '🌼', s_letchi: '🍒', s_or: '🥇', s_ombre: '🌑', s_curcuma: '🧡',
+    s_ocean: '🌊', s_pitaya: '🐉', s_cafe: '☕', s_argent: '🥈',
+    s_mafate: '🌳', s_neige: '❄️',
+    /* auras */
+    a_leaves: '🍃', a_embers: '✨', a_bubbles: '🫧', a_notes: '🎵', a_stars: '⭐',
+    a_rain: '🌧️', a_papi: '🦋', a_lava: '🌋', a_petal: '🌸',
+    /* pièces de la cinquième vague */
+    b5_spikes: '🦔', b5_collier: '📿', b5_queue: '🐁',
+    b5_tent4: '🐙', b5_tent8: '🦑', f5_bec: '🐤',
+    s5_songe: '🍀', s5_flanboyan: '🌺', s5_maido: '🌫️', s5_ambre: '🍯',
+    s5_bassin: '💧', s5_marmay: '🌷', s5_cendre: '🌋', s5_barachois: '🏝️',
     h_foulard: '🧣', h_letchi: '🍒', h_capeline: '👒', h_tangue: '🦔', h_volcano: '⛑️',
     f_rondes: '👓', f_maloya: '🥁', f_barbe: '🧔',
     b_calebasse: '🫙', b_filet: '🕸️', b_parapluie: '☂️',
@@ -34417,6 +34868,389 @@ function COS_AURA(f, kind, px, py) {
     s_bourbon: '🍦', s_mangue: '🥭', s_cyclone: '🌀', s_corail: '🪸', s_basalte: '🪨'
   });
 })();
+
+
+/* ===== 43-fiche-maitrise.js ===== */
+/* ============================================================
+   SMASH PÉI — FICHE TECHNIQUE : LA MAÎTRISE EN CLAIR
+
+   Le système de maîtrise existait, mais nulle part on ne pouvait
+   lire ce qu'il donnait vraiment. On voyait « Niv. 4 » et une
+   barre, sans savoir ce que le niveau 5 apporterait, ni ce que
+   valait la voie FORCE par rapport à ROCHE, ni combien les
+   accessoires équipés ajoutaient au total.
+
+   Cette section répond à quatre questions, dans cet ordre :
+
+     1. OÙ J'EN SUIS — niveau, expérience, matchs joués, KO.
+     2. CE QUE ÇA DONNE AUJOURD'HUI — le bonus réellement appliqué,
+        décomposé entre progression, voies et équipement.
+     3. LES PALIERS — les dix niveaux, ce que chacun ajoute, et les
+        trois carrefours (3, 6, 9) où l'on choisit une voie.
+     4. LES TROIS VOIES — ce que chacune apporte, chiffré.
+
+   Rien n'est calculé ici : tout est lu depuis `Mastery`, pour que
+   l'affichage ne puisse jamais mentir sur les vrais bonus.
+   ============================================================ */
+
+(function ficheMaitrise() {
+  if (typeof UI === 'undefined' || typeof UI.dataCharHtml !== 'function') return;
+
+  const CLES = ['dmg', 'range', 'run', 'jump', 'air', 'weight'];
+
+  function pct(v) {
+    if (!v) return '—';
+    return (v > 0 ? '+' : '') + Math.round(v * 1000) / 10 + ' %';
+  }
+
+  function nomCle(k) {
+    return UI.t('mz_' + k) || k;
+  }
+
+  /* Bonus cumulé de la progression continue à un niveau donné */
+  function bonusNiveau(n) {
+    const b = {};
+    for (const k in MASTERY.perLevel) b[k] = MASTERY.perLevel[k] * n;
+    return b;
+  }
+
+  UI.masteryHtml = function (c) {
+    if (typeof Mastery === 'undefined' || !c) return '';
+    const T = k => this.t(k);
+    const E = s => this.dataEsc(s);
+    const id = (c.__base || c).id;
+    const lvl = Mastery.level(id);
+    const pr = Mastery.progress(id);
+    const m = Mastery.all()[id] || {};
+    const prog = Mastery.bonus(id);
+    const gear = Mastery.gearBonus(id);
+    const tot = Mastery.total(id);
+    const lang = this.lang;
+
+    /* ---------- 1. où j'en suis ---------- */
+    let html = '<div class="optcol-t">' + E(T('mzTitre')) + '</div><div class="mz">';
+    html +=
+      '<div class="mz-tete">' +
+        '<div class="mz-niv"><b>' + lvl + '</b><span>' + E(T('mzNiv')) + '</span></div>' +
+        '<div class="mz-prog">' +
+          '<div class="mz-bar"><i style="width:' + Math.round(pr.k * 100) + '%"></i></div>' +
+          '<span>' + (pr.max ? E(T('mzMax'))
+                             : pr.cur + ' / ' + pr.need + ' ' + E(T('mzXp'))) + '</span>' +
+        '</div>' +
+        '<div class="mz-chiffres">' +
+          '<span><b>' + (m.matches || 0) + '</b>' + E(T('mzMatchs')) + '</span>' +
+          '<span><b>' + (m.kos || 0) + '</b>' + E(T('mzKos')) + '</span>' +
+        '</div>' +
+      '</div>';
+
+    /* ---------- 2. ce que ça donne aujourd'hui ---------- */
+    const actives = CLES.filter(k => (tot[k] || 0) !== 0);
+    html += '<div class="mz-st">' + E(T('mzActuel')) + '</div>';
+    if (!actives.length) {
+      html += '<p class="mz-vide">' + E(T('mzRien')) + '</p>';
+    } else {
+      html += '<div class="mz-lignes">';
+      for (const k of actives) {
+        const p = prog[k] || 0, g = gear[k] || 0, t = tot[k] || 0;
+        const borne = Math.abs(p + g - t) > 0.0001;
+        html += '<div class="mz-ligne">' +
+          '<span>' + E(nomCle(k)) + '</span>' +
+          '<i>' + E(T('mzDeNiv')) + ' ' + pct(p) + '</i>' +
+          '<i>' + E(T('mzDeGear')) + ' ' + pct(g) + '</i>' +
+          '<b>' + pct(t) + (borne ? ' <em>' + E(T('mzPlafond')) + '</em>' : '') + '</b>' +
+          '</div>';
+      }
+      html += '</div>';
+    }
+
+    /* ---------- 3. les paliers ---------- */
+    html += '<div class="mz-st">' + E(T('mzPaliers')) + '</div>';
+    html += '<div class="mz-echelle">';
+    for (let n = 1; n <= MASTERY.max; n++) {
+      const atteint = lvl >= n;
+      const carrefour = MASTERY.paliers.indexOf(n) >= 0;
+      const b = bonusNiveau(n);
+      const detail = CLES.filter(k => b[k])
+        .map(k => nomCle(k) + ' ' + pct(b[k])).join(' · ');
+      const choisi = carrefour ? Mastery.voie(id, n) : null;
+      html += '<div class="mz-pal' + (atteint ? ' ok' : '') + (carrefour ? ' carre' : '') + '">' +
+        '<span class="mz-pn">' + n + '</span>' +
+        '<span class="mz-pd">' + E(detail || '—') + '</span>' +
+        (carrefour
+          ? '<span class="mz-pv">' +
+              (choisi ? VOIES[choisi].ic + ' ' + E(VOIES[choisi][lang] || VOIES[choisi].fr)
+                      : (atteint ? '<em class="mz-att">' + E(T('mzAChoisir')) + '</em>'
+                                 : E(T('mzChoixVoie'))))
+            + '</span>'
+          : '') +
+        '</div>';
+    }
+    html += '</div>';
+
+    /* ---------- 4. les trois voies ---------- */
+    html += '<div class="mz-st">' + E(T('mzVoies')) + '</div><div class="mz-voies">';
+    for (const cle in VOIES) {
+      const v = VOIES[cle];
+      const pris = MASTERY.paliers.filter(p => Mastery.voie(id, p) === cle).length;
+      const detail = Object.keys(v.bonus).map(k => nomCle(k) + ' ' + pct(v.bonus[k])).join(' · ');
+      html += '<div class="mz-voie' + (pris ? ' pris' : '') + '">' +
+        '<div class="mz-vh"><span class="mz-vic">' + v.ic + '</span>' +
+          '<b>' + E(v[lang] || v.fr) + '</b>' +
+          (pris ? '<i class="mz-vn">×' + pris + '</i>' : '') + '</div>' +
+        '<p>' + E(lang === 'en' ? v.dEN : (lang === 'cr' ? v.dCR : v.dFR)) + '</p>' +
+        '<div class="mz-vb">' + E(detail) + '</div>' +
+        '</div>';
+    }
+    html += '</div>';
+
+    /* ---------- rappel de la règle ---------- */
+    html += '<p class="mz-note">' + E(T('mzNote')) + '</p>';
+    html += '</div>';
+    return html;
+  };
+
+  /* On greffe la section à la fin de la fiche plutôt que de réécrire
+     `dataCharHtml` : si la fiche évolue, la maîtrise suit. */
+  const orig = UI.dataCharHtml.bind(UI);
+  UI.dataCharHtml = function (c) {
+    let base = orig(c);
+    try { base += this.masteryHtml(c); } catch (e) { console.warn('maitrise', e); }
+    return base;
+  };
+
+  /* ---------- habillage ---------- */
+  const s = document.createElement('style');
+  s.id = 'mz-style';
+  s.textContent = `
+.mz { display: flex; flex-direction: column; gap: 10px; }
+.mz-st {
+  font-size: 11px; font-weight: 800; letter-spacing: .12em;
+  color: var(--dim); margin-top: 6px;
+}
+.mz-tete {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 12px 14px; border-radius: 14px;
+  background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09);
+}
+.mz-niv { display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.mz-niv b { font-family: 'Bangers', Impact, sans-serif; font-size: 34px; color: var(--gold); }
+.mz-niv span { font-size: 9px; letter-spacing: .14em; opacity: .7; }
+.mz-prog { flex: 1 1 180px; display: flex; flex-direction: column; gap: 5px; min-width: 150px; }
+.mz-bar { height: 9px; border-radius: 6px; background: rgba(255,255,255,.12); overflow: hidden; }
+.mz-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--gold), #ff8a3c); }
+.mz-prog span { font-size: 11px; opacity: .75; font-variant-numeric: tabular-nums; }
+.mz-chiffres { display: flex; gap: 14px; }
+.mz-chiffres span { display: flex; flex-direction: column; align-items: center; font-size: 9px; letter-spacing: .1em; opacity: .7; }
+.mz-chiffres b { font-size: 17px; opacity: 1; color: #fff; }
+
+.mz-lignes { display: flex; flex-direction: column; gap: 5px; }
+.mz-ligne {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 7px 12px; border-radius: 10px;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07);
+  font-size: 12.5px;
+}
+.mz-ligne > span { flex: 1 1 100px; font-weight: 700; }
+.mz-ligne > i { font-style: normal; font-size: 11px; opacity: .6; white-space: nowrap; }
+.mz-ligne > b { color: var(--gold); font-variant-numeric: tabular-nums; }
+.mz-ligne em { font-style: normal; font-size: 9px; opacity: .6; }
+.mz-vide { font-size: 12px; opacity: .6; margin: 0; }
+
+.mz-echelle { display: flex; flex-direction: column; gap: 3px; }
+.mz-pal {
+  display: flex; align-items: center; gap: 10px;
+  padding: 5px 10px; border-radius: 8px; font-size: 12px;
+  background: rgba(255,255,255,.03); opacity: .5;
+}
+.mz-pal.ok { opacity: 1; background: rgba(255,209,102,.09); }
+.mz-pal.carre { border-left: 3px solid var(--gold); }
+.mz-pn {
+  width: 22px; text-align: center; font-weight: 800;
+  font-family: 'Bangers', Impact, sans-serif; font-size: 15px;
+}
+.mz-pd { flex: 1; opacity: .85; }
+.mz-pv { font-size: 11px; font-weight: 700; white-space: nowrap; }
+.mz-att { font-style: normal; color: #ff8a3c; }
+
+.mz-voies { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; }
+.mz-voie {
+  padding: 10px 12px; border-radius: 12px;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.09);
+}
+.mz-voie.pris { border-color: var(--gold); background: rgba(255,209,102,.1); }
+.mz-vh { display: flex; align-items: center; gap: 8px; }
+.mz-vic { font-size: 18px; }
+.mz-vh b { letter-spacing: .06em; }
+.mz-vn { font-style: normal; margin-left: auto; color: var(--gold); font-weight: 800; }
+.mz-voie p { margin: 6px 0 6px; font-size: 12px; opacity: .78; line-height: 1.35; }
+.mz-vb { font-size: 11px; color: var(--gold); font-weight: 700; }
+.mz-note { font-size: 11px; opacity: .55; line-height: 1.4; margin: 2px 0 0; }
+
+/* téléphone : on garde tout lisible sans réduire les zones tactiles */
+#app.mob .mz-tete { gap: 10px; padding: 10px; }
+#app.mob .mz-niv b { font-size: 28px; }
+#app.mob .mz-ligne { font-size: 11.5px; padding: 6px 10px; gap: 6px; }
+#app.mob .mz-ligne > i { flex: 1 1 auto; }
+#app.mob .mz-pal { font-size: 11px; }
+#app.mob .mz-voies { grid-template-columns: 1fr; }
+`;
+  document.head.appendChild(s);
+})();
+
+/* ============================================================
+   CATALOGUE DES OBJETS : LES CAPSULES D'INVOCATION
+
+   Dans la fiche des objets, une capsule s'affichait comme un
+   projectile sans dégâts — ce qui est vrai, et parfaitement
+   incompréhensible. On lui donne son propre type et on dit ce
+   qu'elle fait vraiment : qui elle appelle, et pour combien de
+   temps.
+   ============================================================ */
+(function ficheCapsules() {
+  if (typeof UI === 'undefined' || typeof UI.dataItemType !== 'function') return;
+
+  const typeOrig = UI.dataItemType.bind(UI);
+  UI.dataItemType = function (d) {
+    if (d && d.invoc) return 'itInvoc';
+    return typeOrig(d);
+  };
+
+  /* Les chiffres de projectile n'ont aucun sens pour une capsule :
+     elle ne fait pas de dégâts, c'est tout l'intérêt. On les retire
+     pour ne laisser que ce qui compte. */
+  const numsOrig = UI.dataItemNums.bind(UI);
+  UI.dataItemNums = function (d) {
+    if (d && d.invoc) return [];
+    return numsOrig(d);
+  };
+
+  const effOrig = UI.dataItemEffects.bind(UI);
+  UI.dataItemEffects = function (d) {
+    const out = effOrig(d);
+    if (d && d.invoc && typeof INVOCS !== 'undefined' && INVOCS[d.invoc]) {
+      const D = INVOCS[d.invoc];
+      const nom = this.lang === 'en' ? D.nEN : (this.lang === 'cr' ? D.nCR : D.nFR);
+      out.push([this.t('eInvoc'), nom]);
+      out.push([this.t('eDuree'), this.dataNum(D.vie / 60, 1) + ' s']);
+      out.push([this.t('eFrappe'), this.dataNum(D.frappe.dmg, 1) + ' % / ' +
+                this.dataNum(D.cadence / 60, 1) + ' s']);
+    }
+    return out;
+  };
+})();
+
+/* ---------- textes ---------- */
+Object.assign(I18N.fr, {
+  idGato: 'Gâteau patate encore tiède. Ça remet d\'aplomb et ça cale l\'estomac avant la suite.',
+  idPunch: 'Un ti punch avalé sec. Les coups partent plus fort, la prudence part avec.',
+  idVacoa: 'Un bouclier tressé en vacoa. Léger, souple, et il encaisse bien plus qu\'il n\'en a l\'air.',
+  idSifflet: 'Un coup de sifflet et le cyclone répond. Tout ce qui traîne autour part en tournant.',
+  idBatte: 'Une batte taillée dans le goyavier. Un seul coup, mais celui-là, on s\'en souvient.',
+  idFusee: 'Une fusée bricolée au sable volcanique. Ça part droit, ça part vite, ça ne pardonne pas.',
+  idMiel: 'Un pot de miel de baies roses. Ça colle aux doigts, ça colle aussi aux adversaires.',
+  idTisec: 'Un verre de ti sec lancé à la volée. Ça brûle en arrivant, comme il se doit.',
+  idPimanzoizo: 'Un piman zoizo, minuscule et redoutable. À lancer de loin, jamais à goûter.',
+  idKokoz: 'Une noix de coco bien dure. Ça rebondit, ça roule, et ça finit toujours sur quelqu\'un.',
+  idParasolvacoa: 'Un parasol en feuilles de vacoa. Tant qu\'on le tient, on plane et on encaisse mieux.',
+  idBwamizik: 'Une boîte à musique lontan. Elle joue trois notes, et le tempo se met de ton côté.',
+  idCapsuletangue: 'Un panier en vacoa qui remue tout seul. Lance-le : le tangue en sort et charge le premier venu.',
+  idCapsulepaille: 'Une plume qui pèse trois fois rien. Lancée, elle appelle le paille-en-queue et ses piqués.',
+  idCapsulekal: 'Un grigri qu\'on n\'ouvre pas à la légère. Grand-mère Kal sort et lance ses sorts de loin.',
+  idCapsuleboeuf: 'Une cloche de bœuf moka. Elle sonne, la bête arrive, et ce qui est devant part loin.',
+  idCapsulezandoli: 'Une boîte à zandoli. Le lézard tire la langue et ramène l\'adversaire à portée de coup.',
+  idCapsulesitarane: 'La lanterne du brigand. Son spectre flotte, glace et désoriente ceux qu\'il traverse.',
+  idCapsulebabouk: 'Un bocal qu\'on préfère lancer que garder. Le babouk tisse et cloue l\'adversaire sur place.',
+  idCapsulebichique: 'Une vouve pleine de bichiques. Le banc bouscule sans blesser, mais il n\'arrête jamais.',
+  idCapsulecabri: 'Une sonnaille de cabri. Le petit arrive au galop et enchaîne les coups de tête.',
+  idCapsulesoleil: 'Un éclat arraché au Piton. Rare, brûlant, et sans pitié pour qui passe dessous.',
+  itInvoc: 'INVOCATION', eInvoc: 'Appelle', eDuree: 'Durée', eFrappe: 'Frappe',
+  mzTitre: 'MAÎTRISE DU COMBATTANT',
+  mzNiv: 'NIVEAU', mzXp: 'XP', mzMax: 'Maîtrise complète',
+  mzMatchs: 'MATCHS', mzKos: 'KO',
+  mzActuel: 'BONUS ACTIFS EN CE MOMENT',
+  mzDeNiv: 'niveau', mzDeGear: 'accessoires', mzPlafond: 'plafonné',
+  mzRien: 'Aucun bonus pour l’instant : joue quelques matchs avec ce combattant, ou équipe-lui des accessoires.',
+  mzPaliers: 'CE QUE CHAQUE NIVEAU APPORTE',
+  mzChoixVoie: 'choix d’une voie', mzAChoisir: 'à choisir !',
+  mzVoies: 'LES TROIS VOIES',
+  mzNote: 'Les bonus de maîtrise et d’accessoires sont désactivés en ligne et en tournoi : là-bas, tout le monde combat à armes égales. Un choix de voie se reprend gratuitement, à tout moment, depuis le vestiaire.',
+  mz_dmg: 'Dégâts', mz_range: 'Portée', mz_run: 'Course',
+  mz_jump: 'Saut', mz_air: 'Contrôle aérien', mz_weight: 'Poids'
+});
+Object.assign(I18N.cr, {
+  idGato: 'Gato patat ankor sho. I rmète a plon é i kal out lestoma.',
+  idPunch: 'In ti ponsh avalé sèk. Bann kou i part pli for, la pridans i sava avèk.',
+  idVacoa: 'In boukliyé trésé an vakoa. Lézé, soup, é i ankès pli k\'i paré.',
+  idSifflet: 'In kou d siflé é lo siklòn i répon. Tousa i trène otour i sava an tournan.',
+  idBatte: 'In bat taye dann goyavyé. In sèl kou, mé sat la, ou souvien.',
+  idFusee: 'In fizé brikolé ek du sab volkanik. I part drwat, i part vit, i pardone pa.',
+  idMiel: 'In po mièl bé roz. I kol dann dwa, i kol osi dsi lot.',
+  idTisec: 'In vèr ti sèk zèté a la volé. I brile kan i ariv, konm i fo.',
+  idPimanzoizo: 'In piman zoizo, tou pti é térib. Pou zèt delwin, zamé pou gouté.',
+  idKokoz: 'In koko byen dir. I rebondi, i roul, é i fini touzour dsi kékin.',
+  idParasolvacoa: 'In parasol an fèy vakoa. Tan k\'ou tien ali, ou plane é ou ankès myé.',
+  idBwamizik: 'In bwat mizik lontan. I zoue troi not, é lo tenpo i mète ali ek ou.',
+  idCapsuletangue: 'In panyé vakoa i bouj tousèl. Zèt ali : lo tang i sort é i sarj lo premyé.',
+  idCapsulepaille: 'In plim lé lézé konm rien. Zèt ali, pay-an-ké i vien pik dsi.',
+  idCapsulekal: 'In grigri i ouvèr pa konmsa. Granmèr Kal i sort é i zèt son sor delwin.',
+  idCapsuleboeuf: 'In klosh bèf moka. I sone, la bèt i ariv, é sak lé devan i sava lwin.',
+  idCapsulezandoli: 'In bwat zandoli. Lo léza i tir la lang é i ramenn out advèrsèr.',
+  idCapsulesitarane: 'Lantern lo brigan. Son lespri i flot, i glas é i pèrd sak li travèrs.',
+  idCapsulebabouk: 'In bokal ou préfèr zèt ké gard. Lo babouk i tis é i kol l\'ot la.',
+  idCapsulebichique: 'In vouv ranpli bishik. Lo bann i bouskil san blès, mé li arèt zamé.',
+  idCapsulecabri: 'In sonay kabri. Lo pti i ariv o galo é i anshène bann kou d tèt.',
+  idCapsulesoleil: 'In éklat rasé dsi lo Piton. Rar, brilan, é san pityé pou sak i pas anba.',
+  itInvoc: 'INVOKASYON', eInvoc: 'I apèl', eDuree: 'Tan', eFrappe: 'Frap',
+  mzTitre: 'MÈTRIZ LO KONBATAN',
+  mzNiv: 'NIVO', mzXp: 'XP', mzMax: 'Mèt konplé',
+  mzMatchs: 'MATCH', mzKos: 'KO',
+  mzActuel: 'BONIS AKTIF DALON',
+  mzDeNiv: 'nivo', mzDeGear: 'aksésoir', mzPlafond: 'plafoné',
+  mzRien: 'Poin bonis ankor : zoué inpé ek li, ou byen mèt ali bann aksésoir.',
+  mzPaliers: 'SAK NIVO I DONE KOSA',
+  mzChoixVoie: 'shwazi in shomin', mzAChoisir: 'pou shwazi !',
+  mzVoies: 'BANN TROI SHOMIN',
+  mzNote: 'Bann bonis lé kupé an ligne ek an tournoi : laba tout domoun i konbat parèy. In shwa i pé rprann kan ou vé, dann vestiar.',
+  mz_dmg: 'Déga', mz_range: 'Porté', mz_run: 'Galoup',
+  mz_jump: 'So', mz_air: 'Kontrol anlèr', mz_weight: 'Poi'
+});
+Object.assign(I18N.en, {
+  idGato: 'Warm sweet-potato cake. It sets you right and fills you up for what comes next.',
+  idPunch: 'A ti punch downed in one. Hits land harder; so does caution leave.',
+  idVacoa: 'A woven vacoa shield. Light, supple, and it soaks up far more than it looks.',
+  idSifflet: 'One whistle and the cyclone answers. Everything loose nearby spins away.',
+  idBatte: 'A guava-wood bat. One swing only — but that one is remembered.',
+  idFusee: 'A rocket cobbled together from volcanic sand. Straight, fast, unforgiving.',
+  idMiel: 'A jar of pink-pepper honey. It sticks to fingers — and to opponents.',
+  idTisec: 'A shot of ti sec thrown flat out. It burns on arrival, as it should.',
+  idPimanzoizo: 'A tiny, fearsome bird-chilli. Throw it from afar; never taste it.',
+  idKokoz: 'A good hard coconut. It bounces, it rolls, and it always ends up on someone.',
+  idParasolvacoa: 'A vacoa-leaf parasol. While held, you glide further and take hits better.',
+  idBwamizik: 'An old music box. Three notes, and the tempo takes your side.',
+  idCapsuletangue: 'A vacoa basket that will not sit still. Throw it and the tenrec charges the nearest foe.',
+  idCapsulepaille: 'A weightless feather. Thrown, it calls the tropicbird and its dives.',
+  idCapsulekal: 'A charm best left closed. Granny Kal comes out and hexes from afar.',
+  idCapsuleboeuf: 'A moka ox bell. It rings, the beast arrives, and whatever stands there leaves.',
+  idCapsulezandoli: 'An anole box. The lizard\'s tongue drags your opponent back into range.',
+  idCapsulesitarane: 'The outlaw\'s lantern. His ghost drifts through, chilling and blinding.',
+  idCapsulebabouk: 'A jar you would rather throw than hold. The huntsman webs foes in place.',
+  idCapsulebichique: 'A trap full of bichiques. The shoal shoves without hurting, and never stops.',
+  idCapsulecabri: 'A goat bell. The little one gallops in and headbutts, again and again.',
+  idCapsulesoleil: 'A shard torn from the Piton. Rare, molten, and merciless to whoever passes beneath.',
+  itInvoc: 'SUMMON', eInvoc: 'Calls', eDuree: 'Duration', eFrappe: 'Strike',
+  mzTitre: 'FIGHTER MASTERY',
+  mzNiv: 'LEVEL', mzXp: 'XP', mzMax: 'Fully mastered',
+  mzMatchs: 'MATCHES', mzKos: 'KOs',
+  mzActuel: 'BONUSES ACTIVE RIGHT NOW',
+  mzDeNiv: 'level', mzDeGear: 'gear', mzPlafond: 'capped',
+  mzRien: 'No bonus yet — play a few matches with this fighter, or equip some gear.',
+  mzPaliers: 'WHAT EACH LEVEL GIVES',
+  mzChoixVoie: 'pick a path', mzAChoisir: 'pick one!',
+  mzVoies: 'THE THREE PATHS',
+  mzNote: 'Mastery and gear bonuses are switched off online and in tournaments — there, everyone fights on equal terms. A path choice can be changed for free at any time from the locker.',
+  mz_dmg: 'Damage', mz_range: 'Reach', mz_run: 'Run',
+  mz_jump: 'Jump', mz_air: 'Air control', mz_weight: 'Weight'
+});
 
 </script>
 </body>
