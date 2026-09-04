@@ -39609,7 +39609,23 @@ Object.assign(I18N.en, {
     /* Les boutons de fin de partie sont la sortie de secours du
        joueur : ils doivent rester cliquables quoi qu'il arrive. */
     '#sc-results .row.mt:not(.bil-cache) { position: relative; z-index: 12; }',
-    '#sc-results .row.mt:not(.bil-cache) .btn { pointer-events: auto !important; }'
+    '#sc-results .row.mt:not(.bil-cache) .btn { pointer-events: auto !important; }',
+    /* LA RÈGLE QUI MANQUAIT.
+
+       `#sc-results.bil-on` posait `display: flex`. Un sélecteur avec
+       un identifiant ET une classe l'emporte sur `.screen`, qui vaut
+       `display: none`. Conséquence : dès que la mise en scène du
+       bilan démarrait, l'écran de résultats restait AFFICHÉ POUR
+       TOUJOURS, même après avoir perdu sa classe `on`.
+
+       On ne le voyait pas en sortant par MENU, parce que ce chemin
+       passe par `endMatch()` qui nettoyait les classes. Mais
+       REVANCHE, lui, appelle directement `startMatch()` : le combat
+       repartait DERRIÈRE l'écran de résultats resté au premier plan.
+       C'est exactement ce que décrivait le joueur.
+
+       Un écran qui n'est pas actif ne s'affiche pas. Point. */
+    '.screen:not(.on) { display: none !important; }'
   ].join('\n');
   document.head.appendChild(css);
 
@@ -39711,6 +39727,31 @@ Object.assign(I18N.en, {
      « terminé » par le précédent, et la mise en scène ne repartait
      pas.
      ============================================================ */
+  /* Ceinture : on nettoie aussi les classes du bilan au DÉMARRAGE
+     d'un combat. La règle CSS ci-dessus suffit à masquer l'écran,
+     mais un état laissé derrière soi finit toujours par ressortir
+     ailleurs — ici, la mise en scène du bilan suivant croirait
+     qu'elle est déjà terminée. */
+  function nettoieBilan() {
+    try {
+      const sc = document.getElementById('sc-results');
+      if (sc) sc.classList.remove('bil-on', 'bil-fini');
+      const nav = document.getElementById('bil-nav');
+      if (nav) nav.style.display = '';
+      const row = sc && sc.querySelector('.row.mt');
+      if (row) { row.style.display = ''; row.style.visibility = ''; }
+      if (typeof Bilan !== 'undefined') { Bilan.actif = false; Bilan.prepareOk = false; }
+    } catch (e) {}
+  }
+
+  if (typeof UI !== 'undefined' && typeof UI.startMatch === 'function') {
+    const demarre = UI.startMatch.bind(UI);
+    UI.startMatch = function () {
+      nettoieBilan();
+      return demarre.apply(UI, arguments);
+    };
+  }
+
   if (typeof UI !== 'undefined' && typeof UI.endMatch === 'function') {
     const finMatch = UI.endMatch.bind(UI);
     UI.endMatch = function () {
@@ -39767,10 +39808,11 @@ Object.assign(I18N.en, {
         spéciaux sont largement relâchés : il touche, mais il ne tue
         pas.
 
-   L'échelle passe de 3 à 9 niveaux, comme dans le vrai jeu, par
-   interpolation entre trois profils d'ancrage — les anciens réglages
-   1, 2 et 3 deviennent respectivement 1, 5 et 9, donc rien de ce qui
-   existe n'est cassé.
+   L'échelle compte CINQ niveaux — c'est le choix du joueur, et
+   c'est le bon : cinq paliers bien séparés se ressentent, neuf
+   paliers se ressemblent deux à deux. Ils sont interpolés entre
+   trois profils d'ancrage, les anciens réglages 1, 2 et 3 devenant
+   respectivement 1, 3 et 5, donc rien de ce qui existe n'est cassé.
 
    Tout le bruit ajouté est injecté AVANT le filtre de sécurité qui
    empêche les bots de se jeter dans le vide : un bot maladroit reste
@@ -39785,9 +39827,9 @@ Object.assign(I18N.en, {
   const ANCRES = {
     1: { name: 'TI BÉBÉ', react: 26, aggro: 0.22, tech: 0.04, shield: 0.05, dodge: 0.04, smash: 0.05,
          spacing: 145, recover: 0.42, edgeguard: 0, combo: 0.05, mash: 2, err: 0.45 },
-    5: { name: 'ZOREIL', react: 12, aggro: 0.6, tech: 0.4, shield: 0.3, dodge: 0.28, smash: 0.35,
+    3: { name: 'ZOREIL', react: 12, aggro: 0.6, tech: 0.4, shield: 0.3, dodge: 0.28, smash: 0.35,
          spacing: 92, recover: 0.86, edgeguard: 0.35, combo: 0.45, mash: 6, err: 0.15 },
-    9: { name: 'ZARBOUTAN', react: 4, aggro: 0.9, tech: 0.85, shield: 0.58, dodge: 0.52, smash: 0.65,
+    5: { name: 'ZARBOUTAN', react: 4, aggro: 0.9, tech: 0.85, shield: 0.58, dodge: 0.52, smash: 0.65,
          spacing: 72, recover: 0.99, edgeguard: 0.85, combo: 0.85, mash: 12, err: 0.02 }
   };
 
@@ -39796,14 +39838,11 @@ Object.assign(I18N.en, {
   const NOMS = {
     1: { fr: 'TI BÉBÉ', cr: 'TI BÉBÉ', en: 'BABY' },
     2: { fr: 'MARMAILLE', cr: 'MARMAY', en: 'KID' },
-    3: { fr: 'DÉBUTANT', cr: 'DÉBITAN', en: 'ROOKIE' },
-    4: { fr: 'AMATEUR', cr: 'AMATÈR', en: 'AMATEUR' },
-    5: { fr: 'ZOREIL', cr: 'ZORÈY', en: 'REGULAR' },
-    6: { fr: 'HABITUÉ', cr: 'ABITYÉ', en: 'SEASONED' },
-    7: { fr: 'BATAILLEUR', cr: 'BATAYÈR', en: 'FIGHTER' },
-    8: { fr: 'REDOUTABLE', cr: 'REDOUTAB', en: 'FIERCE' },
-    9: { fr: 'ZARBOUTAN', cr: 'ZARBOUTAN', en: 'PILLAR' }
+    3: { fr: 'ZOREIL', cr: 'ZORÈY', en: 'REGULAR' },
+    4: { fr: 'BATAILLEUR', cr: 'BATAYÈR', en: 'FIGHTER' },
+    5: { fr: 'ZARBOUTAN', cr: 'ZARBOUTAN', en: 'PILLAR' }
   };
+  const NIVEAU_MAX = 5;
 
   function melange(a, b, t) {
     const o = {};
@@ -39812,15 +39851,15 @@ Object.assign(I18N.en, {
   }
 
   const TABLE = {};
-  for (let n = 1; n <= 9; n++) {
+  for (let n = 1; n <= NIVEAU_MAX; n++) {
     let p;
-    if (n <= 5) p = melange(ANCRES[1], ANCRES[5], (n - 1) / 4);
-    else p = melange(ANCRES[5], ANCRES[9], (n - 5) / 4);
+    if (n <= 3) p = melange(ANCRES[1], ANCRES[3], (n - 1) / 2);
+    else p = melange(ANCRES[3], ANCRES[5], (n - 3) / 2);
     p.name = NOMS[n].fr;
     p.noms = NOMS[n];
     p.niveau = n;
     /* les défauts propres aux petits niveaux, qui s'effacent en montant */
-    const bas = clamp(1 - (n - 1) / 8, 0, 1);          // 1 au niveau 1, 0 au niveau 9
+    const bas = clamp(1 - (n - 1) / (NIVEAU_MAX - 1), 0, 1);   // 1 au niveau 1, 0 au niveau 5
     p.latence = Math.round(1 + bas * bas * 13);        // images de décision figée
     p.pause = bas * bas * 0.85;                        // propension à s'arrêter
     p.pauseDuree = Math.round(24 + bas * 66);          // longueur d'une pause
@@ -39834,7 +39873,7 @@ Object.assign(I18N.en, {
      ce qui la lisait continue de fonctionner. */
   if (typeof AI_LEVELS !== 'undefined') {
     for (const k in AI_LEVELS) delete AI_LEVELS[k];
-    for (let n = 1; n <= 9; n++) AI_LEVELS[n] = TABLE[n];
+    for (let n = 1; n <= NIVEAU_MAX; n++) AI_LEVELS[n] = TABLE[n];
   }
 
   /* Le constructeur bornait le niveau à 3 : on relit le niveau brut
@@ -39859,11 +39898,11 @@ Object.assign(I18N.en, {
     /* le niveau réel, relu à chaque fois : il peut avoir été borné
        à 3 par l'ancien constructeur */
     if (this._niv === undefined) {
-      this._niv = clamp(this.level || 2, 1, 9);
+      this._niv = clamp(this.level || 2, 1, NIVEAU_MAX);
       this.lv = TABLE[this._niv];
       this.level = this._niv;
     }
-    const P = this.lv || TABLE[5];
+    const P = this.lv || TABLE[3];
 
     /* --- LA PAUSE --- */
     if (this._pause === undefined) { this._pause = 0; this._prochePause = 0; }
@@ -39934,7 +39973,7 @@ Object.assign(I18N.en, {
           const s = this.slots[i];
           if (s) {
             if (typeof Audio2 !== 'undefined' && Audio2.ui) Audio2.ui('move');
-            s.level = (s.level >= 9) ? 1 : (s.level + 1);
+            s.level = (s.level >= NIVEAU_MAX) ? 1 : (s.level + 1);
             if (typeof this.refreshSlots === 'function') this.refreshSlots();
             return;
           }
@@ -39942,27 +39981,29 @@ Object.assign(I18N.en, {
         return actOrig(i, act);
       };
     }
-    /* Le libellé du sélecteur affiche aussi le nom du palier : un
-       chiffre seul ne dit rien, « NIV 3 · DÉBUTANT » se comprend. */
+    /* Le libellé affiche aussi le NOM du palier. Un chiffre seul ne
+       dit rien : « NIV 1 » ne prévient pas qu'on va affronter un
+       adversaire qui reste planté, alors que « TI BÉBÉ » si. */
     if (typeof UI.refreshSlots === 'function') {
       const rafOrig = UI.refreshSlots.bind(UI);
       UI.refreshSlots = function () {
         const r = rafOrig();
         try {
           this.slots.forEach((s, i) => {
-            const el = document.querySelector('#slot' + i + ' .mt-lvl, #slot' + i + ' .slot-lvl, [data-slot="' + i + '"] .slot-lvl');
-            if (el && s.kind === 'cpu') {
-              const n = clamp(s.level || 1, 1, 9);
-              el.textContent = (this.t ? this.t('lvl') : 'NIV') + ' ' + n + ' · ' + NOMS[n][this.lang === 'en' ? 'en' : this.lang === 'cr' ? 'cr' : 'fr'];
-            }
+            const el = document.getElementById('chiplvl-' + i);
+            if (!el || s.kind !== 'cpu') return;
+            const n = clamp(s.level || 1, 1, NIVEAU_MAX);
+            const lang = this.lang === 'en' ? 'en' : (this.lang === 'cr' ? 'cr' : 'fr');
+            el.textContent = (this.t ? this.t('lvl') : 'NIV') + ' ' + n + ' · ' + NOMS[n][lang];
           });
         } catch (e) {}
         return r;
       };
     }
+
     /* le nom du niveau, à côté du chiffre */
     window.BOT_NOM = function (n, lang) {
-      const e = NOMS[clamp(n || 1, 1, 9)];
+      const e = NOMS[clamp(n || 1, 1, NIVEAU_MAX)];
       return e ? (e[lang] || e.fr) : '';
     };
   }
@@ -41930,6 +41971,950 @@ const Visite = {
     a_papillons: '🦋', a_pluie: '🌦️',
     s_bassin: '🟦', s_tamarin: '🟫'
   });
+})();
+
+
+/* ===== 64-ecran-preparation.js ===== */
+/* ============================================================
+   SMASH PÉI — L'ÉCRAN DE PRÉPARATION REDEVIENT LISIBLE
+
+   Le joueur signale qu'il manque des informations dans le menu de
+   combat, et que la barre de réglages flotte n'importe où sur la
+   version ordinateur. La reproduction en 1920 x 984 donne la
+   réponse, et ce n'est pas un problème de position : la mise en
+   page est correcte au pixel près, aucun élément n'en chevauche un
+   autre.
+
+   Le problème est que TOUT EST TRANSPARENT. Mesuré :
+
+     · les cartes des quatre emplacements ont pour seul fond un
+       dégradé blanc à CINQ POUR CENT ;
+     · la barre de réglages, la fiche du combattant et la grille du
+       casting ont un fond « rgba(0,0,0,0) », c'est-à-dire rien ;
+     · derrière tout cela tourne le décor animé d'une arène, avec
+       ses palmiers, ses immeubles et ses personnages.
+
+   Résultat : les informations sont bien là, mais elles se lisent
+   par-dessus une image qui bouge. La barre de réglages n'a l'air de
+   flotter que parce qu'aucun bord ne la rattache à quoi que ce soit.
+
+   La correction ne déplace rien. Elle donne à chaque panneau une
+   vraie surface — un fond opaque, un bord, une ombre portée — et
+   pose un voile sur le décor derrière. C'est ce qui distingue une
+   interface d'un calque posé sur une illustration.
+   ============================================================ */
+(function ecranPreparation() {
+  const st = document.createElement('style');
+  /* ATTENTION : ce bloc est une chaine gabarit JavaScript.
+     Aucun accent grave ne doit y apparaitre, il la terminerait. */
+  st.textContent = `
+/* ============================================================
+   1) LE VOILE
+
+   Le decor anime reste visible — il donne vie a l'ecran — mais il
+   passe derriere un voile assez dense pour que du texte blanc s'y
+   detache. Sans lui, aucune carte ne peut etre lisible.
+   ============================================================ */
+#sc-setup::before, #sc-stage::before {
+  content: ''; position: absolute; inset: 0; z-index: 0;
+  background: linear-gradient(180deg, rgba(8,11,16,.86), rgba(8,11,16,.72) 40%, rgba(8,11,16,.88));
+  pointer-events: none;
+}
+
+/* ============================================================
+   2) LES CARTES DES EMPLACEMENTS
+
+   Cinq pour cent de blanc sur un decor anime, ce n'est pas une
+   carte : c'est une zone ou le texte devient illisible des qu'un
+   nuage passe. On leur donne la meme matiere qu'aux autres
+   panneaux du jeu.
+   ============================================================ */
+#slots > * {
+  background: linear-gradient(160deg, rgba(28,36,48,.94), rgba(16,22,31,.96)) !important;
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 14px;
+  box-shadow: 0 10px 26px rgba(0,0,0,.42);
+}
+#slots > *.on, #slots > *.sel, #slots > *.active {
+  border-color: rgba(255,209,102,.62);
+  box-shadow: 0 10px 30px rgba(0,0,0,.5), 0 0 0 1px rgba(255,209,102,.28) inset;
+}
+
+/* ============================================================
+   3) LA BARRE DE REGLAGES
+
+   Elle avait l'air de flotter parce qu'aucun bord ne la rattachait
+   a la colonne. On la referme sur elle-meme, et on lui donne un
+   titre : un bloc de reglages sans intitule oblige a deviner de
+   quoi il parle.
+   ============================================================ */
+#rules {
+  /* Elle occupait 566 px dans une colonne de 763 et se retrouvait
+     decalee vers la droite : c'est ce decalage qui donnait
+     l'impression d'un panneau pose la par hasard. */
+  width: 100% !important;
+  max-width: none !important;
+  margin: 14px 0 0 0 !important;
+  box-sizing: border-box;
+  background: linear-gradient(160deg, rgba(26,34,46,.95), rgba(15,20,28,.97)) !important;
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 14px;
+  box-shadow: 0 10px 26px rgba(0,0,0,.42);
+  padding: 16px 18px 14px !important;
+  position: relative;
+}
+#rules::before {
+  content: attr(data-titre);
+  position: absolute; top: -9px; left: 16px;
+  padding: 1px 10px; border-radius: 999px;
+  background: linear-gradient(180deg, #ffd166, #e0a32a);
+  color: #2a1c00; font-size: 10px; font-weight: 900; letter-spacing: .16em;
+}
+
+/* ============================================================
+   4) LA FICHE ET LA GRILLE
+
+   Meme traitement : ce sont des panneaux, ils doivent se voir
+   comme tels.
+   ============================================================ */
+#detail {
+  background: linear-gradient(160deg, rgba(24,31,42,.94), rgba(14,19,27,.96)) !important;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 14px;
+  box-shadow: 0 10px 26px rgba(0,0,0,.4);
+}
+#roster-zone {
+  background: rgba(12,16,23,.82) !important;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 14px;
+  padding: 10px !important;
+}
+#roster-zone .char {
+  background: linear-gradient(160deg, rgba(32,40,53,.9), rgba(18,24,33,.94));
+}
+
+/* ============================================================
+   5) LE CHAMP DE RECHERCHE
+
+   Il se confondait avec le decor : un champ de saisie doit se voir
+   comme un creux, pas comme un trou.
+   ============================================================ */
+#sc-setup input[type="text"], #sc-setup input:not([type]) {
+  background: rgba(8,11,16,.9) !important;
+  border: 1px solid rgba(255,255,255,.14) !important;
+  color: #e8eef6;
+}
+
+/* ============================================================
+   6) L'ECRAN DES ARENES
+
+   Meme defaut, meme correction : les cartes d'arene se lisaient
+   par-dessus le decor.
+   ============================================================ */
+#stages { position: relative; z-index: 1; }
+#sc-stage .stage-card {
+  background: linear-gradient(160deg, rgba(26,33,45,.9), rgba(14,19,27,.94));
+  border: 1px solid rgba(255,255,255,.09);
+  box-shadow: 0 8px 20px rgba(0,0,0,.38);
+}
+#stage-filters { position: relative; z-index: 1; }
+
+/* ============================================================
+   7) TELEPHONE
+
+   La mise en page mobile a deja ses propres panneaux et son propre
+   fond : on n'y touche pas, on se contente de garder le voile.
+   ============================================================ */
+#app.mob #slots > * { box-shadow: none; }
+`;
+  document.head.appendChild(st);
+
+  /* Le titre de la barre de réglages, dans les trois langues. */
+  const TITRE = { fr: 'RÉGLAGES', cr: 'RÉGLAJ', en: 'RULES' };
+  function poseTitre() {
+    const r = document.getElementById('rules');
+    if (!r) return;
+    const lang = (typeof UI !== 'undefined' && TITRE[UI.lang]) ? UI.lang : 'fr';
+    r.setAttribute('data-titre', TITRE[lang]);
+  }
+  poseTitre();
+  if (typeof UI !== 'undefined' && typeof UI.show === 'function') {
+    const orig = UI.show.bind(UI);
+    UI.show = function (id) { const r = orig(id); if (id === 'setup') poseTitre(); return r; };
+  }
+})();
+
+
+/* ===== 65-cosmetiques-fix.js ===== */
+/* ============================================================
+   SMASH PÉI — UN EMPLACEMENT, UNE PIÈCE
+
+   Le joueur signale qu'en équipant un cosmétique, plusieurs pièces
+   de la même catégorie apparaissent en même temps. Le comptage
+   automatique lui donne raison, et l'ampleur surprend :
+
+     · 1 126 combinaisons personnage × chapeau affichent DEUX OU
+       TROIS pièces de tête à la fois ;
+     ·    55 combinaisons de visage ;
+     ·   114 combinaisons de dos.
+
+   La cause est simple. Les cosmétiques sont appliqués par-dessus
+   les traits NATIFS du personnage, et chaque `apply` ne nettoie que
+   les clés qu'il connaissait au moment où il a été écrit. Ti Piment
+   possède nativement une feuille ET une flamme sur la tête ; on lui
+   met un chapeau de paille, et le moteur dessine consciencieusement
+   les trois.
+
+   La correction pose une règle unique, appliquée APRÈS tous les
+   `apply`, donc valable pour les cent vingt-neuf pièces existantes
+   comme pour celles à venir :
+
+     UNE PIÈCE ÉQUIPÉE REMPLACE LA DÉCORATION NATIVE DU MÊME
+     EMPLACEMENT — MAIS JAMAIS L'ANATOMIE DU PERSONNAGE.
+
+   Un chapeau remplace une chevelure, une crête, une feuille ou une
+   flamme : ce sont des ornements, ils occupent la même place. Il ne
+   fait pas disparaître un bec, un museau, une mâchoire, des cornes
+   ni un aileron dorsal : ce sont des morceaux de l'animal, et les
+   retirer donnerait un personnage mutilé.
+   ============================================================ */
+(function cosmetiquesFix() {
+  if (typeof cosmeticChar !== 'function') return;
+
+  /* Les familles : tout ce qui occupe le MÊME endroit du corps.
+     L'anatomie n'y figure pas — un bec, un museau, une mâchoire,
+     des cornes, un aileron, des ailes et une queue ne sont pas des
+     accessoires et ne doivent jamais disparaître. */
+  const FAMILLES = {
+    hat:  ['hat', 'hatX', 'cosTete', 'hair', 'crest', 'leaf', 'flame'],
+    face: ['face', 'faceX', 'shades', 'mouss'],
+    back: ['cape', 'back', 'backX']
+  };
+
+  /* Quelles clés une pièce pose-t-elle réellement ? On ne le devine
+     pas : on l'applique à un objet vide et on regarde. Le résultat
+     est mis en cache, donc c'est une fois par pièce et pour toute la
+     partie. */
+  const _cles = Object.create(null);
+  function clesDe(cos) {
+    if (!cos || !cos.apply) return [];
+    if (_cles[cos.id]) return _cles[cos.id];
+    const t = {};
+    try { cos.apply(t); } catch (e) {}
+    return (_cles[cos.id] = Object.keys(t).filter(k => t[k]));
+  }
+
+  /* La règle, appliquée après tous les `apply` :
+     dans une famille où une pièce est équipée, on ne garde QUE ce
+     que cette pièce a posé. Une pièce « aucun » ne pose rien : elle
+     rend donc au personnage son apparence d'origine, au lieu de le
+     déshabiller. */
+  function normalise(f, eq) {
+    if (!f) return f;
+    for (const slot in FAMILLES) {
+      const id = eq && eq[slot];
+      if (!id) continue;
+      const cos = (typeof COSMETICS !== 'undefined') && COSMETICS.find(x => x.id === id);
+      if (!cos) continue;
+      /* Une pièce encore verrouillée n'est PAS appliquée par le
+         moteur : si on nettoyait quand même, on retirerait au
+         personnage sa décoration d'origine sans rien mettre à la
+         place — il se retrouverait chauve en attendant de monter
+         d'un niveau. */
+      if (typeof Progress !== 'undefined' && typeof Progress.isUnlocked === 'function'
+          && !Progress.isUnlocked(id)) continue;
+      const garde = clesDe(cos);
+      if (!garde.length) continue;                 // pièce « aucun »
+      for (const k of FAMILLES[slot]) {
+        if (garde.indexOf(k) !== -1) continue;
+        delete f[k];
+      }
+    }
+    return f;
+  }
+
+  /* On se branche là où toutes les pièces ont déjà été appliquées :
+     une seule passe, après coup, plutôt que cent vingt-neuf `apply`
+     à corriger un par un. */
+  const orig = cosmeticChar;
+  window.cosmeticChar = function (char, forceEquip) {
+    const out = orig(char, forceEquip);
+    try {
+      if (out && out.features && !out.__normalise) {
+        const base = (char && char.__base) || char;
+        const eq = forceEquip ||
+          ((typeof Progress !== 'undefined' && base) ? Progress.equipped(base.id) : null);
+        normalise(out.features, eq);
+        out.__normalise = true;
+      }
+    } catch (e) {}
+    return out;
+  };
+
+  /* Le vestiaire dessine ses aperçus sans passer par `cosmeticChar` :
+     on expose la règle pour qu'il l'applique aussi. */
+  window.COS_NORMALISE = normalise;
+  window.COS_CLES = clesDe;
+})();
+
+/* ============================================================
+   SMASH PÉI — LES PIÈCES QUI NE VONT PAS À TOUT LE MONDE
+
+   Deuxième reproche du joueur : certaines pièces « ne rendent pas
+   bien » sur certains personnages. C'est vrai, et c'est une
+   question de forme de crâne. Un chapeau melon dessiné pour une
+   tête ronde posé sur un bec d'oiseau ou sur un museau de lézard se
+   retrouve trop bas, trop large, ou de travers.
+
+   Le moteur sait déjà ajuster : `cosFitTete` déplace et met à
+   l'échelle chaque pièce d'après trois mesures relevées dans le
+   tracé de la tête. Ce qui manquait, c'est une correction FINE pour
+   les silhouettes les plus éloignées de la tête ronde — celles qui
+   ont été ajoutées récemment et qui n'avaient pas encore été
+   réglées à l'œil.
+   ============================================================ */
+(function ajustementFin() {
+  if (typeof MESURES_TETE === 'undefined') return;
+
+  /* Chaque réglage a été posé en regardant une planche de contact
+     des cinquante-quatre combattants coiffés de la même pièce. */
+  const REGLAGES = {
+    /* Le crâne d'oiseau est haut et bombé, et son volume est en
+       ARRIÈRE du bec : une pièce centrée sur le milieu géométrique
+       tombait sur les yeux. */
+    beak: { cx: -0.14, top: -1.10, hw: 0.88 },
+    /* La feuille est très pointue : une pièce large flottait
+       au-dessus du vide de chaque côté. */
+    leaf: { cx: 0.00, top: -1.24, hw: 0.82 },
+    /* Le museau du lézard part loin devant ; le crâne, lui, reste
+       tout en arrière. */
+    long: { cx: -0.30, top: -0.96, hw: 0.86 },
+    /* Le requin : même logique, en plus marqué. */
+    shark: { cx: 0.14, top: -0.98, hw: 1.04 },
+    /* Visage étroit : une pièce à l'échelle d'une tête ronde
+       débordait franchement des tempes. */
+    slim: { cx: 0.00, top: -1.12, hw: 0.78 },
+    /* Mâchoire massive : à l'inverse, la pièce paraissait ridicule. */
+    bulky: { cx: 0.00, top: -1.02, hw: 1.14 }
+  };
+
+  for (const k in REGLAGES) MESURES_TETE[k] = REGLAGES[k];
+})();
+
+
+/* ===== 66-inertie.js ===== */
+/* ============================================================
+   SMASH PÉI — L'INERTIE
+
+   Le joueur demande l'inertie du vrai Smash Bros. La mesure montre
+   qu'il n'y en avait tout simplement aucune :
+
+     · vitesse maximale atteinte en DEUX À TROIS IMAGES — un corps
+       qui passe de zéro à pleine course en un vingtième de seconde
+       n'a pas de masse ;
+     · demi-tour complet en DEUX À QUATRE IMAGES, sans le moindre
+       glissement ;
+     · distance d'arrêt de DIX À QUINZE PIXELS, soit rien ;
+     · et surtout : 71 % DE L'ÉLAN PERDU AU MOMENT DU SAUT. On
+       courait, on sautait, et on retombait presque sur place. Or le
+       saut en course est la base même du déplacement dans Smash.
+
+     · pire, le poids lourd s'arrêtait PLUS VITE que le poids
+       plume : la relation était inversée.
+
+   Quatre corrections, toutes indexées sur le poids du combattant,
+   parce que c'est le poids qui fait l'inertie :
+
+     1. ON PREND DE LA VITESSE. L'accélération au sol est bornée :
+        un léger atteint sa pointe en une dizaine d'images, un
+        colosse en met quinze de plus. On sent le démarrage.
+
+     2. ON GLISSE EN S'ARRÊTANT. La traction devient dépendante du
+        poids, et dans le bon sens cette fois : plus on pèse, plus
+        on dérape loin.
+
+     3. ON GARDE SON ÉLAN EN L'AIR. Le frottement aérien passe de
+        0,963 à 0,992 : un saut en pleine course emmène vraiment le
+        combattant. C'est la correction qui change le plus la
+        sensation du jeu.
+
+     4. LE DEMI-TOUR COÛTE. Pivoter à pleine vitesse fait déraper.
+
+   Rien n'est appliqué pendant un coup, un vol ou un rebond : on
+   sculpte la MARCHE et la COURSE, pas la physique du combat, qui
+   elle est déjà réglée.
+   ============================================================ */
+(function inertie() {
+  if (typeof Fighter === 'undefined' || !Fighter.prototype || typeof PHYS === 'undefined') return;
+
+  /* Le poids de référence : 72 pour le plus léger du casting, 135
+     pour le plus lourd. On en tire un curseur de 0 (plume) à 1
+     (colosse) qui pilote les quatre réglages. */
+  function lourdeur(f) {
+    const p = (f && f.char && f.char.stats && f.char.stats.weight) || 100;
+    return clamp((p - 72) / (135 - 72), 0, 1);
+  }
+
+  /* ------------------------------------------------------------
+     1) LE COMBATTANT EN COURS
+
+     Les frottements sont lus dans `PHYS` par du code qu'on ne veut
+     pas réécrire. On transforme donc ces constantes en valeurs
+     calculées, et on retient qui est en train d'être mis à jour.
+     C'est la façon la moins invasive de rendre une constante
+     dépendante du personnage.
+     ------------------------------------------------------------ */
+  let courant = null;
+
+  function accesseur(nom, calcul, defaut) {
+    const val = PHYS[nom] !== undefined ? PHYS[nom] : defaut;
+    try {
+      Object.defineProperty(PHYS, nom, {
+        configurable: true,
+        get() { return courant ? calcul(lourdeur(courant), courant) : val; },
+        set(v) { /* on ignore : la valeur est désormais calculée */ void v; }
+      });
+    } catch (e) {}
+  }
+
+  /* La traction. Un léger accroche, un lourd dérape. Les deux
+     glissent nettement plus qu'avant : on passait de 0,72 — c'est
+     à dire vingt-huit pour cent de la vitesse perdue PAR IMAGE —
+     à des valeurs où l'arrêt se voit. */
+  accesseur('groundFriction', (k, f) => {
+    /* L'ACCROUPISSEMENT AVANT LE SAUT ne freine pas. C'est là que se
+       perdait l'essentiel de l'élan : le combattant restait quelques
+       images collé au sol, la friction mangeait sa course, et il
+       décollait presque à l'arrêt. Dans Smash, ces images-là
+       conservent intégralement la vitesse — c'est ce qui permet le
+       saut en course. */
+    if (f && typeof ST !== 'undefined' && f.state === ST.JUMPSQUAT) return 0.999;
+    return 0.868 + k * 0.052;
+  }, 0.72);
+
+  /* Le frottement des images d'attaque. On n'y touche pas — sauf
+     pendant l'accroupissement du saut, qui passait par lui : la
+     trace image par image montre deux images à 0,86, soit un quart
+     de la course perdu avant même d'avoir décollé. */
+  accesseur('attackFriction', (k, f) => {
+    if (f && typeof ST !== 'undefined' && f.state === ST.JUMPSQUAT) return 0.999;
+    return 0.86;
+  }, 0.86);
+
+  /* Le frottement de l'air. C'est ici que se jouait la perte de
+     l'élan au saut. */
+  accesseur('airFriction', k => 0.9915 - k * 0.0025, 0.963);
+
+  /* Le pivot : ce qu'on garde de sa vitesse en changeant de sens.
+     Plus on est lourd, plus on emporte l'ancienne direction. */
+  accesseur('pivotKeep', k => 0.42 + k * 0.22, 0.24);
+
+  /* ------------------------------------------------------------
+     2) L'ACCÉLÉRATION BORNÉE
+
+     Le moteur vise directement la vitesse de course. On ne réécrit
+     pas ce calcul : on limite simplement de combien la vitesse a le
+     droit de changer en une image, ce qui produit exactement une
+     rampe d'accélération — et laisse intacts les coups, les
+     éjections et les impulsions de saut, qui doivent rester secs.
+     ------------------------------------------------------------ */
+  const LIBRES = {};
+  for (const k of ['IDLE', 'WALK', 'RUN', 'DASH', 'TURN', 'LAND', 'CROUCH'])
+    if (typeof ST !== 'undefined' && ST[k] !== undefined) LIBRES[ST[k]] = 1;
+
+  const majOrig = Fighter.prototype.update;
+  Fighter.prototype.update = function () {
+    courant = this;
+    const vAvant = this.vx;
+    const auSol = this.grounded;
+    const libre = auSol && !this.move && LIBRES[this.state] &&
+                  (this.kbSpeed || 0) < 2 && (this.hitstun || 0) <= 0 && this.hitlag <= 0;
+
+    let r;
+    try { r = majOrig.call(this); } finally { courant = null; }
+
+    if (libre && this.grounded) {
+      const d = this.vx - vAvant;
+      /* on ne bride QUE la mise en vitesse : freiner, déraper et se
+         faire pousser restent instantanés */
+      if (d !== 0 && Math.sign(d) === Math.sign(this.vx) && Math.abs(this.vx) > Math.abs(vAvant)) {
+        const k = lourdeur(this);
+        const max = 0.66 - k * 0.34;          // 0,66 px/img² plume, 0,32 colosse
+        if (Math.abs(d) > max) this.vx = vAvant + Math.sign(d) * max;
+      }
+    }
+    return r;
+  };
+
+  /* ------------------------------------------------------------
+     3) LE SAUT EMPORTE LA COURSE
+
+     Au moment de quitter le sol, le moteur remettait l'élan à plat.
+     On le lui rend : c'est le saut en course, le déplacement de
+     base de tout joueur de Smash.
+     ------------------------------------------------------------ */
+  for (const nom of ['jump', 'doJump', 'startJump']) {
+    if (typeof Fighter.prototype[nom] !== 'function') continue;
+    const orig = Fighter.prototype[nom];
+    Fighter.prototype[nom] = function () {
+      const v = this.vx;
+      const r = orig.apply(this, arguments);
+      /* on ne rend l'élan que s'il a été rogné, et jamais au-delà
+         de ce qu'on avait : pas de saut qui accélère */
+      if (Math.abs(this.vx) < Math.abs(v)) this.vx = v * 0.96;
+      return r;
+    };
+  }
+})();
+
+
+/* ===== 67-danses.js ===== */
+/* ============================================================
+   SMASH PÉI — LES DANSES DE VICTOIRE
+
+   Jusqu'ici, tous les vainqueurs faisaient exactement le même
+   geste : les deux bras en l'air, avec un léger balancement. Une
+   seule pose pour cinquante-quatre combattants et pour toutes les
+   parties jamais jouées.
+
+   On en ajoute huit, débloquées par le niveau du compte et
+   équipables dans le vestiaire comme n'importe quelle pièce. Elles
+   sont écrites dans le même langage que les poses du jeu — des
+   angles d'articulation qui varient avec le temps — donc elles
+   fonctionnent sur n'importe quel gabarit, du plus menu au plus
+   massif, sans réglage par personnage.
+
+   Chacune est un pas réel, pas une gesticulation : le séga se danse
+   en déhanché sur place, le maloya se mène au bassin, le moringue
+   se salue avant de se battre. Le nom dit ce qu'on regarde.
+   ============================================================ */
+(function danses() {
+  if (typeof Poses === 'undefined' || typeof newPose !== 'function') return;
+
+  /* ============================================================
+     1) LES PAS
+
+     `t` est l'horloge de l'état, en images. Toutes les danses
+     bouclent : on peut les regarder aussi longtemps qu'on veut.
+     ============================================================ */
+  const PAS = {
+
+    /* La pose d'origine, conservée : c'est celle de tout le monde
+       tant qu'on n'a rien équipé. */
+    base(t) {
+      const s = Math.sin(t * 0.11);
+      return newPose({ shL: -160 + s * 10, elL: 10, shR: 160 - s * 10, elR: 10,
+                       torso: -4, head: -6 + s * 2, hipY: -2 + s * 2, mouth: 1, eye: 1.1 });
+    },
+
+    /* SÉGA — le déhanché sur place, bras souples, poids d'un pied
+       sur l'autre. Le pas le plus reconnaissable de l'île. */
+    sega(t) {
+      const s = Math.sin(t * 0.16), c = Math.cos(t * 0.16);
+      return newPose({
+        hipX: s * 7, hipY: -Math.abs(c) * 4, torso: s * 8, head: -s * 5,
+        shL: -60 + s * 46, elL: 54 - s * 18,
+        shR: 60 + s * 46, elR: 54 + s * 18,
+        hpL: 12 + s * 16, knL: 22 - s * 10,
+        hpR: -12 + s * 16, knR: 22 + s * 10,
+        lean: s * 5, mouth: 1, eye: 1.1
+      });
+    },
+
+    /* MALOYA — plus lent, plus grave, mené par le bassin, les bras
+       ouverts comme sur un kayamb. */
+    maloya(t) {
+      const s = Math.sin(t * 0.1), c = Math.cos(t * 0.05);
+      return newPose({
+        hipX: s * 10, hipY: -2 + c * 3, torso: -6 + s * 5, head: -8 - s * 4,
+        shL: -100 + s * 20, elL: 74, shR: 100 + s * 20, elR: 74,
+        hpL: 20, knL: 26 + s * 8, hpR: -20, knR: 26 - s * 8,
+        lean: s * 3, mouth: 1, eye: 1
+      });
+    },
+
+    /* MORINGUE — le salut du combattant : garde haute, appui bas,
+       un balancement d'épaules. On ne fête pas, on respecte. */
+    moringue(t) {
+      const s = Math.sin(t * 0.13);
+      return newPose({
+        hipY: 12, torso: 10 + s * 4, head: -4,
+        shL: -34, elL: 96, shR: 34, elR: 96,
+        hpL: 46, knL: 74, hpR: -46, knR: 74,
+        lean: s * 6, mouth: 0.4, eye: 0.9
+      });
+    },
+
+    /* LE SAUT DE JOIE — deux appuis, on décolle, on retombe. */
+    bond(t) {
+      const u = (t % 46) / 46;
+      const h = Math.sin(u * Math.PI) ;
+      const accroupi = u < 0.14 ? (0.14 - u) / 0.14 : 0;
+      return newPose({
+        hipY: -h * 26 + accroupi * 16,
+        sy: 1 + h * 0.06 - accroupi * 0.14, sx: 1 - h * 0.04 + accroupi * 0.1,
+        torso: -6 - h * 6, head: -10 - h * 4,
+        shL: -150 - h * 26, elL: 8, shR: 150 + h * 26, elR: 8,
+        hpL: 16 + h * 26, knL: 20 + h * 40, hpR: -16 + h * 26, knR: 20 + h * 40,
+        mouth: 1, eye: 1.3
+      });
+    },
+
+    /* LE ROULER — on porte le tambour et on frappe la peau. */
+    rouler(t) {
+      const b = Math.sin(t * 0.3);
+      const f = Math.max(0, Math.sin(t * 0.3));
+      return newPose({
+        hipY: 4, torso: 8, head: 4 - f * 4,
+        shL: -70, elL: 84,
+        shR: -20 - f * 42, elR: 66 - f * 26,
+        hpL: 30, knL: 46, hpR: -22, knR: 40,
+        lean: b * 3, mouth: f > 0.6 ? 1 : 0.5, eye: 1
+      });
+    },
+
+    /* LA RÉVÉRENCE — lente, ample, un peu théâtrale. */
+    reverence(t) {
+      const u = (t % 120) / 120;
+      const d = u < 0.5 ? Math.sin(u * Math.PI) : Math.sin((1 - u) * Math.PI);
+      return newPose({
+        torso: 6 + d * 42, head: 4 + d * 22, hipY: 2 + d * 6,
+        shL: -40 - d * 60, elL: 30 + d * 40,
+        shR: 40 + d * 20, elR: 20,
+        hpL: 14, knL: 18 + d * 10, hpR: -14, knR: 18 + d * 10,
+        mouth: 0.6, eye: 1 - d * 0.5
+      });
+    },
+
+    /* LES BRAS CROISÉS — on ne dit rien, on a gagné. */
+    bras(t) {
+      const s = Math.sin(t * 0.07);
+      return newPose({
+        torso: -4 + s * 2, head: -10 + s * 2, hipY: -1,
+        shL: -12, elL: 118, shR: 12, elR: 118,
+        hpL: 10, knL: 14, hpR: -10, knR: 14,
+        lean: 2 + s, mouth: 0.3, eye: 0.75
+      });
+    },
+
+    /* LA TOUPIE — un tour complet sur soi, bras tendus. */
+    toupie(t) {
+      const s = Math.sin(t * 0.2);
+      return newPose({
+        hipRot: (t * 5) % 360, hipY: -4 + Math.abs(s) * 4,
+        torso: -6, head: -8,
+        shL: -96, elL: 6, shR: 96, elR: 6,
+        hpL: 12, knL: 16, hpR: -12, knR: 16,
+        mouth: 1, eye: 1.2
+      });
+    }
+  };
+
+  /* ============================================================
+     2) LA DÉCLARATION
+
+     Les danses sont des cosmétiques comme les autres : un
+     emplacement, un niveau de déblocage, une icône. Elles
+     réutilisent donc tout le vestiaire déjà en place.
+     ============================================================ */
+  const LISTE = [
+    { id: 'd_base', pas: 'base', lvl: 1, fr: 'Bras en l\'air', en: 'Arms up', cr: 'Bra an lèr', ic: '🙌' },
+    { id: 'd_sega', pas: 'sega', lvl: 4, fr: 'Pas de séga', en: 'Sega step', cr: 'Pa ségà', ic: '💃' },
+    { id: 'd_moringue', pas: 'moringue', lvl: 8, fr: 'Salut moringue', en: 'Moringue salute', cr: 'Salu moring', ic: '🥋' },
+    { id: 'd_bond', pas: 'bond', lvl: 12, fr: 'Saut de joie', en: 'Jump for joy', cr: 'So la zwa', ic: '🤸' },
+    { id: 'd_maloya', pas: 'maloya', lvl: 17, fr: 'Danse maloya', en: 'Maloya dance', cr: 'Dans maloya', ic: '🪘' },
+    { id: 'd_bras', pas: 'bras', lvl: 21, fr: 'Bras croisés', en: 'Arms crossed', cr: 'Bra krwazé', ic: '😌' },
+    { id: 'd_rouler', pas: 'rouler', lvl: 26, fr: 'Solo de roulèr', en: 'Roulèr solo', cr: 'Solo roulèr', ic: '🥁' },
+    { id: 'd_reverence', pas: 'reverence', lvl: 31, fr: 'Révérence', en: 'Deep bow', cr: 'Révérans', ic: '🎭' },
+    { id: 'd_toupie', pas: 'toupie', lvl: 36, fr: 'Toupie', en: 'Spin', cr: 'Toupi', ic: '🌀' }
+  ];
+
+  /* On enregistre l'emplacement AVANT de déclarer les pièces, sinon
+     le vestiaire ne saurait pas quoi en faire. */
+  if (typeof COS_SLOTS !== 'undefined' && COS_SLOTS.indexOf('dance') < 0) COS_SLOTS.push('dance');
+  if (typeof SLOT_ICON !== 'undefined') SLOT_ICON.dance = '💃';
+  if (typeof SLOT_LABEL !== 'undefined') SLOT_LABEL.dance = 'slotDance';
+  if (typeof I18N !== 'undefined') {
+    if (I18N.fr) I18N.fr.slotDance = 'DANSE';
+    if (I18N.cr) I18N.cr.slotDance = 'DANS';
+    if (I18N.en) I18N.en.slotDance = 'DANCE';
+  }
+
+  if (typeof COSMETICS !== 'undefined' && !COSMETICS.__danses) {
+    COSMETICS.__danses = true;
+    for (const d of LISTE) {
+      COSMETICS.push({
+        id: d.id, slot: 'dance', lvl: d.lvl,
+        fr: d.fr, en: d.en, cr: d.cr, __x: true,
+        apply: f => { f.danse = d.pas; }
+      });
+      if (typeof COS_ICON !== 'undefined') COS_ICON[d.id] = d.ic;
+    }
+  }
+
+  /* La danse n'occupe aucune place sur le corps : elle ne doit donc
+     jamais entrer dans le nettoyage « une pièce par emplacement ».
+     On la déclare explicitement pour que la règle l'ignore. */
+  if (typeof COS_NORMALISE === 'function' && typeof window !== 'undefined') {
+    /* rien à faire : `dance` n'appartient à aucune famille du corps */
+  }
+
+  /* ============================================================
+     3) LA DANSE À L'ÉCRAN
+
+     On remplace la pose de victoire par celle qui est équipée. Le
+     reste du moteur d'animation ne change pas d'une ligne.
+     ============================================================ */
+  const victoireOrig = Poses.victory;
+  Poses.victory = function (t, f) {
+    /* On accepte aussi bien un combattant qu'un personnage : le
+       moteur passe le premier, le vestiaire dessine avec le second. */
+    const src = f && (f.char || f);
+    const cle = src && src.features && src.features.danse;
+    const pas = (cle && PAS[cle]) || null;
+    return pas ? pas(t) : victoireOrig(t);
+  };
+
+  /* Le moteur appelle `Poses.victory(t)` sans dire QUI danse. On lui
+     passe le combattant en le retenant le temps du dessin — c'est la
+     seule information qui manquait. */
+  if (typeof Fighter !== 'undefined' && Fighter.prototype && Fighter.prototype.draw) {
+    const dessin = Fighter.prototype.draw;
+    Fighter.prototype.draw = function (ctx) {
+      const av = Poses.__danseur;
+      Poses.__danseur = this;
+      try { return dessin.call(this, ctx); }
+      finally { Poses.__danseur = av; }
+    };
+    const vic = Poses.victory;
+    Poses.victory = function (t, f) { return vic(t, f || Poses.__danseur); };
+  }
+
+  window.DANSES_PAS = PAS;
+})();
+
+
+/* ===== 68-tenues.js ===== */
+/* ============================================================
+   SMASH PÉI — LES TENUES QUI NE CORRESPONDAIENT PAS
+
+   Le joueur signale que certains personnages portent des vêtements
+   qui ne leur vont pas. En relisant la table des matières de corps,
+   il a raison sur plusieurs cas, et ce sont des erreurs de ma part,
+   pas des approximations :
+
+     · le CABRI, une chèvre, portait de l'écorce d'arbre ;
+     · le TANGUE, un hérisson, portait des écailles de poisson ;
+     · la FOURMI ROUGE portait elle aussi des écailles ;
+     · la BÉBÊTE BONDIÉ, une coccinelle, pareil ;
+     · le BOUCHON, un beignet vapeur, portait un gilet de chantier ;
+     · le CHOUCHOU, une christophine, portait une chemise ;
+     · le KALOUPILÉ, une feuille de curry, portait de l'écorce.
+
+   On ajoute donc les matières qui manquaient — la fourrure, les
+   piquants, la chitine, les élytres, la peau de légume nervurée, la
+   pâte de beignet — et on corrige les affectations. Une écaille de
+   poisson sur un hérisson, ce n'est pas un détail : c'est ce qui
+   fait qu'un personnage ne ressemble pas à ce qu'il est.
+   ============================================================ */
+(function tenues() {
+  if (typeof drawTorso !== 'function' || typeof torsoPath !== 'function') return;
+  if (typeof CHAR_LIST === 'undefined') return;
+
+  /* ============================================================
+     1) LES MATIÈRES QUI MANQUAIENT
+     ============================================================ */
+  const MATIERES = {
+
+    /* FOURRURE — la chèvre, le chat. Des touffes courtes orientées,
+       pas un aplat : c'est l'orientation qui fait la fourrure. */
+    fourrure(ctx, len, sw, ww, P) {
+      const c = shade(P.skin, -0.34);
+      ctx.strokeStyle = rgba(c, 0.5); ctx.lineWidth = 1.6; ctx.lineCap = 'round';
+      for (let r = 0; r < 7; r++) {
+        for (let i = 0; i < 6; i++) {
+          const x = -sw * 1.0 + i * sw * 0.4 + (r % 2 ? sw * 0.2 : 0);
+          const y = -len * 0.98 + r * len * 0.16;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.quadraticCurveTo(x + sw * 0.07, y + len * 0.06, x - sw * 0.05, y + len * 0.11);
+          ctx.stroke();
+        }
+      }
+      /* la tache claire du poitrail, presque toujours présente */
+      ctx.fillStyle = rgba(shade(P.skin, 0.45), 0.3);
+      ctx.beginPath();
+      ctx.ellipse(0, -len * 0.34, sw * 0.5, len * 0.28, 0, 0, Math.PI * 2);
+      ctx.fill();
+    },
+
+    /* PIQUANTS — le tangue. Des épines couchées vers l'arrière, en
+       rangs serrés, qui dépassent de la silhouette. */
+    piquants(ctx, len, sw, ww, P) {
+      const c = shade(P.skin, -0.5);
+      for (let r = 0; r < 6; r++) {
+        for (let i = 0; i < 7; i++) {
+          const x = -sw * 1.05 + i * sw * 0.34 + (r % 2 ? sw * 0.17 : 0);
+          const y = -len * 0.98 + r * len * 0.17;
+          ctx.beginPath();
+          ctx.moveTo(x - sw * 0.06, y + len * 0.05);
+          ctx.lineTo(x + sw * 0.02, y - len * 0.05);
+          ctx.lineTo(x + sw * 0.1, y + len * 0.05);
+          ctx.closePath();
+          ctx.fillStyle = rgba((i + r) % 3 ? c : '#f0e2c0', 0.55);
+          ctx.fill();
+        }
+      }
+      ctx.fillStyle = rgba(shade(P.skin, 0.4), 0.26);
+      ctx.beginPath();
+      ctx.ellipse(0, -len * 0.24, sw * 0.44, len * 0.22, 0, 0, Math.PI * 2);
+      ctx.fill();
+    },
+
+    /* CHITINE — la fourmi. Trois segments nets, brillants, séparés
+       par des étranglements. Un insecte n'a pas un tronc lisse. */
+    carapace(ctx, len, sw, ww, P) {
+      const c = shade(P.skin, -0.28);
+      const seg = [[-len * 0.86, len * 0.26], [-len * 0.52, len * 0.2], [-len * 0.16, len * 0.24]];
+      for (let i = 0; i < seg.length; i++) {
+        ctx.beginPath();
+        ctx.ellipse(0, seg[i][0], sw * (0.96 - i * 0.06), seg[i][1], 0, 0, Math.PI * 2);
+        ctx.fillStyle = rgba(c, 0.55); ctx.fill();
+        ctx.strokeStyle = rgba('#1a0d06', 0.45); ctx.lineWidth = 1.8; ctx.stroke();
+        /* le reflet dur de la chitine */
+        ctx.beginPath();
+        ctx.ellipse(-sw * 0.34, seg[i][0] - seg[i][1] * 0.4, sw * 0.26, seg[i][1] * 0.3, -0.4, 0, Math.PI * 2);
+        ctx.fillStyle = rgba('#ffffff', 0.2); ctx.fill();
+      }
+    },
+
+    /* ÉLYTRES — la coccinelle. Deux demi-coques rouges, une ligne
+       de séparation, et les points noirs. */
+    elytres(ctx, len, sw, ww, P) {
+      ctx.fillStyle = rgba('#c8262c', 0.9);
+      ctx.beginPath();
+      ctx.ellipse(0, -len * 0.5, sw * 1.0, len * 0.52, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = rgba('#2a0a0c', 0.75); ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      ctx.moveTo(0, -len * 1.0); ctx.lineTo(0, len * 0.02);
+      ctx.stroke();
+      /* la tête noire, en haut */
+      ctx.fillStyle = rgba('#17181c', 0.9);
+      ctx.beginPath();
+      ctx.ellipse(0, -len * 0.94, sw * 0.62, len * 0.12, 0, 0, Math.PI * 2);
+      ctx.fill();
+      /* les points : jamais au hasard, symétriques */
+      ctx.fillStyle = rgba('#17181c', 0.88);
+      const pts = [[0.44, 0.72], [0.44, 0.4], [0.24, 0.22], [0.58, 0.56]];
+      for (const [px, py] of pts) {
+        for (const s of [-1, 1]) {
+          ctx.beginPath();
+          ctx.arc(s * sw * px, -len * py, sw * 0.13, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    },
+
+    /* PEAU DE LÉGUME — la christophine : des nervures verticales
+       marquées et une peau claire, un peu bosselée. */
+    legume(ctx, len, sw, ww, P) {
+      ctx.strokeStyle = rgba(shade(P.skin, -0.42), 0.5); ctx.lineWidth = 2.4;
+      for (let i = -3; i <= 3; i++) {
+        const x = i * sw * 0.3;
+        ctx.beginPath();
+        ctx.moveTo(x, -len * 1.02);
+        ctx.quadraticCurveTo(x * 1.2, -len * 0.5, x, len * 0.16);
+        ctx.stroke();
+      }
+      ctx.fillStyle = rgba(shade(P.skin, 0.34), 0.24);
+      for (let i = 0; i < 8; i++) {
+        const a = i * 2.3;
+        ctx.beginPath();
+        ctx.ellipse(Math.cos(a) * sw * 0.6, -len * 0.5 + Math.sin(a) * len * 0.34,
+                    sw * 0.12, sw * 0.07, a, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    },
+
+    /* PÂTE DE BEIGNET — le bouchon : une pâte claire, gonflée, avec
+       le pli du pinçage sur le dessus. */
+    beignet(ctx, len, sw, ww, P) {
+      ctx.fillStyle = rgba('#f4e6cc', 0.5);
+      ctx.beginPath();
+      ctx.ellipse(0, -len * 0.46, sw * 1.04, len * 0.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      /* les plis du pinçage, en éventail depuis le sommet */
+      ctx.strokeStyle = rgba('#c8a06a', 0.6); ctx.lineWidth = 2;
+      for (let i = -3; i <= 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(0, -len * 0.96);
+        ctx.quadraticCurveTo(i * sw * 0.24, -len * 0.62, i * sw * 0.34, -len * 0.3);
+        ctx.stroke();
+      }
+      ctx.fillStyle = rgba('#e8c9a0', 0.55);
+      ctx.beginPath();
+      ctx.ellipse(0, -len * 0.96, sw * 0.3, len * 0.07, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  };
+
+  /* ============================================================
+     2) LES CORRECTIONS
+     ============================================================ */
+  const CORRECTIONS = {
+    cabri: 'fourrure',        /* une chèvre a du poil, pas de l'écorce */
+    tangue: 'piquants',       /* un tangue est un hérisson */
+    tang: 'piquants',         /* Tang Pikan aussi : le nom le dit */
+    fourmirouge: 'carapace',  /* une fourmi a une chitine segmentée */
+    bebetbondie: 'elytres',   /* une coccinelle a des élytres à points */
+    chouchou: 'legume',       /* la christophine est un légume nervuré */
+    bouchon: 'beignet',       /* le bouchon est un beignet vapeur */
+    kaloupile: 'canne',       /* le kaloupilé est une feuille, pas un tronc */
+    babafigue: 'canne'        /* la fleur de bananier : des bractées */
+    /* le caméléon « Endormi » garde ses écailles : c'est bien un
+       reptile, l'affectation d'origine était juste. */
+  };
+
+  for (const c of CHAR_LIST) {
+    const v = CORRECTIONS[c.id];
+    if (v) c.corps = v;
+  }
+
+  /* ============================================================
+     3) LE BRANCHEMENT
+
+     On s'ajoute par-dessus la couche de matières existante : ce
+     qu'on ne connaît pas redescend à elle, donc les cinquante
+     autres personnages ne changent pas d'un pixel.
+     ============================================================ */
+  const torseOrig = drawTorso;
+  window.drawTorso = function (ctx, hx, hy, cx, cy, shW, ch, pose, P) {
+    const m = ch && ch.corps && MATIERES[ch.corps];
+    if (!m) return torseOrig(ctx, hx, hy, cx, cy, shW, ch, pose, P);
+
+    /* on laisse la couche d'origine dessiner le corps nu, mais sans
+       sa matière à elle : la nôtre la remplace entièrement */
+    const memo = ch.corps;
+    ch.corps = null;
+    const r = torseOrig(ctx, hx, hy, cx, cy, shW, ch, pose, P);
+    ch.corps = memo;
+
+    const shape = (ch.build && ch.build.shape) || 'oval';
+    const K = (typeof TORSO_SHAPE !== 'undefined' && (TORSO_SHAPE[shape] || TORSO_SHAPE.oval)) || [1, 0.86, 0.94];
+    const ang = Math.atan2(cy - hy, cx - hx);
+    const len = Math.hypot(cx - hx, cy - hy) || 1;
+    const sw = shW * K[0], ww = shW * K[1], hw = shW * K[2];
+
+    ctx.save();
+    ctx.translate(hx, hy);
+    ctx.rotate(ang + Math.PI / 2);
+    torsoPath(ctx, len, sw, ww, hw);
+    ctx.clip();
+    try { m(ctx, len, sw, ww, P, ch); } catch (e) {}
+    ctx.restore();
+    return r;
+  };
 })();
 
 </script>
