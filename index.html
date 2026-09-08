@@ -23985,12 +23985,17 @@ Object.assign(UI, {
       ${a.res.unlocked.length ? `<div class="unlocks">${a.res.unlocked.map(c =>
         `<div class="unlock"><b>${T('newItem')}</b><span>${this.lang === 'en' ? c.en : c.fr}</span></div>`).join('')}</div>` : ''}`;
     // animation de remplissage
-    let k = 0;
+    /* Le remplissage avancait de 2 % PAR IMAGE AFFICHEE : deux
+       secondes sur un ecran 60 Hz, une seule sur un ecran 120 Hz. On
+       le pilote au temps reel, pour que la barre mette la meme duree
+       partout. */
     const target = i.pct;
     const start = a.res.levelUp ? 0 : a.from;
+    const duree = 1700;
+    const t0 = performance.now();
     const step = () => {
-      k += 0.02;
-      const v = start + (target - start) * easeOut(Math.min(1, k));
+      const k = Math.min(1, (performance.now() - t0) / duree);
+      const v = start + (target - start) * easeOut(k);
       this.renderXp('res-xp-bar', v);
       if (k < 1 && this.screen === 'results') requestAnimationFrame(step);
     };
@@ -37018,10 +37023,14 @@ const Bilan = {
     setTimeout(() => {
       const cible = Progress.info().pct;
       const start = a.res.levelUp ? 0 : a.from;
-      let k = 0;
+      /* meme correction que dans 11-ui2 : au temps reel, pas a
+         l'image, sinon la barre se remplit deux fois plus vite sur un
+         ecran 120 Hz */
+      const dur = 1550;
+      const tb = performance.now();
       const step = () => {
-        k += 0.022;
-        UI.renderXp('res-xp-bar', start + (cible - start) * easeOut(Math.min(1, k)));
+        const k = Math.min(1, (performance.now() - tb) / dur);
+        UI.renderXp('res-xp-bar', start + (cible - start) * easeOut(k));
         if (k < 1 && UI.screen === 'results') requestAnimationFrame(step);
       };
       step();
@@ -43973,47 +43982,90 @@ const Visite = {
 
     /* La pose d'origine, conservée : c'est celle de tout le monde
        tant qu'on n'a rien équipé. */
+    /* Les bras en l'air. C'etait un balancement continu, si doux
+       qu'il se confondait avec la moitie des autres pas. On lui rend
+       un TEMPS FORT : les bras poussent vers le ciel sur le temps,
+       les genoux plient entre deux. Une danse se reconnait a son
+       rythme avant de se reconnaitre a sa forme. */
     base(t) {
-      const s = Math.sin(t * 0.11);
-      return newPose({ shL: -160 + s * 10, elL: 10, shR: 160 - s * 10, elR: 10,
-                       torso: -4, head: -6 + s * 2, hipY: -2 + s * 2, mouth: 1, eye: 1.1 });
+      /* La poussée MONTE vite et TIENT : les bras restent tendus en
+         l'air les trois quarts du temps. C'est une pose de vainqueur,
+         pas un balancement — et cette tenue est ce qui la distingue
+         des pas qui, eux, oscillent sans arrêt. */
+      const u = (t % 44) / 44;
+      const monte = u < 0.14 ? u / 0.14 : (u < 0.78 ? 1 : 1 - (u - 0.78) / 0.22);
+      const s = Math.sin(t * 0.08);
+      return newPose({
+        shL: -118 - monte * 62, elL: 40 - monte * 34,
+        shR: 118 + monte * 62, elR: 40 - monte * 34,
+        torso: -2 - monte * 7, head: -4 - monte * 10,
+        hipY: -1 - monte * 8, sy: 1 + monte * 0.03,
+        hpL: 8, knL: 14 + (1 - monte) * 12, hpR: -8, knR: 14 + (1 - monte) * 12,
+        lean: s * 2, mouth: 1, eye: 1.1 + monte * 0.3
+      });
     },
 
-    /* SÉGA — le déhanché sur place, bras souples, poids d'un pied
-       sur l'autre. Le pas le plus reconnaissable de l'île. */
+    /* SÉGA — le déhanché. La hanche CLAQUE d'un côté puis de l'autre
+       et s'y tient un temps ; les bras restent BAS, souples, près des
+       hanches. C'est cette bande basse qui le distingue du maloya,
+       qui se danse bras ouverts à l'horizontale. */
     sega(t) {
-      const s = Math.sin(t * 0.16), c = Math.cos(t * 0.16);
+      const u = (t % 26) / 26;
+      /* un déhanché n'est pas un sinus : il tient en bout de course */
+      const s = Math.tanh(Math.sin(u * Math.PI * 2) * 2.2);
+      const c = Math.cos(u * Math.PI * 4);
       return newPose({
-        hipX: s * 7, hipY: -Math.abs(c) * 4, torso: s * 8, head: -s * 5,
-        shL: -60 + s * 46, elL: 54 - s * 18,
-        shR: 60 + s * 46, elR: 54 + s * 18,
-        hpL: 12 + s * 16, knL: 22 - s * 10,
-        hpR: -12 + s * 16, knR: 22 + s * 10,
-        lean: s * 5, mouth: 1, eye: 1.1
+        hipX: s * 11, hipY: -3 - Math.abs(c) * 14, sy: 1 + Math.abs(c) * 0.04,
+        torso: s * 6, head: -s * 7,
+        shL: -22 + s * 20, elL: 34 - s * 14,
+        shR: 22 + s * 20, elR: 34 + s * 14,
+        hpL: 10 + s * 26, knL: 26 - s * 12 + Math.abs(c) * 18,
+        hpR: -10 + s * 26, knR: 26 + s * 12 + Math.abs(c) * 18,
+        lean: s * 8, mouth: 1, eye: 1.1
       });
     },
 
-    /* MALOYA — plus lent, plus grave, mené par le bassin, les bras
-       ouverts comme sur un kayamb. */
+    /* MALOYA — le corps est LENT et il RESPIRE : les genoux plient et
+       se tendent sur un cycle long, tout le buste monte et descend.
+       Par-dessus, les mains tremblent vite sur le kayamb. Deux
+       tempos superposés et une amplitude verticale ample : c'est ce
+       qui la sépare de la cadence mbiwi, qui ne bouge que les
+       poignets et reste plantée à la même hauteur. */
     maloya(t) {
-      const s = Math.sin(t * 0.1), c = Math.cos(t * 0.05);
+      /* Le maloya se MÈNE AU BASSIN : le bassin décrit un cercle
+         lent, tandis que les mains tremblent vite sur le kayamb.
+         Deux tempos superposés et une rotation du bassin — deux
+         signatures que rien d'autre n'utilise dans le jeu. (Une
+         première version le faisait s'accroupir profondément : la
+         mesure a montré qu'il devenait alors le jumeau du pas du
+         porteur, qui est exactement cela.) */
+      const a = t * 0.048;
+      const vif = Math.sin(t * 0.55);
       return newPose({
-        hipX: s * 10, hipY: -2 + c * 3, torso: -6 + s * 5, head: -8 - s * 4,
-        shL: -100 + s * 20, elL: 74, shR: 100 + s * 20, elR: 74,
-        hpL: 20, knL: 26 + s * 8, hpR: -20, knR: 26 - s * 8,
-        lean: s * 3, mouth: 1, eye: 1
+        hipX: Math.cos(a) * 18, hipY: -4 + Math.sin(a) * 7,
+        hipRot: Math.sin(a) * 17,
+        torso: -5 + Math.cos(a) * 7, head: -8 - Math.sin(a) * 5,
+        shL: -92, elL: 74 + vif * 16,
+        shR: 92, elR: 74 - vif * 16,
+        hpL: 24, knL: 34, hpR: -24, knR: 34,
+        lean: Math.cos(a) * 6, mouth: 1, eye: 1
       });
     },
 
-    /* MORINGUE — le salut du combattant : garde haute, appui bas,
-       un balancement d'épaules. On ne fête pas, on respecte. */
+    /* MORINGUE — le salut du combattant. Garde haute, appui TRÈS
+       bas, et un transfert de poids d'un pied sur l'autre avec
+       roulement d'épaules. La mesure le confondait avec les bras
+       croisés : on creuse donc la position, qui est justement ce
+       qu'un moringueur travaille. On ne fête pas, on respecte. */
     moringue(t) {
-      const s = Math.sin(t * 0.13);
+      const s = Math.sin(t * 0.085);
+      const ep = Math.sin(t * 0.17);                  // le roulement d'épaules
       return newPose({
-        hipY: 12, torso: 10 + s * 4, head: -4,
-        shL: -34, elL: 96, shR: 34, elR: 96,
-        hpL: 46, knL: 74, hpR: -46, knR: 74,
-        lean: s * 6, mouth: 0.4, eye: 0.9
+        hipY: 26 + Math.abs(s) * 6, sy: 0.95,
+        torso: 14 + s * 7, head: -2 - ep * 5,
+        shL: -30 + ep * 22, elL: 104, shR: 30 + ep * 22, elR: 104,
+        hpL: 58 + s * 16, knL: 96, hpR: -58 + s * 16, knR: 96,
+        lean: s * 10, mouth: 0.4, eye: 0.9
       });
     },
 
@@ -44032,19 +44084,6 @@ const Visite = {
       });
     },
 
-    /* LE ROULER — on porte le tambour et on frappe la peau. */
-    rouler(t) {
-      const b = Math.sin(t * 0.3);
-      const f = Math.max(0, Math.sin(t * 0.3));
-      return newPose({
-        hipY: 4, torso: 8, head: 4 - f * 4,
-        shL: -70, elL: 84,
-        shR: -20 - f * 42, elR: 66 - f * 26,
-        hpL: 30, knL: 46, hpR: -22, knR: 40,
-        lean: b * 3, mouth: f > 0.6 ? 1 : 0.5, eye: 1
-      });
-    },
-
     /* LA RÉVÉRENCE — lente, ample, un peu théâtrale. */
     reverence(t) {
       const u = (t % 120) / 120;
@@ -44058,14 +44097,20 @@ const Visite = {
       });
     },
 
-    /* LES BRAS CROISÉS — on ne dit rien, on a gagné. */
+    /* LES BRAS CROISÉS — on ne dit rien, on a gagné. Elle est
+       VOLONTAIREMENT la plus immobile du jeu : c'est sa raison
+       d'être, et c'est aussi ce qui la distingue une fois qu'on a
+       creusé le moringue. Un seul haussement d'épaules toutes les
+       trois secondes, et un regard qui part sur le côté. */
     bras(t) {
-      const s = Math.sin(t * 0.07);
+      const u = (t % 190) / 190;
+      const hauss = u > 0.62 && u < 0.76 ? Math.sin((u - 0.62) / 0.14 * Math.PI) : 0;
+      const regard = Math.sin(t * 0.02);
       return newPose({
-        torso: -4 + s * 2, head: -10 + s * 2, hipY: -1,
-        shL: -12, elL: 118, shR: 12, elR: 118,
-        hpL: 10, knL: 14, hpR: -10, knR: 14,
-        lean: 2 + s, mouth: 0.3, eye: 0.75
+        torso: -3, head: -11 + regard * 4, hipY: -1 - hauss * 4,
+        shL: -6 - hauss * 22, elL: 128, shR: 6 + hauss * 22, elR: 128,
+        hpL: 8, knL: 12, hpR: -8, knR: 12,
+        lean: 2, mouth: 0.25, eye: 0.7
       });
     },
 
@@ -44096,7 +44141,6 @@ const Visite = {
     { id: 'd_bond', pas: 'bond', lvl: 12, fr: 'Saut de joie', en: 'Jump for joy', cr: 'So la zwa', ic: '🤸' },
     { id: 'd_maloya', pas: 'maloya', lvl: 17, fr: 'Danse maloya', en: 'Maloya dance', cr: 'Dans maloya', ic: '🪘' },
     { id: 'd_bras', pas: 'bras', lvl: 21, fr: 'Bras croisés', en: 'Arms crossed', cr: 'Bra krwazé', ic: '😌' },
-    { id: 'd_rouler', pas: 'rouler', lvl: 26, fr: 'Solo de roulèr', en: 'Roulèr solo', cr: 'Solo roulèr', ic: '🥁' },
     { id: 'd_reverence', pas: 'reverence', lvl: 31, fr: 'Révérence', en: 'Deep bow', cr: 'Révérans', ic: '🎭' },
     { id: 'd_toupie', pas: 'toupie', lvl: 36, fr: 'Toupie', en: 'Spin', cr: 'Toupi', ic: '🌀' }
   ];
@@ -44172,6 +44216,24 @@ const Visite = {
     const vic = Poses.victory;
     Poses.victory = function (t, f) { return vic(t, f || Poses.__danseur); };
   }
+
+  /* LE SOLO DE ROULÈR A ÉTÉ RETIRÉ à la demande du joueur. Quelqu'un
+     qui l'avait équipé garderait un identifiant qui ne correspond
+     plus à rien : le moteur retomberait sur la pose commune sans rien
+     dire, et le joueur croirait à un bogue. On lui rend donc
+     explicitement une danse valide, une fois, au chargement. */
+  try {
+    if (typeof Save !== 'undefined' && Save.data && Save.data.equipped) {
+      for (const k in Save.data.equipped) {
+        const e = Save.data.equipped[k];
+        if (e && e.dance === 'd_rouler') e.dance = 'd_base';
+      }
+      if (Save.data.unlocked) {
+        const i = Save.data.unlocked.indexOf('d_rouler');
+        if (i >= 0) Save.data.unlocked.splice(i, 1);
+      }
+    }
+  } catch (e) {}
 
   window.DANSES_PAS = PAS;
   /* la correspondance pièce → pas, dont le vestiaire a besoin pour
@@ -44465,6 +44527,14 @@ const Visite = {
   let boucle = 0;
   let horloge = 0;
 
+  /* Le nombre de pas de 1/60 s ecoules depuis le dernier dessin. Par
+     defaut on avance d'un pas par image affichee — c'est juste sur un
+     ecran 60 Hz. Le module de cadence (74) remplace cette fonction par
+     une vraie horloge des qu'il est charge, et l'apercu garde alors sa
+     vitesse quelle que soit la frequence de l'ecran. */
+  let pasHorloge = () => 1;
+  window.VESTIAIRE_HORLOGE = function (h) { if (typeof h === 'function') pasHorloge = h; };
+
   function visible() {
     const sc = document.getElementById('sc-locker');
     return !!(sc && sc.classList.contains('on'));
@@ -44475,8 +44545,9 @@ const Visite = {
     if (!visible()) return;
     const cv = document.getElementById('lockercv');
     const ch = UI.lockerChar;
-    if (cv && ch) {
-      horloge++;
+    const av = pasHorloge();
+    if (cv && ch && av > 0) {
+      horloge += av;
       let perso;
       try { perso = cosmeticChar(ch, Progress.equipped(ch.id)); } catch (e) { perso = ch; }
 
@@ -44590,357 +44661,6 @@ const Visite = {
   document.head.appendChild(st);
 
   window.VESTIAIRE_ANIME = reveille;
-})();
-
-
-/* ===== 70-memes.js ===== */
-/* ============================================================
-   SMASH PÉI — LES MOTS DU PAYS, DITS À VOIX HAUTE
-
-   Première version : un bandeau écrit apparaissait quatre ou cinq
-   fois par combat. Le joueur a corrigé le tir sur les deux points :
-
-       « Il faut que les mèmes soient des voix qu'on entend (avec un
-         bon accent créole réunionnais) et non des écritures ! Il faut
-         mettre moins de mèmes (uniquement à des moments importants
-         dans la partie). »
-
-   Deux changements, donc, et le second compte autant que le premier.
-
-   1) ON L'ENTEND, ON NE LE LIT PLUS.
-
-   La voix passe par la synthèse vocale du navigateur, avec une voix
-   FRANÇAISE — et c'est le bon choix, pas un pis-aller : le créole
-   réunionnais est une langue à base lexicale française, donc une
-   voix française qui lit une graphie adaptée sort quelque chose de
-   très proche. Tout le travail est dans cette graphie. On n'écrit
-   pas « zot la vu », qu'une voix française prononcerait « zo la
-   vu », mais « zotte la vu ». Chaque réplique porte donc deux
-   écritures : celle qu'un Réunionnais reconnaît, et celle qu'il faut
-   donner à la machine pour qu'elle la dise juste.
-
-   S'y ajoutent la prosodie — le créole se parle plus vite et plus
-   haut que le français standard — et une voix légèrement différente
-   par combattant, pour que ce soit LE personnage qui parle.
-
-   Le bandeau écrit ne disparaît pas complètement : il reste le
-   filet de sécurité quand aucune voix n'est disponible (certains
-   navigateurs, le son coupé). Mieux vaut lire que rien entendre.
-
-   2) BEAUCOUP MOINS SOUVENT.
-
-   L'ancienne version parlait au coup d'envoi et sur un K.O. sur
-   trois. Le coup d'envoi n'est pas un moment important : c'est le
-   moment où l'on n'a encore rien fait. On ne garde que ce qui compte
-   vraiment dans une partie :
-
-     · LA DERNIÈRE VIE — quand quelqu'un n'a plus qu'un souffle ;
-     · LE K.O. SPECTACULAIRE — l'étoile, ou le K.O. arraché à très
-       haut pourcentage. Pas les autres ;
-     · LA FIN DU MATCH.
-
-   Une à trois répliques par combat au lieu de cinq. On les attend au
-   lieu de les subir.
-   ============================================================ */
-(function memes() {
-  if (typeof Match === 'undefined' || !Match.prototype) return;
-
-  /* ============================================================
-     1) LES RÉPLIQUES
-
-     `cr` : l'écriture créole, celle qu'on affiche si l'on doit
-            afficher.
-     `dit`: la même chose écrite POUR UNE VOIX FRANÇAISE. C'est elle
-            qui est prononcée, et elle seule.
-     ============================================================ */
-  const DERNIERE = [
-    { cr: 'Mi la pa fini !',       dit: 'Mi la pa fini !',            fr: 'J\'ai pas dit mon dernier mot !', en: 'I\'m not done yet!' },
-    { cr: 'Alon, ankor inn kou !', dit: 'Alon ! Ankor inn kou !',     fr: 'Allez, encore un coup !',         en: 'Come on, one more!' },
-    { cr: 'Tienbo, mon dalon !',   dit: 'Tiin-bo, mon dalon !',       fr: 'Tiens bon, l\'ami !',             en: 'Hang in there!' },
-    { cr: 'Larg pa lo mor !',      dit: 'Largue pa lo morre !',       fr: 'Ne lâche rien !',                 en: 'Don\'t let go!' },
-    { cr: 'Mi tienbo ankor !',     dit: 'Mi tiin-bo ankore !',        fr: 'Je tiens encore !',               en: 'Still standing!' }
-  ];
-
-  const KO_FORT = [
-    { cr: 'Aïo !',               dit: 'Aïe-yo !',                  fr: 'Aïe !',                  en: 'Ouch!' },
-    { cr: 'Ala i vol\' !',       dit: 'Ala i volle !',             fr: 'Et le voilà qui vole !', en: 'And off it flies!' },
-    { cr: 'Té, zot la vu sa ?',  dit: 'Té ! Zotte la vu sa ?',     fr: 'Eh, vous avez vu ça ?',  en: 'Did you see that?' },
-    { cr: 'Anlèr !',             dit: 'An lère !',                 fr: 'En l\'air !',            en: 'Airborne!' },
-    { cr: 'Kraz\' net !',        dit: 'Kraze nette !',             fr: 'Écrasé net !',           en: 'Flattened!' },
-    { cr: 'Salu, bay !',         dit: 'Salu, baï !',               fr: 'Salut, au revoir !',     en: 'Bye now!' }
-  ];
-
-  const FIN = [
-    { cr: 'Nou la gaingné !',         dit: 'Nou la guingné !',           fr: 'On a gagné !',             en: 'We won!' },
-    { cr: 'Sa mèm !',                 dit: 'Sa mème !',                  fr: 'C\'est ça même !',         en: 'That\'s the one!' },
-    { cr: 'Ala inn zarboutan !',      dit: 'Ala inn zarboutan !',        fr: 'En voilà un pilier !',     en: 'Now that\'s a legend!' },
-    { cr: 'Lo mèt la parlé !',        dit: 'Lo mète la parlé !',         fr: 'Le maître a parlé !',      en: 'The master has spoken!' },
-    { cr: 'Pèsonn pou arèt a mwin !', dit: 'Pè-sonne pou arète a mwin !', fr: 'Personne pour m\'arrêter !', en: 'No one stops me!' },
-    { cr: 'Batay la fini !',          dit: 'Bataille la fini !',         fr: 'La bagarre est finie !',   en: 'The fight is over!' }
-  ];
-
-  const EGALITE = [
-    { cr: 'Ni koné pa kisa !', dit: 'Ni koné pa kisa !', fr: 'On ne sait même pas qui !', en: 'Nobody even knows who!' }
-  ];
-
-  /* ============================================================
-     2) LE DOSAGE
-
-     Tout est ici, en clair. C'est cette poignée de nombres qui
-     décide si le jeu est agréable ou fatigant.
-     ============================================================ */
-  const REGLES = {
-    maxParCombat: 3,       // jamais plus de trois répliques, quoi qu'il arrive
-    reposImages: 420,      // sept secondes de silence minimum entre deux
-    chanceKoFort: 0.55,    // et seulement sur un K.O. qui valait le coup d'œil
-    maxKoFort: 1,          // une seule fois par combat
-    degatsKoFort: 115,     // « très haut pourcentage » : le K.O. arraché de loin
-    duree: 118, entree: 10, sortie: 20   // pour le bandeau de repli seulement
-  };
-
-  /* ============================================================
-     3) LA VOIX
-
-     La synthèse vocale du navigateur est asynchrone et capricieuse :
-     la liste des voix arrive parfois après le chargement de la page,
-     parfois jamais. On la relit donc à chaque fois, et on se
-     débrouille sans si elle reste vide.
-     ============================================================ */
-  const Voix = {
-    dispo: false,
-    liste: [],
-
-    moteur() {
-      return (typeof window !== 'undefined' && window.speechSynthesis) || null;
-    },
-
-    /* On veut une voix française. À défaut, n'importe laquelle vaut
-       mieux que le silence — mais on baisse alors la vitesse, parce
-       qu'une voix anglaise lisant du créole a besoin d'air. */
-    relire() {
-      const m = this.moteur();
-      if (!m) { this.dispo = false; return; }
-      let v = [];
-      try { v = m.getVoices() || []; } catch (e) { v = []; }
-      const fr = v.filter(x => /^fr/i.test(x.lang || ''));
-      this.liste = fr.length ? fr : v;
-      this.francais = fr.length > 0;
-      this.dispo = this.liste.length > 0;
-    },
-
-    /* Une voix par combattant, tirée de son identifiant : le même
-       personnage a toujours la même voix, d'un combat à l'autre. */
-    pour(f) {
-      if (!this.liste.length) return null;
-      const cle = (f && f.char && (f.char.__base || f.char).id) || '';
-      let n = 0;
-      for (let i = 0; i < cle.length; i++) n = (n * 31 + cle.charCodeAt(i)) % 9973;
-      return this.liste[n % this.liste.length];
-    },
-
-    /* La prosodie créole : plus vif et un peu plus haut que du
-       français lu. La hauteur varie avec le gabarit du combattant —
-       un colosse parle plus grave, et cela s'entend. */
-    parle(texte, f) {
-      const m = this.moteur();
-      if (!m || !this.dispo || !texte) return false;
-      try {
-        const u = new SpeechSynthesisUtterance(texte);
-        const v = this.pour(f);
-        if (v) { u.voice = v; u.lang = v.lang; }
-        else u.lang = 'fr-FR';
-
-        const poids = (f && f.char && f.char.stats && f.char.stats.weight) || 100;
-        const k = clamp((poids - 72) / (135 - 72), 0, 1);      // 0 plume, 1 colosse
-
-        u.rate = (this.francais ? 1.14 : 0.95) - k * 0.06;
-        u.pitch = 1.22 - k * 0.42;
-        const vol = (typeof Audio2 !== 'undefined')
-          ? clamp((Audio2.volMaster || 0.85) * (Audio2.volSfx || 0.9) * 1.25, 0, 1) : 0.9;
-        u.volume = vol;
-
-        m.cancel();          // une réplique à la fois, jamais deux qui se marchent dessus
-        m.speak(u);
-        return true;
-      } catch (e) { return false; }
-    },
-
-    tais() { const m = this.moteur(); if (m) { try { m.cancel(); } catch (e) {} } }
-  };
-
-  Voix.relire();
-  if (Voix.moteur() && typeof Voix.moteur().addEventListener === 'function') {
-    try { Voix.moteur().addEventListener('voiceschanged', () => Voix.relire()); } catch (e) {}
-  }
-  /* certains navigateurs ne remplissent la liste qu'après un premier
-     geste de l'utilisateur : on retente une fois, sans insister */
-  setTimeout(() => Voix.relire(), 1500);
-
-  /* Le son du jeu commande : voix coupée si le son est coupé. */
-  function sonAutorise() {
-    if (typeof Save !== 'undefined' && Save.data && Save.data.opts && Save.data.opts.voix === false) return false;
-    if (typeof Audio2 === 'undefined') return true;
-    if (Audio2.enabled === false) return false;
-    if ((Audio2.volMaster || 0) <= 0.01) return false;
-    return true;
-  }
-
-  /* ============================================================
-     4) DIRE UNE RÉPLIQUE
-     ============================================================ */
-  function tire(liste, evites) {
-    const libres = liste.filter(x => evites.indexOf(x.cr) < 0);
-    const src = libres.length ? libres : liste;
-    return src[Math.floor(Math.random() * src.length)];
-  }
-
-  function dis(M, phrase, qui, teinte) {
-    if (!phrase) return;
-    if ((M.__memeN || 0) >= REGLES.maxParCombat) return;
-    if ((M.__memeRepos || 0) > 0) return;
-    M.__memeN = (M.__memeN || 0) + 1;
-    M.__memeRepos = REGLES.reposImages;
-    (M.__memeVus || (M.__memeVus = [])).push(phrase.cr);
-
-    const parle = sonAutorise() && Voix.dispo && Voix.parle(phrase.dit || phrase.cr, qui);
-    /* Le bandeau n'apparaît QUE si la voix n'a pas pu sortir : le
-       joueur a demandé de l'entendre, pas de le lire. */
-    if (!parle) M.__meme = { p: phrase, t: 0, col: teinte || '#ffd166' };
-  }
-
-  /* ============================================================
-     5) LE BANDEAU DE REPLI
-     ============================================================ */
-  function dessine(M, ctx) {
-    const m = M.__meme;
-    if (!m) return;
-    const T = REGLES.duree;
-    if (m.t >= T) { M.__meme = null; return; }
-    const k = m.t < REGLES.entree ? m.t / REGLES.entree
-            : m.t > T - REGLES.sortie ? (T - m.t) / REGLES.sortie : 1;
-    const monte = (1 - k) * 16;
-
-    const lang = M.lang === 'en' ? 'en' : (M.lang === 'cr' ? 'cr' : 'fr');
-    const gros = m.p.cr;
-    const petit = lang === 'cr' ? '' : (m.p[lang] || m.p.fr);
-
-    ctx.save();
-    ctx.globalAlpha = k;
-    ctx.translate(VW / 2, VH - 186 + monte);
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-
-    ctx.font = '900 46px Bangers, Impact, sans-serif';
-    const lg = ctx.measureText(gros).width;
-    ctx.font = '700 15px system-ui, sans-serif';
-    const lp = petit ? ctx.measureText(petit).width : 0;
-    const larg = Math.max(lg, lp) + 54;
-    const haut = petit ? 76 : 56;
-
-    ctx.beginPath();
-    const r = haut / 2;
-    ctx.moveTo(-larg / 2 + r, -haut / 2);
-    ctx.arcTo(larg / 2, -haut / 2, larg / 2, haut / 2, r);
-    ctx.arcTo(larg / 2, haut / 2, -larg / 2, haut / 2, r);
-    ctx.arcTo(-larg / 2, haut / 2, -larg / 2, -haut / 2, r);
-    ctx.arcTo(-larg / 2, -haut / 2, larg / 2, -haut / 2, r);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(8,10,16,.9)'; ctx.fill();
-    ctx.lineWidth = 2; ctx.strokeStyle = rgba(m.col, 0.7); ctx.stroke();
-
-    const yg = petit ? -12 : 0;
-    ctx.font = '900 46px Bangers, Impact, sans-serif';
-    ctx.lineWidth = 7; ctx.strokeStyle = 'rgba(0,0,0,.85)';
-    ctx.strokeText(gros, 0, yg);
-    const g = ctx.createLinearGradient(0, yg - 22, 0, yg + 22);
-    g.addColorStop(0, '#ffffff'); g.addColorStop(1, m.col);
-    ctx.fillStyle = g; ctx.fillText(gros, 0, yg);
-
-    if (petit) {
-      ctx.font = '700 15px system-ui, sans-serif';
-      ctx.fillStyle = 'rgba(240,246,253,.95)';
-      ctx.fillText(petit, 0, 21);
-    }
-    ctx.restore();
-  }
-
-  /* ============================================================
-     6) LES MOMENTS QUI COMPTENT
-     ============================================================ */
-  const majOrig = Match.prototype.update;
-  Match.prototype.update = function () {
-    const r = majOrig.apply(this, arguments);
-    if (this.__memeRepos > 0) this.__memeRepos--;
-    if (this.__meme) this.__meme.t++;
-    return r;
-  };
-
-  if (typeof Match.prototype.onKO === 'function') {
-    const koOrig = Match.prototype.onKO;
-    Match.prototype.onKO = function (f, killer, dir) {
-      /* on relève le pourcentage AVANT le K.O. : après, il est remis
-         a zéro pour la réapparition, et « très haut pourcentage »
-         vaudrait toujours zéro */
-      const pctAvant = (f && f.dmgTaken) || 0;
-      const r = koOrig.apply(this, arguments);
-      try {
-        if (this.over) return r;
-
-        /* LA DERNIÈRE VIE. Le moment le plus tendu d'un combat, et
-           celui où une phrase porte le plus. C'est le perdant qui
-           parle : il se remet debout. */
-        if (f && f.stocks === 1 && !this.__memeDerniere) {
-          this.__memeDerniere = true;
-          dis(this, tire(DERNIERE, this.__memeVus || []), f, (f && f.color) || '#ffd166');
-          return r;
-        }
-
-        /* LE K.O. SPECTACULAIRE. Pas n'importe lequel : celui qui
-           part en étoile, ou celui arraché à très haut pourcentage —
-           c'est-à-dire celui qu'on a vu venir et qu'on a mérité.
-           Un K.O. ordinaire ne dit rien. */
-        const fort = (this.koCine && this.koCine.kind === 'star') ||
-                     (pctAvant >= REGLES.degatsKoFort);
-        if (fort && (this.__memeKO || 0) < REGLES.maxKoFort && Math.random() < REGLES.chanceKoFort) {
-          this.__memeKO = (this.__memeKO || 0) + 1;
-          dis(this, tire(KO_FORT, this.__memeVus || []), killer || f, (killer && killer.color) || '#ff6b2c');
-        }
-      } catch (e) {}
-      return r;
-    };
-  }
-
-  if (typeof Match.prototype.finish === 'function') {
-    const finOrig = Match.prototype.finish;
-    Match.prototype.finish = function (winner) {
-      const r = finOrig.apply(this, arguments);
-      try {
-        /* la fin passe toujours : on lève le silence et le plafond */
-        this.__memeRepos = 0;
-        this.__memeN = 0;
-        dis(this, winner ? tire(FIN, this.__memeVus || []) : EGALITE[0], winner,
-            winner ? (winner.color || '#ffd166') : '#9aa5b8');
-      } catch (e) {}
-      return r;
-    };
-  }
-
-  if (typeof Match.prototype.drawHud === 'function') {
-    const hudOrig = Match.prototype.drawHud;
-    Match.prototype.drawHud = function (ctx) {
-      try { dessine(this, ctx); } catch (e) {}
-      return hudOrig.apply(this, arguments);
-    };
-  }
-
-  /* On se tait en quittant le combat : une voix qui continue de
-     parler sur l'écran des résultats, c'est un bogue, pas une
-     ambiance. */
-  if (typeof UI !== 'undefined' && typeof UI.show === 'function') {
-    const showOrig = UI.show.bind(UI);
-    UI.show = function (id) { if (id !== 'game') Voix.tais(); return showOrig(id); };
-  }
-
-  window.MEMES_PEI = { DERNIERE, KO_FORT, FIN, EGALITE, REGLES, Voix, dis };
 })();
 
 
@@ -45249,49 +44969,64 @@ const Visite = {
     });
   };
 
-  /* LA CADENCE MBIWI — les avant-bras frappent l'un contre l'autre,
-     très vite, et les épaules suivent. Rien d'autre ne bouge : c'est
-     un pas de poignets. */
+  /* LA CADENCE MBIWI — SEULS les avant-bras bougent, et très vite.
+     Le reste du corps est presque immobile : c'est un pas de
+     poignets, pas un pas de jambes. On a retiré le balancement
+     d'épaules qui le faisait ressembler au séga — deux tiges de
+     bambou se frappent devant soi, on ne se déhanche pas en même
+     temps. */
   PAS.mbiwi = function (t) {
-    const c = Math.sin(t * 0.44);
-    const h = Math.sin(t * 0.22);
+    const c = Math.sin(t * 0.72);                    // la frappe, très rapide
+    const r = Math.sin(t * 0.06);                    // une respiration, à peine
     return newPose({
-      hipX: h * 4, hipY: -Math.abs(h) * 3, torso: h * 4, head: -6 - h * 3,
-      shL: -54 + c * 26, elL: 92 - c * 24,
-      shR: 54 + c * 26, elR: 92 + c * 24,
-      hpL: 12, knL: 20 + Math.abs(h) * 8, hpR: -12, knR: 20 + Math.abs(h) * 8,
-      lean: h * 3, mouth: 0.8, eye: 1.1
+      hipX: 0, hipY: -2, torso: 2, head: -7 + r * 2,
+      shL: -44, elL: 104 - c * 40,
+      shR: 44, elR: 104 + c * 40,
+      hpL: 10, knL: 16, hpR: -10, knR: 16,
+      lean: 0, mouth: 0.8, eye: 1.1
     });
   };
 
-  /* LE KABAR — les deux mains frappent devant soi, sur le temps.
-     C'est la danse la plus simple du lot, et la plus juste : dans un
-     kabar, tout le monde frappe. */
+  /* LE KABAR — le claquement. Les deux mains se rejoignent DEVANT
+     LA POITRINE, sec, et le corps se FIGE entre deux frappes. C'est
+     ce silence entre les coups qui fait sa signature : toutes les
+     autres danses du jeu bougent en continu, celle-ci s'arrête. On
+     lui a retiré le pas de côté, qui appartient au pas glissé et la
+     rendait interchangeable avec la moitié du lot. */
   PAS.kabar = function (t) {
-    const b = (t % 30) / 30;
-    const f = b < 0.28 ? 1 - b / 0.28 : 0;
+    const u = (t % 34) / 34;
+    /* deux frappes rapprochées, puis un silence : ta-ta ... ta-ta */
+    const f1 = u < 0.10 ? 1 - u / 0.10 : 0;
+    const f2 = (u > 0.20 && u < 0.30) ? 1 - (u - 0.20) / 0.10 : 0;
+    const f = Math.max(f1, f2);
     return newPose({
-      hipY: -3 + f * 5, torso: -2 - f * 8, head: -8 - f * 6,
-      shL: -78 - f * 34, elL: 74 - f * 30,
-      shR: 78 + f * 34, elR: 74 - f * 30,
-      hpL: 14, knL: 22 + f * 10, hpR: -14, knR: 22 + f * 10,
-      lean: Math.sin(t * 0.1) * 4, mouth: f > 0.5 ? 1 : 0.5, eye: 1.15
+      hipX: 0, hipY: -1 - f * 7,
+      torso: -1 - f * 12, head: -9 - f * 5,
+      /* mains ouvertes en attente, qui se rejoignent au centre */
+      shL: -70 + f * 62, elL: 58 + f * 46,
+      shR: 70 - f * 62, elR: 58 + f * 46,
+      hpL: 12, knL: 18 + f * 20, hpR: -12, knR: 18 + f * 20,
+      lean: 0, mouth: f > 0.4 ? 1 : 0.35, eye: 1.1 + f * 0.25
     });
   };
 
-  /* LA PHOTO SOUVENIR — bras tendu, sourire, et il rate le cadrage.
-     C'est la seule danse comique du jeu, et elle est affectueuse. */
+  /* LA PHOTO SOUVENIR — un bras tendu vers le haut, l'autre main sur
+     la hanche, tout le corps penché du même côté. C'est la seule
+     danse FRANCHEMENT ASYMÉTRIQUE du lot : les deux épaules ne font
+     jamais la même chose, et c'est ce qui la rend reconnaissable de
+     loin, avant même de comprendre ce qu'elle raconte. */
   PAS.selfie = function (t) {
-    const u = (t % 90) / 90;
-    const pose = u < 0.62 ? 1 : 0;
-    const clic = (u > 0.5 && u < 0.56) ? 1 : 0;
-    const s = Math.sin(t * 0.14);
+    const u = (t % 96) / 96;
+    const clic = (u > 0.44 && u < 0.52) ? 1 : 0;
+    const cadre = u < 0.6 ? 1 : 0.35;               // il cherche l'angle, puis relache
+    const s = Math.sin(t * 0.17);
     return newPose({
-      torso: -4 + s * 3, head: -14 - clic * 6, hipY: -2,
-      shL: -136 - pose * 14, elL: 60 - pose * 20,
-      shR: 40 + s * 12, elR: 66,
-      hpL: 12, knL: 18, hpR: -12, knR: 18,
-      lean: 4 + s * 2, mouth: 1, eye: clic ? 0.2 : 1.3
+      hipX: -9, hipY: -2 - clic * 4,
+      torso: -3 + s * 3, head: -18 - clic * 8,
+      shL: -158 * cadre - 20, elL: 44 - clic * 22,   // le bras qui tient l'appareil
+      shR: 16, elR: 128,                             // l'autre main sur la hanche
+      hpL: 6, knL: 12, hpR: -18, knR: 26,
+      lean: 13 + s * 3, mouth: 1, eye: clic ? 0.15 : 1.35
     });
   };
 
@@ -45309,28 +45044,123 @@ const Visite = {
     });
   };
 
-  /* LE BALANCEMENT DU PORTEUR — lent, ample, très droit. On ne fête
-     pas : on tient. C'est le contraire d'une danse de victoire, et
-     c'est justement ce qui la rend belle après un combat. */
+  /* LE PORTEUR — la mesure a montré que ce pas ressemblait à presque
+     tous les autres : c'était un balancement lent, et un balancement
+     lent, il y en avait déjà cinq. On le refait sur l'axe que
+     personne n'occupait, LE VERTICAL : le corps descend très bas sur
+     les jambes, puis se relève de toute sa hauteur, bras verrouillés
+     au-dessus de la tête comme sous une charge. Très lent, très
+     ample, et impossible à confondre. */
   PAS.porteur = function (t) {
-    const s = Math.sin(t * 0.055);
+    const u = (t % 150) / 150;
+    const bas = 0.5 - Math.cos(u * Math.PI * 2) * 0.5;   // 0 en haut, 1 tout en bas
     return newPose({
-      hipX: s * 6, hipY: 4 + Math.abs(s) * 3, torso: 2 - s * 3, head: -4,
-      shL: -104 + s * 8, elL: 116, shR: 104 + s * 8, elR: 116,
-      hpL: 18, knL: 24, hpR: -18, knR: 24,
-      lean: s * 4, mouth: 0.3, eye: 0.85
+      hipY: -6 + bas * 46,
+      sy: 1 - bas * 0.09, sx: 1 + bas * 0.05,
+      torso: 3 + bas * 12, head: -6 - (1 - bas) * 6,
+      shL: -168 + bas * 26, elL: 8 + bas * 26,
+      shR: 168 - bas * 26, elR: 8 + bas * 26,
+      hpL: 12 + bas * 52, knL: 16 + bas * 86,
+      hpR: -12 + bas * 52, knR: 16 + bas * 86,
+      lean: 0, mouth: 0.3, eye: 0.9 - bas * 0.25
+    });
+  };
+
+  /* ============================================================
+     QUATRE PAS SUR DES AXES QUE PERSONNE N'OCCUPAIT
+
+     La mesure de ressemblance a servi à choisir : plutôt que
+     d'ajouter une sixième variation de balancement, on est allé
+     chercher ce qui manquait — le sol, le déplacement, l'ondulation
+     et le ciseau.
+     ============================================================ */
+
+  /* KABAR ASSIS — accroupi, mains sur les genoux, la tête qui bat la
+     mesure. Le seul pas du jeu qui se danse EN BAS. */
+  PAS.akoup = function (t) {
+    const n = Math.sin(t * 0.34);
+    const b = Math.sin(t * 0.17);
+    return newPose({
+      hipY: 44 + Math.abs(b) * 6, sy: 0.9, sx: 1.08,
+      torso: 22 + b * 4, head: 14 + n * 12,
+      shL: -26, elL: 108, shR: 26, elR: 108,
+      hpL: 74, knL: 116, hpR: -74, knR: 116,
+      lean: b * 4, mouth: n > 0.4 ? 1 : 0.4, eye: 0.9
+    });
+  };
+
+  /* PAS GLISSÉ — il traverse. Le bassin part loin d'un côté puis de
+     l'autre, le buste traîne derrière. Le seul pas qui VOYAGE. */
+  PAS.glisse = function (t) {
+    const u = (t % 84) / 84;
+    const x = Math.sin(u * Math.PI * 2);
+    const tr = Math.sin(u * Math.PI * 2 - 0.9);      // le buste, en retard
+    return newPose({
+      hipX: x * 44, hipY: -2 - Math.abs(x) * 4,
+      torso: tr * 13, head: -8 - tr * 8,
+      shL: -46 + tr * 62, elL: 40 - tr * 26,
+      shR: 46 + tr * 62, elR: 40 + tr * 26,
+      hpL: 10 + x * 34, knL: 20 + Math.abs(x) * 20,
+      hpR: -10 + x * 34, knR: 20 + Math.abs(x) * 20,
+      lean: -tr * 11, mouth: 0.7, eye: 1.05
+    });
+  };
+
+  /* LA HOULE — une ondulation qui remonte le corps : le bassin part,
+     le buste suit, la tête finit, les bras ferment la vague. Rien
+     d'autre dans le jeu n'est décalé en phase comme ça. */
+  PAS.vag = function (t) {
+    const w = 0.09;
+    const h = Math.sin(t * w);
+    const b = Math.sin(t * w - 0.7);
+    const c = Math.sin(t * w - 1.4);
+    const a = Math.sin(t * w - 2.1);
+    return newPose({
+      hipX: h * 3, hipY: -4 + h * 11,
+      torso: b * 17, head: -6 + c * 15,
+      /* les deux bras sont décalés d'un quart d'onde : c'est ce
+         décalage qui fait la vague, et rien d'autre dans le jeu ne
+         l'utilise */
+      shL: -80 + a * 76, elL: 56 + a * 46,
+      shR: 80 + Math.sin(t * w - 3.2) * 76, elR: 56 - Math.sin(t * w - 3.2) * 46,
+      hpL: 16 - b * 12, knL: 22 + b * 16,
+      hpR: -16 - b * 12, knR: 22 - b * 16,
+      lean: c * 9, mouth: 0.6, eye: 1
+    });
+  };
+
+  /* SAUTÉ CROISÉ — il décolle ET il tourne, jambes en ciseau. Le saut
+     de joie ne fait que monter, la toupie ne fait que tourner :
+     celui-ci fait les deux, et c'est ce qui le rend différent des
+     deux. */
+  PAS.salte = function (t) {
+    const u = (t % 52) / 52;
+    const h = Math.max(0, Math.sin(u * Math.PI * 2));
+    const ciseau = Math.sin(u * Math.PI * 4);
+    return newPose({
+      hipY: -h * 34, hipRot: (u * 360) % 360,
+      sy: 1 + h * 0.07, sx: 1 - h * 0.05,
+      torso: -6 - h * 8, head: -12 - h * 6,
+      shL: -118 - h * 40, elL: 18, shR: 118 + h * 40, elR: 18,
+      hpL: 20 + ciseau * 44, knL: 26 + h * 26,
+      hpR: -20 + ciseau * 44, knR: 26 + h * 26,
+      mouth: 1, eye: 1.25
     });
   };
 
   /* --- la déclaration au vestiaire --- */
   const LISTE = [
-    { id: 'd_kabar',   pas: 'kabar',   lvl: 6,  fr: 'Frappé kabar',   en: 'Kabar clap',   cr: 'Frapé kabar',  ic: '👏' },
-    { id: 'd_lion',    pas: 'lion',    lvl: 10, fr: 'Danse du lion',  en: 'Lion dance',   cr: 'Dans lo lion', ic: '🦁' },
-    { id: 'd_selfie',  pas: 'selfie',  lvl: 14, fr: 'Photo souvenir', en: 'Souvenir pic', cr: 'Foto souvenir', ic: '📸' },
-    { id: 'd_mbiwi',   pas: 'mbiwi',   lvl: 19, fr: 'Cadence mbiwi',  en: 'Mbiwi cadence', cr: 'Kadans mbiwi', ic: '🎋' },
-    { id: 'd_zoizo',   pas: 'zoizo',   lvl: 24, fr: 'Vol du zoizo',   en: 'Bird flight',  cr: 'Vol zoizo',    ic: '🕊️' },
-    { id: 'd_porteur', pas: 'porteur', lvl: 40, fr: 'Le porteur',     en: 'The bearer',   cr: 'Lo portèr',    ic: '🕯️' }
-  ];
+    { id: 'd_kabar',   pas: 'kabar',   lvl: 6,  fr: 'Frappé kabar',   en: 'Kabar clap',    cr: 'Frapé kabar',   ic: '👏' },
+    { id: 'd_akoup',   pas: 'akoup',   lvl: 9,  fr: 'Kabar assis',    en: 'Sit-down kabar', cr: 'Kabar asiz',   ic: '🪑' },
+    { id: 'd_lion',    pas: 'lion',    lvl: 10, fr: 'Danse du lion',  en: 'Lion dance',    cr: 'Dans lo lion',  ic: '🦁' },
+    { id: 'd_glisse',  pas: 'glisse',  lvl: 13, fr: 'Pas glissé',     en: 'Sliding step',  cr: 'Pa glisé',      ic: '🛝' },
+    { id: 'd_selfie',  pas: 'selfie',  lvl: 14, fr: 'Photo souvenir', en: 'Souvenir pic',  cr: 'Foto souvenir', ic: '📸' },
+    { id: 'd_mbiwi',   pas: 'mbiwi',   lvl: 19, fr: 'Cadence mbiwi',  en: 'Mbiwi cadence', cr: 'Kadans mbiwi',  ic: '🎋' },
+    { id: 'd_vag',     pas: 'vag',     lvl: 22, fr: 'La houle',       en: 'The swell',     cr: 'La oul',        ic: '🌊' },
+    { id: 'd_zoizo',   pas: 'zoizo',   lvl: 24, fr: 'Vol du zoizo',   en: 'Bird flight',   cr: 'Vol zoizo',     ic: '🕊️' },
+    { id: 'd_salte',   pas: 'salte',   lvl: 26, fr: 'Sauté croisé',   en: 'Scissor jump',  cr: 'Soté krwazé',   ic: '✂️' },
+    { id: 'd_porteur', pas: 'porteur', lvl: 40, fr: 'Le porteur',     en: 'The bearer',    cr: 'Lo portèr',     ic: '🕯️' }
+    ];
 
   if (typeof COSMETICS !== 'undefined' && !COSMETICS.__dansesPlus) {
     COSMETICS.__dansesPlus = true;
@@ -45706,6 +45536,258 @@ const Visite = {
         reward: { cosmetic: 'd_porteur' } }
     );
   }
+})();
+
+
+/* ===== 74-cadence.js ===== */
+/* ============================================================
+   SMASH PÉI — TOUT CE QUI TOURNE TROP VITE SUR UN BON ÉCRAN
+
+   Le joueur écrit : « sur la version ordinateur j'ai l'impression que
+   les replays ainsi que les danses sont en accéléré ».
+
+   Il ne se trompe pas, et la cause est la même partout. Le COMBAT est
+   piloté par un pas de temps fixe : quelle que soit la fréquence de
+   l'écran, il avance de 1/60 de seconde à la fois. Mais tout ce qui
+   s'anime À CÔTÉ du combat — la lecture des replays, la scène
+   d'attente, l'aperçu de danse du vestiaire, la barre d'expérience de
+   fin de partie — avançait D'UN CRAN PAR IMAGE AFFICHÉE. Le code le
+   disait même à voix haute, dans `rpTick` :
+
+       // le tampon est à 20 i/s, l'écran à 60
+
+   « l'écran à 60 » : c'est une supposition, pas une mesure. Sur un
+   écran 60 Hz elle est juste. Sur les écrans d'ordinateur récents —
+   120 Hz, 144 Hz, 165 Hz — elle est fausse dans le mauvais sens, et
+   tout ce qui n'est pas le combat tourne DEUX FOIS À DEUX FOIS ET
+   DEMIE trop vite. D'où les replays accélérés, et d'où les danses du
+   vestiaire qui s'emballent.
+
+   La correction est une seule idée, appliquée partout : ces
+   animations reçoivent leur propre HORLOGE, qui compte des pas de
+   1/60 de seconde de temps réel, exactement comme la boucle de
+   combat. Sur 60 Hz, elle rend un pas par image : rien ne change. Sur
+   120 Hz, elle rend un pas une image sur deux. Sur un écran lent, elle
+   en rend deux d'un coup et l'animation garde sa durée réelle.
+
+   Il n'y a pas de réglage à faire : la vitesse voulue est celle qui
+   était déjà écrite dans le code, on la rend simplement indépendante
+   du matériel.
+   ============================================================ */
+(function cadence() {
+  const PAS = (typeof TICK === 'number' && TICK > 0) ? TICK : (1000 / 60);
+
+  /* Une horloge indépendante par consommateur : deux animations qui
+     se partageraient un même accumulateur se voleraient leurs pas. */
+  function horloge() {
+    let dernier = 0, reste = 0;
+    return function pas() {
+      const now = (typeof performance !== 'undefined' && performance.now)
+        ? performance.now() : Date.now();
+      if (!dernier) { dernier = now; return 1; }
+      let dt = now - dernier;
+      dernier = now;
+      if (dt < 0) dt = 0;
+      if (dt > 250) dt = 250;              // onglet en arrière-plan : on ne rattrape pas
+      reste += dt;
+      let n = 0;
+      while (reste >= PAS && n < 4) { reste -= PAS; n++; }
+      return n;
+    };
+  }
+  window.CADENCE = horloge;
+
+  /* ============================================================
+     1) LA LECTURE DES REPLAYS
+
+     `rpTick` avance le curseur de lecture d'un cran par image
+     affichée. On le laisse faire son travail, mais on lui fait
+     rejouer le bon NOMBRE de crans — zéro compris, quand l'écran est
+     plus rapide que le jeu.
+     ============================================================ */
+  if (typeof UI !== 'undefined' && typeof UI.rpTick === 'function') {
+    const orig = UI.rpTick.bind(UI);
+    const h = horloge();
+    UI.rpTick = function () {
+      const n = h();
+      if (n <= 0) return;                  // trop tôt : on ne bouge pas d'un cran
+      for (let i = 0; i < n; i++) orig();  // écran lent : on rattrape
+    };
+  }
+
+  /* ============================================================
+     2) LA SCÈNE D'ATTENTE
+
+     Même défaut : `attractT++` à chaque image affichée. Le décor et
+     les combattants de l'accueil défilaient donc deux fois trop vite
+     sur un écran 120 Hz. On corrige l'horloge sans toucher au dessin,
+     qui doit lui rester à la fréquence de l'écran — sinon l'image
+     saccade.
+     ============================================================ */
+  if (typeof UI !== 'undefined' && typeof UI.drawAttract === 'function') {
+    const orig = UI.drawAttract.bind(UI);
+    const h = horloge();
+    UI.drawAttract = function (ctx) {
+      /* l'original fait +1 : on ajoute le complément, qui vaut -1
+         quand il ne faut pas avancer du tout */
+      const n = h();
+      this.attractT = (this.attractT || 0) + (n - 1);
+      return orig(ctx);
+    };
+  }
+
+  /* ============================================================
+     3) LA VIGNETTE DE MOMENT FORT
+
+     Elle est lue hors de la boucle à pas fixe, elle aussi.
+     ============================================================ */
+  if (typeof Replay !== 'undefined' && typeof Replay.tick === 'function') {
+    const orig = Replay.tick.bind(Replay);
+    const h = horloge();
+    Replay.tick = function (M) {
+      const n = h();
+      if (n <= 0) return;
+      for (let i = 0; i < n; i++) { if (this.offer) orig(M); }
+    };
+  }
+
+  /* ============================================================
+     4) L'APERÇU DE DANSE DU VESTIAIRE
+
+     Celui-ci est de mon fait : la boucle d'aperçu incrémentait son
+     horloge à chaque image affichée. Sur un écran 120 Hz, la danse
+     qu'on regarde avant de l'équiper tournait donc deux fois plus
+     vite que la même danse en fin de combat — ce qui est le pire des
+     cas, puisque c'est sur cet aperçu qu'on la choisit.
+     ============================================================ */
+  if (typeof window.VESTIAIRE_HORLOGE === 'function') window.VESTIAIRE_HORLOGE(horloge());
+})();
+
+
+/* ===== 75-chute.js ===== */
+/* ============================================================
+   SMASH PÉI — LE TEMPS MORT ENTRE LA CHUTE ET LE K.O.
+
+   Le joueur écrit : « quand un personnage est envoyé dans le vide ou
+   pour un KO j'ai l'impression qu'il y a un temps de latence entre le
+   moment où le perso est tombé et le KO ».
+
+   Il ne se trompe pas. La mesure, sur les trente-six arènes, compte
+   les images entre l'instant où le combattant SORT DU CADRE et
+   l'instant où le K.O. est prononcé :
+
+       médiane          13 images   (0,22 s)  — normal
+       neuf cas sur dix 28 images   (0,47 s)
+       chute simple     63 images   (1,05 s)  sur les grandes arènes
+       pire cas        124 images   (2,07 s)  au Port, quai ouest
+
+   Une seconde entière, deux dans le pire cas, à regarder un écran où
+   il ne se passe plus rien. Et il ne s'agit pas d'un bogue de
+   détection : le K.O. part À L'IMAGE PRÈS où le combattant franchit
+   la limite. Le problème est ailleurs — la limite est simplement très
+   loin sous le décor, et le combattant met une seconde à la
+   parcourir, hors champ, à vitesse de chute constante.
+
+   CE QU'IL NE FAUT SURTOUT PAS FAIRE : rapprocher les limites. Elles
+   définissent la distance de récupération, donc l'équilibre de tous
+   les personnages et de toutes les arènes. Les bouger, c'est refaire
+   le jeu.
+
+   CE QU'ON FAIT À LA PLACE. Il existe un instant précis à partir
+   duquel l'issue N'EST PLUS EN JEU : le combattant est sous toutes
+   les plateformes, il n'a plus un seul saut, il a déjà brûlé son
+   spécial haut. À partir de là, plus aucune entrée manette ne peut
+   changer quoi que ce soit — la seule chose qui reste à faire est
+   d'attendre. C'est ce temps-là, et lui seul, qu'on supprime : sa
+   chute s'accélère franchement jusqu'à la limite.
+
+   Ce que cette règle ne touche pas, et c'est tout l'intérêt :
+
+     · un combattant à qui il reste un saut n'est jamais concerné ;
+     · un combattant qui n'a pas utilisé son spécial haut non plus ;
+     · quelqu'un au-dessus d'une plateforme, même très bas, non plus ;
+     · et rien ne s'accélère tant qu'on n'a pas vérifié la condition
+       pendant plusieurs images d'affilée, pour qu'un état transitoire
+       ne déclenche jamais l'accélération par erreur.
+
+   Autrement dit : on ne raccourcit jamais une chute rattrapable. On
+   raccourcit l'attente d'un résultat déjà connu.
+   ============================================================ */
+(function chute() {
+  if (typeof Fighter === 'undefined' || !Fighter.prototype || !Fighter.prototype.update) return;
+
+  const CONFIRME = 5;        // images de vérification avant d'accélérer
+  const GAIN = 1.34;         // accélération par image, une fois condamné
+  const VMAX = 78;           // vitesse plafond : au-delà on traverserait les murs
+
+  /* Le combattant peut-il encore revenir ? On répond NON seulement
+     quand on en est sûr. */
+  function condamne(f) {
+    const M = f.M;
+    if (!M || !M.stage || !f.alive) return false;
+    if (f.grounded || f.state === ST.DEAD || f.state === ST.LEDGE ||
+        f.state === ST.RESPAWN || f.state === ST.ENTRY) return false;
+
+    /* il lui reste un saut ? il peut revenir */
+    const maxJ = (f.char && f.char.stats && f.char.stats.jumps) || 2;
+    if (f.jumps < maxJ) return false;
+    /* il n'a pas encore brûlé son spécial haut ? il peut revenir */
+    if (!f.upUsed) return false;
+    /* il est en train de s'en servir ? on ne coupe pas une remontée */
+    if (f.state === ST.SPECIAL || f.state === ST.ATTACK || f.state === ST.AIRDODGE) return false;
+    /* il est accroché, agrippé, projeté par quelqu'un : ce n'est plus
+       lui qui décide, on n'y touche pas */
+    if (f.state === ST.GRABBED || f.grabbedBy) return false;
+
+    const B = M.stage.bounds;
+    let dessous = true, dehors = true;
+    for (const p of M.stage.plats) {
+      const top = p.y + (p.dy || 0);
+      /* au-dessus d'une plateforme, à portée de chute : il retombera
+         dessus, il n'est pas condamné */
+      if (f.x > p.x - 60 && f.x < p.x + p.w + 60 && top > f.y - 40) return false;
+      if (top > f.y - 150) dessous = false;
+      if (f.x > p.x - 300 && f.x < p.x + p.w + 300) dehors = false;
+    }
+    /* deux façons d'être perdu : très bas sous tout, ou très loin de
+       tout latéralement — et dans les deux cas il faut s'en éloigner
+       encore, pas revenir */
+    if (dessous && f.vy > 0 && f.y > B.top) return true;
+    if (dehors && Math.abs(f.vx) > 0.5) return true;
+    return false;
+  }
+
+  const orig = Fighter.prototype.update;
+  Fighter.prototype.update = function () {
+    const r = orig.apply(this, arguments);
+    try {
+      if (condamne(this)) {
+        this.__perdu = (this.__perdu || 0) + 1;
+        if (this.__perdu > CONFIRME) {
+          /* On DÉPLACE, on n'accélère pas la vitesse. Première
+             tentative : augmenter `vy`. Elle ne marchait pas, et la
+             trace le montrait bien — la vitesse remontait à 23,9 puis
+             y restait collée, parce que la physique la ramène chaque
+             image à la vitesse de chute terminale du personnage. Ce
+             plafond est une bonne chose et il n'est pas question d'y
+             toucher : il régit toutes les chutes rattrapables. On
+             ajoute donc un déplacement PAR-DESSUS la physique, qui ne
+             s'applique qu'à quelqu'un dont le sort est déjà scellé et
+             qui n'a plus aucune plateforme sous lui — donc rien à
+             traverser. */
+          const B = this.M.stage.bounds;
+          this.__vChute = Math.min(VMAX, (this.__vChute || 11) * GAIN);
+          if (this.vy > 0 && this.y - this.h < B.bottom) this.y += this.__vChute;
+          if (Math.abs(this.vx) > 0.5) {
+            const s = Math.sign(this.vx);
+            if ((s < 0 && this.x > B.left) || (s > 0 && this.x < B.right))
+              this.x += s * this.__vChute * 0.85;
+          }
+        }
+      } else { this.__perdu = 0; this.__vChute = 0; }
+    } catch (e) {}
+    return r;
+  };
 })();
 
 </script>
