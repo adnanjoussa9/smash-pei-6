@@ -18367,6 +18367,89 @@ class Brain {
 
   press(b) { this.out[b] = true; }
 
+  /* ============================================================
+     LA GÉOGRAPHIE RÉELLE DE LA SCÈNE
+
+     Tout le raisonnement des bots reposait sur une seule ligne :
+
+         const main = stage.plats.find(p => !p.pass);
+
+     c'est-à-dire « la première plateforme pleine EST la scène ». Sur
+     une arène à un seul plateau, c'est vrai. Partout ailleurs, c'est
+     faux, et les conséquences sont exactement ce que le joueur
+     décrit :
+
+       · CIRQUE DE CILAOS a deux falaises. `main` ne désignait que
+         celle de GAUCHE. Le filtre de sécurité interdisait donc
+         d'aller à droite depuis presque toute la scène : le bot
+         restait planté sur place, à se balancer d'un pied sur
+         l'autre. C'est le campement, et la mesure le confirme —
+         vingt et une secondes d'immobilité sur un combat.
+
+       · TUNNEL DE LAVE a un PLAFOND, qui est une plateforme pleine
+         lui aussi. Un bot posé dessus ne pouvait ni le traverser
+         (il n'est pas traversant) ni marcher jusqu'au bord (le
+         garde-fou l'en empêchait). Vingt-six secondes coincé en
+         l'air, à ne rien faire.
+
+     On remplace donc partout « la première plateforme pleine » par
+     une vraie question de terrain : Y A-T-IL DE QUOI SE POSER, ICI
+     OU EN DESSOUS ? Elle se pose sur toutes les plateformes, elle
+     marche sur toutes les arènes, et elle n'a pas besoin de savoir
+     laquelle est « la bonne ».
+     ============================================================ */
+
+  /* Existe-t-il une surface où retomber à l'aplomb de `x`, à la
+     hauteur `y` ou en dessous ? `chute` est la hauteur de chute
+     qu'on s'autorise. */
+  solA(x, y, chute) {
+    const M = this.f.M;
+    const st = M && M.stage;
+    if (!st) return true;
+    const B = st.bounds;
+    if (B && (x < B.left + 30 || x > B.right - 30)) return false;
+    const bas = (chute === undefined ? 560 : chute);
+    for (const p of st.plats) {
+      const top = p.y + (p.dy || 0);
+      if (x > p.x - 8 && x < p.x + p.w + 8 && top > y - 60 && top < y + bas) return true;
+    }
+    return false;
+  }
+
+  /* Puis-je avancer de `portee` pixels dans la direction `dir` sans
+     me retrouver au-dessus du vide ? */
+  solDevant(dir, portee) {
+    const f = this.f;
+    const d = portee === undefined ? (52 + f.w * 0.5) : portee;
+    return this.solA(f.x + dir * d, f.y);
+  }
+
+  /* La plateforme la plus accessible : la distance horizontale
+     compte, mais REMONTER coûte bien plus cher que redescendre —
+     c'est ce qui empêche un bot de viser un plafond. */
+  solProche() {
+    const f = this.f, M = f.M;
+    if (!M || !M.stage) return null;
+    let best = null, bd = Infinity;
+    for (const p of M.stage.plats) {
+      const top = p.y + (p.dy || 0);
+      if (top < f.y - 420) continue;                     // hors d'atteinte vers le haut
+      const cx = clamp(f.x, p.x + 20, p.x + p.w - 20);
+      const cout = Math.abs(f.x - cx) + Math.max(0, f.y - top) * 1.7 + (p.pass ? 60 : 0);
+      if (cout < bd) { bd = cout; best = p; }
+    }
+    return best || M.stage.plats[0] || null;
+  }
+
+  /* Vers quel côté se trouve le salut ? */
+  dirVersSol() {
+    const f = this.f;
+    const p = this.solProche();
+    if (!p) return 1;
+    const cx = clamp(f.x, p.x + 20, p.x + p.w - 20);
+    return sign(cx - f.x) || 1;
+  }
+
   /* Filtre de sécurité : aucune décision ne doit projeter le bot hors de la scène.
      Les spéciaux latéraux (ruée, téléport) déplacent le combattant de 250 à 300 px :
      lancés près du bord, ils étaient la première cause de suicide des bots. */
@@ -18387,32 +18470,39 @@ class Brain {
     }
     const o = this.decideRaw();
     const f = this.f;
-    const main = f.M.stage.plats.find(p => !p.pass);
-    if (main && f.state !== ST.DEAD) {
-      const cx = main.x + main.w / 2;
-      const toStage = sign(cx - f.x) || 1;
+    if (f.M && f.M.stage && f.state !== ST.DEAD) {
+      const toStage = this.dirVersSol();
       if (f.grounded) {
-        // au sol : ni roulade ni spécial latéral vers le vide
-        const margin = 190 + f.w * 0.5;
-        const outL = f.x < main.x + margin && o.ax < 0;
-        const outR = f.x > main.x + main.w - margin && o.ax > 0;
-        if (outL || outR) {
+        /* Au sol : ni roulade ni spécial latéral VERS LE VIDE. La
+           question n'est plus « suis-je loin du milieu de la scène »
+           — qui bloquait un bot au beau milieu du Cirque de Cilaos —
+           mais « y a-t-il encore du sol à deux cents pixels devant
+           moi ». Sur une arène simple, les deux reviennent au même ;
+           sur toutes les autres, seule la seconde est vraie. */
+        const portee = 190 + f.w * 0.5;
+        /* …sauf quand le bot est en train de SAUTER un trou dont il a
+           vu la rive : lui interdire cela, c'est l'enfermer sur son
+           bout de plateau. */
+        const franchit = o.jump && this.gapAhead(sign(o.ax));
+        if (!franchit && o.ax !== 0 && !this.solDevant(sign(o.ax), portee)) {
           o.special = false;
           o.ax = clamp(-o.ax, -0.45, 0.45);
           if (o.ay > 0) o.ay = 0;
         }
       } else {
         // en l'air : une esquive aérienne fait 185 px, jamais vers l'extérieur
-        const margin = 150 + f.w * 0.5;
-        const nearEdge = f.x < main.x + margin || f.x > main.x + main.w - margin;
-        if (nearEdge && sign(o.ax) === -toStage) {
+        const portee = 150 + f.w * 0.5;
+        if (o.ax !== 0 && !this.solA(f.x + sign(o.ax) * portee, f.y, 900) &&
+            sign(o.ax) === -toStage) {
           if (o.shield) o.ax = toStage * 0.9;      // on esquive VERS la scène
           else o.ax = 0;
         }
         /* DÉJÀ DEHORS : plus aucune décision ne peut nous éloigner
            encore. On rentre, point. C'est le dernier filet avant la
-           chute, et il ne coûte rien quand tout va bien. */
-        const dehors = f.x < main.x || f.x > main.x + main.w;
+           chute, et il ne coûte rien quand tout va bien.
+           « Dehors » veut dire : plus rien sous les pieds, nulle part
+           — pas « à droite de la première plateforme trouvée ». */
+        const dehors = !this.solA(f.x, f.y, 1300);
         if (dehors) {
           if (sign(o.ax) !== toStage) o.ax = toStage;
           o.special = o.special && o.ay < 0;       // pas de ruée latérale dans le vide
@@ -18436,6 +18526,24 @@ class Brain {
 
     if (f.grounded || f.state === ST.LEDGE) this.dodgedBack = false;
     if (!f.alive || f.state === ST.DEAD) { this.out = o; return o; }
+
+    /* ------- LE COMPTEUR D'IMMOBILITÉ -------
+       Un bot qui n'a pas bougé de quatre-vingt-dix pixels en quatre
+       secondes n'est pas en train de temporiser : il est coincé, ou
+       il campe. Plutôt que d'espérer que le hasard le débloque, on
+       le mesure et on le pousse. Pendant deux secondes et demie il
+       oublie le placement défensif, il fonce et il saute.
+
+       On ne compte pas les images passées à encaisser ni les pauses
+       volontaires des petits niveaux : rester immobile parce qu'on
+       est un TI BÉBÉ, c'est voulu ; rester immobile parce que la
+       scène nous en empêche, c'est le bogue. */
+    if (this._memX === undefined) { this._memX = f.x; this._memT = 0; this._force = 0; }
+    if (this._force > 0) this._force--;
+    if (f.hitstun > 0 || f.state === ST.HITSTUN || f.state === ST.TUMBLE) { this._memX = f.x; this._memT = 0; }
+    else this._memT++;
+    if (Math.abs(f.x - this._memX) > 90) { this._memX = f.x; this._memT = 0; }
+    else if (this._memT > 240) { this._force = 150; this._memT = 0; this._memX = f.x; }
 
     // sortie de prise : mash
     if (f.state === ST.GRABBED) {
@@ -18464,7 +18572,7 @@ class Brain {
     const range = L.spacing * (f.char.rangeMul || 1);
 
     // erreurs volontaires
-    if (Math.random() < L.err * 0.06) { this.out = o; return o; }
+    if (this._force <= 0 && Math.random() < L.err * 0.06) { this.out = o; return o; }
 
     // ------- défense -------
     const threat = this.incoming(t);
@@ -18550,41 +18658,72 @@ class Brain {
 
     // ------- approche -------
     let want = dir;
-    if (adx < range * 0.55) want = -dir * 0.6;                 // spacing
+    /* Le recul de placement est suspendu tant qu'on est en train de
+       se débloquer : c'est lui qui, combiné à un bord, produisait le
+       balancement sur place que le joueur appelle « camper ». */
+    if (adx < range * 0.55 && this._force <= 0) want = -dir * 0.6;   // spacing
     if (this.plan === 'edgeguard') { if (this.planT-- > 0) want = dir; else this.plan = 'approach'; }
 
     o.ax = clamp(want, -1, 1) * (adx > 260 ? 1 : 0.75);
 
+    /* ------- DESCENDRE D'UNE PLATEFORME -------
+       Elle vient AVANT le garde-fou, pour que le garde-fou puisse
+       encore refuser une descente vers le vide.
+
+       Le cas traversant était déjà traité. Le cas PLEIN ne l'était
+       pas du tout, et c'est lui qui coinçait les bots : sur une
+       plateforme qu'on ne peut pas traverser, la seule sortie est de
+       marcher jusqu'au bord. Personne ne le leur avait dit — d'où
+       les vingt-six secondes passées sur le plafond du Tunnel de
+       Lave. */
+    if (dy > 130 && f.grounded && f.platform) {
+      const presse = this._force > 0;
+      if (f.platform.pass) {
+        if (Math.random() < (presse ? 0.5 : 0.1)) { o.ay = 1; o.jump = true; }
+      } else {
+        const p = f.platform;
+        /* le bord le plus proche, à condition qu'il y ait quelque
+           chose en dessous : on descend, on ne se jette pas */
+        const versGauche = (f.x - p.x) < (p.x + p.w - f.x);
+        for (const d of (versGauche ? [-1, 1] : [1, -1])) {
+          const bord = d < 0 ? p.x - 30 : p.x + p.w + 30;
+          if (this.solA(bord, f.y, 900)) { o.ax = d; break; }
+        }
+      }
+    }
+
     // ------- garde-fou : ne jamais courir ni sauter dans le vide -------
-    const main = stage.plats.find(p => !p.pass);
-    // le bot garde-rebord reste SUR la scène : il n'accompagne jamais
-    // son adversaire dans le vide
+    /* Même correction qu'ailleurs : la question est « y a-t-il du sol
+       devant », pas « suis-je près du bord de la première plateforme
+       de la liste ». C'est ce qui empêchait de quitter une
+       plateforme haute, et ce qui faisait piétiner les bots au milieu
+       des arènes à plusieurs plateaux. */
+    /* Le trou se teste AVANT le garde-fou, pas après. Dans l'ordre
+       inverse, le garde-fou faisait reculer le bot du bord, ce qui
+       annulait la détection du trou, ce qui empêchait le saut : la
+       seule façon de franchir un vide était interdite par la règle
+       censée protéger du vide. */
+    const gap = this.gapAhead(sign(o.ax || dir));
     let atLedge = false;
-    if (main && f.grounded) {
-      const margin = 52 + f.w * 0.5;
-      if (o.ax < 0 && f.x < main.x + margin) { o.ax = 0.25; atLedge = true; }
-      if (o.ax > 0 && f.x > main.x + main.w - margin) { o.ax = -0.25; atLedge = true; }
+    if (!gap && f.grounded && o.ax !== 0 && !this.solDevant(sign(o.ax))) {
+      o.ax = -sign(o.ax) * 0.25; atLedge = true;
     }
     /* Le garde-rebord abandonne dès qu'il quitte lui-même la scène, ou
        dès qu'il a brûlé son spécial haut. Poursuivre un adversaire
        dans le vide, c'est échanger un K.O. contre une vie : mauvais
        calcul, et surtout spectacle absurde. */
     if (this.plan === 'edgeguard' &&
-        (f.upUsed || !f.grounded && (f.x < main.x || f.x > main.x + main.w)))
+        (f.upUsed || (!f.grounded && !this.solA(f.x, f.y, 400))))
       this.plan = 'approach';
 
     // saut : cible en hauteur, ou trou franchissable devant
-    const gap = !atLedge && this.gapAhead(sign(o.ax || dir));
-    const needJump = (dy < -90 && adx < 220) || gap;
-    if (needJump && this.jumpCd <= 0 && Math.random() < 0.4 + L.aggro * 0.3) {
+    void atLedge;
+    const needJump = (dy < -90 && adx < 220) || gap ||
+                     (this._force > 0 && dy < -60);
+    if (needJump && this.jumpCd <= 0 && Math.random() < 0.4 + L.aggro * 0.3 + (this._force > 0 ? 0.4 : 0)) {
       o.jump = true; this.jumpCd = 10 + rndi(0, 8);
     }
     if (!f.grounded && dy > 120 && f.vy < 0) o.ay = 1;         // fast fall
-
-    // descente de plateforme
-    if (dy > 130 && f.grounded && f.platform && f.platform.pass && Math.random() < 0.1) {
-      o.ay = 1; o.jump = true;
-    }
 
     this.out = o;
     return o;
@@ -18620,55 +18759,67 @@ class Brain {
   isOffstage() {
     const f = this.f, M = f.M;
     if (f.grounded || f.state === ST.LEDGE) return false;
-    const main = M.stage.plats.find(p => !p.pass);
-    if (!main) return false;
-    const on = f.x > main.x + 6 && f.x < main.x + main.w - 6;
-    if (!on) return true;
-    if (f.y > main.y + 30) return true;
-    /* le vent compte : s'il souffle vers l'extérieur et qu'on tombe
-       déjà, on ne parie pas sur la chance */
-    const W = M.wind;
-    if (W && W.frames > 0 && f.vy > 2) {
-      const versDehors = sign(f.x - (main.x + main.w / 2)) === W.dir;
-      if (versDehors && f.y > main.y - 40) return true;
-    }
-    return false;
-  }
-
-  enemyOffstage(t) {
-    const M = this.f.M;
-    const main = M.stage.plats.find(p => !p.pass);
-    if (!main) return false;
-    return !t.grounded && (t.x < main.x || t.x > main.x + main.w || t.y > main.y + 60);
-  }
-
-  gapAhead(dir) {
-    const f = this.f;
-    if (!f.grounded) return false;
-    const M = f.M;
-    const x = f.x + dir * 70;
-    let landing = false;
-    for (const p of M.stage.plats) {
-      const top = p.y + (p.dy || 0);
-      if (x > p.x && x < p.x + p.w && Math.abs(f.y - top) < 30) { if (!p.pass) return false; landing = true; }
-    }
-    // aucun sol solide de l'autre côté : c'est le vide, on ne saute pas dedans
-    if (!landing) {
-      for (const p of M.stage.plats) {
-        if (p.pass) continue;
-        const top = p.y + (p.dy || 0);
-        if (x + dir * 130 > p.x && x + dir * 130 < p.x + p.w && Math.abs(f.y - top) < 120) return true;
+    if (!M || !M.stage) return false;
+    /* Hors scène ne veut plus dire « à côté de la première
+       plateforme pleine » — sur le Cirque de Cilaos, cela déclarait
+       hors scène quiconque sautait au-dessus de la falaise DE DROITE,
+       et le bot filait vers la gauche au lieu de se battre. Cela veut
+       dire : plus rien où retomber, ni sous moi ni à portée de
+       chute. */
+    if (this.solA(f.x, f.y, 1100)) {
+      /* le vent compte : s'il souffle vers l'extérieur et qu'on tombe
+         déjà, on ne parie pas sur la chance */
+      const W = M.wind;
+      if (W && W.frames > 0 && f.vy > 2) {
+        const p = this.solProche();
+        if (p) {
+          const cx = p.x + p.w / 2;
+          if (sign(f.x - cx) === W.dir && f.y > (p.y + (p.dy || 0)) - 40) return true;
+        }
       }
       return false;
     }
     return true;
   }
 
+  enemyOffstage(t) {
+    const M = this.f.M;
+    if (!M || !M.stage) return false;
+    if (t.grounded) return false;
+    for (const p of M.stage.plats) {
+      const top = p.y + (p.dy || 0);
+      if (t.x > p.x - 20 && t.x < p.x + p.w + 20 && top > t.y - 60 && top < t.y + 700) return false;
+    }
+    return true;
+  }
+
+  /* Y a-t-il un trou juste devant, ET une rive de l'autre côté ?
+
+     L'ancienne version regardait soixante-dix pixels devant, puis
+     deux cents, et n'acceptait d'atterrir qu'à trente pixels près en
+     hauteur. Un saut porte à trois cents pixels, et une rive est
+     rarement exactement au même niveau : au Cirque de Cilaos, le pont
+     est quarante pixels sous les falaises, donc invisible pour ce
+     test. Les bots ne traversaient jamais, chacun restait sur sa
+     falaise — c'est précisément ce que le joueur appelle camper. */
+  gapAhead(dir) {
+    const f = this.f;
+    if (!f.grounded) return false;
+    if (this.solA(f.x + dir * 70, f.y, 40)) return false;    // le sol continue : pas de trou
+    for (let d = 110; d <= 380; d += 45)
+      if (this.solA(f.x + dir * d, f.y, 300)) return true;   // une rive à portée de saut
+    return false;
+  }
+
   recover(o, stage) {
     const f = this.f, L = this.lv;
-    const main = stage.plats.find(p => !p.pass) || stage.plats[0];
+    /* On remonte vers la plateforme la PLUS PROCHE, pas vers la
+       première de la liste. Sur une arène à deux plateaux, viser le
+       centre du plateau d'en face, c'est traverser tout le vide avec
+       un seul saut : le bot mourait en essayant de « rentrer ». */
+    const main = this.solProche() || stage.plats.find(p => !p.pass) || stage.plats[0];
     const top = main.y + (main.dy || 0);
-    const cx = main.x + main.w / 2;
+    const cx = clamp(f.x, main.x + 30, main.x + main.w - 30);
     const dir = sign(cx - f.x) || 1;
 
     // on dérive TOUJOURS vers la scène : jamais d'input vide en récupération
@@ -19587,7 +19738,12 @@ class Match {
     if (this.koCine) { this.koCine.t++; if (this.koCine.t > 200) this.koCine = null; }
     if (this.over) {
       this.endT++;
-      if (this.endT === 1) { Audio2.stopMusic(); Audio2.jingle(this.result.draw ? 'lose' : 'win'); }
+      /* `result` est pose par `finish()`. Si quoi que ce soit marque la
+         partie terminee sans passer par la — un mode de jeu, un abandon
+         reseau, un test — cette ligne levait une erreur qui arretait net
+         la boucle de jeu, ecran fige. Une lecture prudente coute un
+         caractere et supprime la classe entiere de pannes. */
+      if (this.endT === 1) { Audio2.stopMusic(); Audio2.jingle((this.result && this.result.draw) ? 'lose' : 'win'); }
       if (this.endT === 70) Audio2.playMusic('victory');
     }
   }
@@ -20606,6 +20762,9 @@ const I18N = {
     kos: 'KO', falls: 'CHUTES', dmg: 'DÉGÂTS',
     spd: 'VITESSE', pow: 'PUISSANCE', wgt: 'POIDS', air: 'AÉRIEN',
     pickChar: 'Clique sur un slot puis sur un combattant',
+    /* La version courte : dans la fiche d'un emplacement vide, la
+       phrase complete debordait de la carte sur telephone. */
+    pickCharCourt: 'Choisis un combattant',
     selectAll: 'Choisis un combattant pour chaque joueur actif',
     lvl: 'NIV', sound: 'SON', full: 'PLEIN ÉCRAN', quality: 'QUALITÉ',
     hintMusic: 'Chaque morceau est synthétisé en direct — roulèr, kayamb, pikèr, basse, marimba',
@@ -20636,6 +20795,7 @@ const I18N = {
     kos: 'KO', falls: 'TONBÉ', dmg: 'DÉGA',
     spd: 'VITÈS', pow: 'PISANS', wgt: 'POI', air: 'AÉRYIN',
     pickChar: 'Klik dsi in slot apré dsi in gèryé',
+    pickCharCourt: 'Choizi in gèryé',
     selectAll: 'Shwazi in gèryé pou shak zoueur',
     lvl: 'NIV', sound: 'SON', full: 'GRAN LÉKRAN', quality: 'KALITÉ',
     hintMusic: 'Tout la mizik lé fabriké an direk — roulèr, kayamb, pikèr, bas, marimba',
@@ -20666,6 +20826,7 @@ const I18N = {
     kos: 'KOS', falls: 'FALLS', dmg: 'DAMAGE',
     spd: 'SPEED', pow: 'POWER', wgt: 'WEIGHT', air: 'AIR',
     pickChar: 'Click a slot, then click a fighter',
+    pickCharCourt: 'Pick a fighter',
     selectAll: 'Pick a fighter for every active slot',
     lvl: 'LV', sound: 'SOUND', full: 'FULLSCREEN', quality: 'QUALITY',
     hintMusic: 'Every track is synthesised live — roulèr, kayamb, pikèr, bass, marimba',
@@ -21129,7 +21290,7 @@ const UI = {
         (s.device.indexOf('kb') === 0 ? KEYMAPS[s.device].label : 'Manette ' + (+s.device[2] + 1));
       document.getElementById('slotname-' + i).textContent = s.char ? charName(s.char, this.lang) : '—';
       document.getElementById('slottag-' + i).textContent = s.char
-        ? (this.lang === 'en' ? s.char.tagEN : s.char.tagFR) : T('pickChar');
+        ? (this.lang === 'en' ? s.char.tagEN : s.char.tagFR) : T('pickCharCourt');
       const cv = document.getElementById('slotcv-' + i);
       if (cv) this.drawPortrait(cv, s.char, i);
     });
@@ -42060,15 +42221,24 @@ const Visite = {
   border: 1px solid rgba(255,255,255,.10);
   border-radius: 14px;
   box-shadow: 0 10px 26px rgba(0,0,0,.42);
-  padding: 16px 18px 14px !important;
+  /* La place du titre est reservee EN HAUT DU PANNEAU, pas au-dessus
+     de lui : voir la note du bloc suivant. */
+  padding: 30px 18px 14px !important;
   position: relative;
 }
+/* Le titre etait pose a cheval sur le bord (top: -9px), donc a
+   l'exterieur du panneau. Partout ou un parent coupe ce qui deborde
+   — et sur telephone la colonne des reglages defile, donc elle coupe
+   — la pastille se retrouvait tranchee en deux dans la hauteur. Un
+   libelle ne doit jamais dependre de ce que fait son parent : on le
+   rentre a l'interieur, ou plus rien ne peut le rogner. */
 #rules::before {
   content: attr(data-titre);
-  position: absolute; top: -9px; left: 16px;
-  padding: 1px 10px; border-radius: 999px;
+  position: absolute; top: 10px; left: 16px;
+  padding: 2px 10px; border-radius: 999px; line-height: 1.35;
   background: linear-gradient(180deg, #ffd166, #e0a32a);
   color: #2a1c00; font-size: 10px; font-weight: 900; letter-spacing: .16em;
+  max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 /* ============================================================
@@ -42676,21 +42846,36 @@ const Visite = {
   };
 
   /* Le moteur appelle `Poses.victory(t)` sans dire QUI danse. On lui
-     passe le combattant en le retenant le temps du dessin — c'est la
-     seule information qui manquait. */
-  if (typeof Fighter !== 'undefined' && Fighter.prototype && Fighter.prototype.draw) {
-    const dessin = Fighter.prototype.draw;
-    Fighter.prototype.draw = function (ctx) {
-      const av = Poses.__danseur;
-      Poses.__danseur = this;
-      try { return dessin.call(this, ctx); }
-      finally { Poses.__danseur = av; }
-    };
+     passe le combattant en le retenant le temps du calcul.
+
+     CORRECTION — et c'est ELLE qui faisait que les danses ne se
+     voyaient jamais en jeu : la pose de victoire n'est pas choisie
+     au moment du DESSIN, elle l'est dans `updateAnim`, pendant la
+     mise à jour. On accrochait donc la mauvaise méthode : au moment
+     où `Poses.victory` était appelée, personne n'avait dit qui
+     dansait, et la pose commune reprenait la main à tous les coups.
+     On accroche maintenant les deux, parce que les deux dessinent :
+     `updateAnim` pour le combat, `draw` pour les aperçus. */
+  if (typeof Fighter !== 'undefined' && Fighter.prototype) {
+    for (const nom of ['updateAnim', 'draw']) {
+      if (typeof Fighter.prototype[nom] !== 'function') continue;
+      const orig = Fighter.prototype[nom];
+      Fighter.prototype[nom] = function () {
+        const av = Poses.__danseur;
+        Poses.__danseur = this;
+        try { return orig.apply(this, arguments); }
+        finally { Poses.__danseur = av; }
+      };
+    }
     const vic = Poses.victory;
     Poses.victory = function (t, f) { return vic(t, f || Poses.__danseur); };
   }
 
   window.DANSES_PAS = PAS;
+  /* la correspondance pièce → pas, dont le vestiaire a besoin pour
+     montrer une danse qu'on n'a pas encore équipée */
+  window.DANSES_ID = {};
+  for (const d of LISTE) window.DANSES_ID[d.id] = d.pas;
 })();
 
 
@@ -42915,6 +43100,560 @@ const Visite = {
     ctx.restore();
     return r;
   };
+})();
+
+
+/* ===== 69-vestiaire-danse.js ===== */
+/* ============================================================
+   SMASH PÉI — LA DANSE SE VOIT DANS LE VESTIAIRE
+
+   On pouvait équiper une danse, mais rien ne bougeait : l'aperçu du
+   vestiaire dessinait UNE image, une seule, au moment où la page se
+   construisait. Le personnage y était figé dans sa pose de repos.
+   Acheter un pas de séga revenait donc à choisir un nom dans une
+   liste, sans jamais savoir ce qu'on prenait.
+
+   Deux corrections, et la seconde compte autant que la première :
+
+     1. L'APERÇU VIT. Une boucle d'animation tourne tant que le
+        vestiaire est à l'écran, et s'arrête dès qu'on en sort. Le
+        personnage respire au repos, et danse pour de bon quand le
+        casier DANSE est ouvert.
+
+     2. ON VOIT AVANT DE POSSÉDER. Toucher une danse encore
+        verrouillée la montre quand même dans l'aperçu, avec sa
+        mention de niveau. C'est ce qui donne envie de monter : une
+        récompense qu'on ne peut pas regarder n'en est pas une.
+   ============================================================ */
+(function vestiaireDanse() {
+  if (typeof UI === 'undefined' || typeof UI.renderLocker !== 'function') return;
+  if (typeof Poses === 'undefined' || typeof drawFighterRig !== 'function') return;
+
+  /* ============================================================
+     1) LE DESSIN D'UNE IMAGE
+
+     Repris tel quel de l'aperçu d'origine — même cadrage, même
+     halo, même échelle — pour que rien ne saute au moment où
+     l'animation démarre. Seule la POSE devient variable.
+     ============================================================ */
+  function dessine(cv, perso, pose) {
+    const c = cv.getContext('2d');
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, cv.width, cv.height);
+    const g = c.createRadialGradient(cv.width / 2, cv.height * 0.4, 8,
+                                     cv.width / 2, cv.height * 0.5, cv.width * 0.7);
+    g.addColorStop(0, rgba(perso.pal.cloth || perso.pal.skin, 0.34));
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = g; c.fillRect(0, 0, cv.width, cv.height);
+    c.save();
+    c.translate(cv.width / 2, cv.height * 0.92);
+    const sc = (cv.width / 420) * 2.5 / ((perso.stats && perso.stats.size) || 1);
+    c.scale(sc, sc);
+    try { drawFighterRig(c, perso, pose, { scale: 1 }); } catch (e) {}
+    c.restore();
+  }
+
+  /* ============================================================
+     2) LA BOUCLE
+
+     Une seule, partagée, qui s'arrête d'elle-même. Elle ne tourne
+     que si l'écran du vestiaire est visible : quitter le menu suffit
+     à la couper, on n'a rien à débrancher à la main.
+     ============================================================ */
+  let boucle = 0;
+  let horloge = 0;
+
+  function visible() {
+    const sc = document.getElementById('sc-locker');
+    return !!(sc && sc.classList.contains('on'));
+  }
+
+  function image() {
+    boucle = 0;
+    if (!visible()) return;
+    const cv = document.getElementById('lockercv');
+    const ch = UI.lockerChar;
+    if (cv && ch) {
+      horloge++;
+      let perso;
+      try { perso = cosmeticChar(ch, Progress.equipped(ch.id)); } catch (e) { perso = ch; }
+
+      /* Quelle danse regarde-t-on ? Celle qu'on vient de toucher
+         dans le tiroir, sinon celle qui est équipée. */
+      const pas = UI.__danseApercu ||
+                  (perso.features && perso.features.danse) || null;
+
+      let pose;
+      if (UI.lockerSlot === 'dance' && pas && window.DANSES_PAS && DANSES_PAS[pas]) {
+        pose = DANSES_PAS[pas](horloge);
+      } else if (UI.lockerSlot === 'dance') {
+        pose = Poses.victory(horloge, perso);
+      } else {
+        pose = Poses.idle(horloge);
+      }
+      dessine(cv, perso, pose);
+    }
+    boucle = requestAnimationFrame(image);
+  }
+
+  function reveille() {
+    if (boucle || !visible()) return;
+    boucle = requestAnimationFrame(image);
+  }
+
+  /* ============================================================
+     3) LE BRANCHEMENT
+
+     Après chaque construction du vestiaire : on relance la boucle,
+     et on rend les cartes de danse « regardables », y compris les
+     verrouillées. Un premier toucher montre, un second équipe —
+     donc on ne perd pas le geste habituel, on l'enrichit.
+     ============================================================ */
+  const rendu = UI.renderLocker.bind(UI);
+  UI.renderLocker = function () {
+    const r = rendu();
+
+    /* la danse équipée redevient la référence dès qu'on change de
+       personnage ou d'emplacement */
+    if (this.lockerSlot !== 'dance') this.__danseApercu = null;
+
+    try {
+      const box = document.getElementById('locker-items');
+      if (box && this.lockerSlot === 'dance') {
+        box.querySelectorAll('.lk-card').forEach(b => {
+          const id = b.dataset.id;
+          const pas = window.DANSES_ID && DANSES_ID[id];
+          if (!pas) return;
+          const equipe = b.onclick;
+          const montre = () => {
+            if (this.__danseApercu === pas) return;
+            this.__danseApercu = pas;
+            horloge = 0;
+            box.querySelectorAll('.lk-card').forEach(x => x.classList.remove('vu'));
+            b.classList.add('vu');
+            reveille();
+          };
+          /* survol à la souris : l'aperçu suit le regard, sans clic */
+          b.onmouseenter = montre;
+          b.onclick = (e) => {
+            const dejaVu = this.__danseApercu === pas;
+            montre();
+            /* une pièce verrouillée ne s'équipe pas, mais elle se
+               regarde : on remplace le refus sec par une démonstration */
+            if (b.classList.contains('lock')) {
+              if (typeof Audio2 !== 'undefined') Audio2.ui('move');
+              return;
+            }
+            /* premier toucher = aperçu, second = on équipe. Sur écran
+               tactile il n'y a pas de survol : sans cette étape, on
+               équiperait sans jamais avoir vu le pas. */
+            const tactile = document.body.classList.contains('mob');
+            if (!dejaVu && tactile) { if (typeof Audio2 !== 'undefined') Audio2.ui('move'); return; }
+            if (equipe) equipe.call(b, e);
+          };
+        });
+        const vu = this.__danseApercu;
+        if (vu) box.querySelectorAll('.lk-card').forEach(x => {
+          if (window.DANSES_ID && DANSES_ID[x.dataset.id] === vu) x.classList.add('vu');
+        });
+      }
+    } catch (e) {}
+
+    reveille();
+    return r;
+  };
+
+  /* On relance aussi à l'ouverture de l'écran : on peut y revenir
+     sans repasser par une construction complète. */
+  if (typeof UI.show === 'function') {
+    const showOrig = UI.show.bind(UI);
+    UI.show = function (id) {
+      const r = showOrig(id);
+      if (id === 'locker') { horloge = 0; setTimeout(reveille, 0); }
+      return r;
+    };
+  }
+
+  /* ============================================================
+     4) LE REPÈRE VISUEL
+
+     La carte qu'on est en train de regarder porte un liseré clair :
+     sans lui, on ne saurait pas d'où vient ce qu'on voit bouger.
+     ============================================================ */
+  const st = document.createElement('style');
+  st.textContent =
+    '.lk-card.vu { box-shadow: 0 0 0 2px rgba(255,255,255,.55) inset, 0 8px 22px rgba(0,0,0,.4); }' +
+    '.lk-card.lock.vu { filter: grayscale(.35) brightness(.85); }' +
+    '#lockercv { cursor: default; }';
+  document.head.appendChild(st);
+
+  window.VESTIAIRE_ANIME = reveille;
+})();
+
+
+/* ===== 70-memes.js ===== */
+/* ============================================================
+   SMASH PÉI — LES MOTS DU PAYS
+
+   Le jeu se passe à La Réunion, et pendant un combat on n'entendait
+   pas un mot de créole. Le joueur demande des « mèmes créoles » au
+   départ, sur les K.O. et à la fin — en précisant l'essentiel :
+
+       « Il faut pas que ça fasse trop mais que c'est bien placé. »
+
+   C'est une consigne de DOSAGE, et c'est elle qui a guidé l'écriture
+   de ce fichier autant que le contenu. Une phrase qui revient à
+   chaque K.O. cesse d'être drôle au troisième combat ; une phrase
+   qui apparaît pendant un échange gêne la lecture du jeu. Les règles
+   sont donc strictes :
+
+     · UNE au coup d'envoi, une fois la bannière ALLEZ passée ;
+     · sur les K.O., à peine plus d'un sur trois, jamais deux en
+       moins de six secondes, et TROIS AU MAXIMUM par combat ;
+     · une seule au moment où quelqu'un tombe à sa dernière vie ;
+     · UNE à la fin, choisie selon ce qui vient de se passer.
+
+   Cela fait quatre à cinq apparitions dans un combat de trois
+   minutes. On les remarque, on ne les subit pas.
+
+   Sur la forme : le créole est écrit en grand, et la traduction dans
+   la langue de l'interface se glisse en dessous, en petit. Un joueur
+   de l'île lit la première ligne et sourit ; un joueur d'ailleurs lit
+   la seconde et apprend un mot. Personne n'est laissé dehors.
+
+   Le bandeau se place SOUS le combat et AU-DESSUS des jauges : ni
+   dans les jambes de la bannière K.O., ni par-dessus les dégâts.
+   ============================================================ */
+(function memes() {
+  if (typeof Match === 'undefined' || !Match.prototype) return;
+
+  /* ============================================================
+     1) LES PHRASES
+
+     Du créole réunionnais réel, pas du français déguisé : « aïo »,
+     « bat' karé », « tienbo », « zarboutan » sont des mots qu'on
+     entend, et la traduction française donnée ici est celle du sens,
+     pas du mot à mot.
+     ============================================================ */
+  const DEPART = [
+    { cr: 'Anou zoué !',        fr: 'On y va !',              en: 'Let\'s play!' },
+    { cr: 'Sa i sava chofé !',  fr: 'Ça va chauffer !',       en: 'This is going to get hot!' },
+    { cr: 'Alé, mi atann a ou !', fr: 'Vas-y, je t\'attends !', en: 'Come on, I\'m waiting!' },
+    { cr: 'Tienbo lo kèr !',    fr: 'Accroche-toi !',         en: 'Hold on tight!' },
+    { cr: 'Larg pa lo mor !',   fr: 'Ne lâche rien !',        en: 'Don\'t let go!' },
+    { cr: 'Gard\' a ou !',      fr: 'Fais gaffe à toi !',     en: 'Watch yourself!' },
+    { cr: 'Zot lé paré ?',      fr: 'Vous êtes prêts ?',      en: 'Are you all ready?' }
+  ];
+
+  const KO = [
+    { cr: 'Aïo !',                fr: 'Aïe !',                    en: 'Ouch!' },
+    { cr: 'Ala i vol\' !',        fr: 'Et le voilà qui vole !',   en: 'And off he flies!' },
+    { cr: 'Té, zot la vu sa ?',   fr: 'Eh, vous avez vu ça ?',    en: 'Hey, did you see that?' },
+    { cr: 'Fini bat\' karé !',    fr: 'Fini la balade !',         en: 'Stroll\'s over!' },
+    { cr: 'Anlèr !',              fr: 'En l\'air !',              en: 'Airborne!' },
+    { cr: 'Sa i fé mal, sa !',    fr: 'Ça, ça fait mal !',        en: 'That one hurt!' },
+    { cr: 'Kraz\' net !',         fr: 'Écrasé net !',             en: 'Flattened!' },
+    { cr: 'Salu, bay !',          fr: 'Salut, au revoir !',       en: 'Bye now!' },
+    { cr: 'Out\' zafèr lé fané !', fr: 'Ton affaire est fichue !', en: 'You\'re done for!' }
+  ];
+
+  const DERNIERE = [
+    { cr: 'Mi la pa fini !',    fr: 'J\'ai pas dit mon dernier mot !', en: 'I\'m not done yet!' },
+    { cr: 'Alon, ankor inn kou !', fr: 'Allez, encore un coup !', en: 'Come on, one more!' },
+    { cr: 'Tienbo, mon dalon !', fr: 'Tiens bon, l\'ami !',      en: 'Hang in there, mate!' }
+  ];
+
+  const FIN = [
+    { cr: 'Nou la gaingné !',        fr: 'On a gagné !',            en: 'We won!' },
+    { cr: 'Sa mèm !',                fr: 'C\'est ça même !',        en: 'That\'s the one!' },
+    { cr: 'Ala inn zarboutan !',     fr: 'En voilà un pilier !',    en: 'Now that\'s a legend!' },
+    { cr: 'Lo mèt la parlé !',       fr: 'Le maître a parlé !',     en: 'The master has spoken!' },
+    { cr: 'Pèsonn pou arèt a mwin !', fr: 'Personne pour m\'arrêter !', en: 'No one can stop me!' }
+  ];
+
+  const EGALITE = [
+    { cr: 'Ni koné pa kisa !', fr: 'On ne sait même pas qui !', en: 'Nobody even knows who!' }
+  ];
+
+  /* ============================================================
+     2) LE DOSAGE
+
+     Tout est ici, en clair, pour qu'on puisse le relire d'un coup
+     d'œil : c'est la partie du fichier qui décide si le jeu est
+     agréable ou fatigant.
+     ============================================================ */
+  const REGLES = {
+    chanceKO: 0.36,        // à peine plus d'un K.O. sur trois
+    maxKO: 3,              // et jamais plus de trois par combat
+    chanceDerniere: 0.5,   // la dernière vie : une fois, si le sort le veut
+    reposImages: 360,      // six secondes de silence entre deux phrases
+    duree: 118,            // le temps d'affichage, entrée et sortie comprises
+    entree: 10, sortie: 20
+  };
+
+  function tire(liste, evites) {
+    const libres = liste.filter(x => evites.indexOf(x.cr) < 0);
+    const src = libres.length ? libres : liste;
+    return src[Math.floor(Math.random() * src.length)];
+  }
+
+  /* ============================================================
+     3) LE BANDEAU
+     ============================================================ */
+  function pose(M, phrase, teinte) {
+    if (!phrase) return;
+    M.__meme = { p: phrase, t: 0, col: teinte || '#ffd166' };
+    M.__memeRepos = REGLES.reposImages;
+    (M.__memeVus || (M.__memeVus = [])).push(phrase.cr);
+  }
+
+  function dessine(M, ctx) {
+    const m = M.__meme;
+    if (!m) return;
+    const T = REGLES.duree;
+    if (m.t >= T) { M.__meme = null; return; }
+    /* entrée franche, sortie douce : on veut que l'œil l'attrape, pas
+       qu'il la cherche */
+    const k = m.t < REGLES.entree ? m.t / REGLES.entree
+            : m.t > T - REGLES.sortie ? (T - m.t) / REGLES.sortie : 1;
+    const monte = (1 - k) * 16;
+
+    const lang = M.lang === 'en' ? 'en' : (M.lang === 'cr' ? 'cr' : 'fr');
+    const gros = m.p.cr;
+    /* en créole dans l'interface, la traduction n'a pas lieu d'être */
+    const petit = lang === 'cr' ? '' : (m.p[lang] || m.p.fr);
+
+    ctx.save();
+    ctx.globalAlpha = k;
+    ctx.translate(VW / 2, VH - 186 + monte);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    ctx.font = '900 46px Bangers, Impact, sans-serif';
+    const lg = ctx.measureText(gros).width;
+    ctx.font = '700 15px system-ui, sans-serif';
+    const lp = petit ? ctx.measureText(petit).width : 0;
+    const larg = Math.max(lg, lp) + 54;
+    const haut = petit ? 76 : 56;
+
+    /* la pastille : assez sombre pour que le texte tienne par-dessus
+       n'importe quel décor, assez discrète pour ne pas cacher le jeu */
+    ctx.beginPath();
+    const r = haut / 2;
+    ctx.moveTo(-larg / 2 + r, -haut / 2);
+    ctx.arcTo(larg / 2, -haut / 2, larg / 2, haut / 2, r);
+    ctx.arcTo(larg / 2, haut / 2, -larg / 2, haut / 2, r);
+    ctx.arcTo(-larg / 2, haut / 2, -larg / 2, -haut / 2, r);
+    ctx.arcTo(-larg / 2, -haut / 2, larg / 2, -haut / 2, r);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(8,10,16,.9)';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = rgba(m.col, 0.7);
+    ctx.stroke();
+
+    const yg = petit ? -12 : 0;
+    ctx.font = '900 46px Bangers, Impact, sans-serif';
+    ctx.lineWidth = 7; ctx.strokeStyle = 'rgba(0,0,0,.85)';
+    ctx.strokeText(gros, 0, yg);
+    const g = ctx.createLinearGradient(0, yg - 22, 0, yg + 22);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(1, m.col);
+    ctx.fillStyle = g;
+    ctx.fillText(gros, 0, yg);
+
+    if (petit) {
+      ctx.font = '700 15px system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(240,246,253,.95)';
+      ctx.fillText(petit, 0, 21);
+    }
+    ctx.restore();
+  }
+
+  /* ============================================================
+     4) LES MOMENTS
+
+     On se branche sur les évènements qui existent déjà. Aucun
+     nouveau compteur dans la boucle de jeu : le bandeau ne coûte
+     rien tant qu'il n'y a rien à dire.
+     ============================================================ */
+
+  /* --- le coup d'envoi --- */
+  const majOrig = Match.prototype.update;
+  Match.prototype.update = function () {
+    const r = majOrig.apply(this, arguments);
+    if (this.__memeRepos > 0) this.__memeRepos--;
+    if (this.__meme) this.__meme.t++;
+
+    /* on compte les images DEPUIS la fin du decompte : la banniere
+       verte ALLEZ dure soixante-seize images, et le bandeau ne doit
+       pas lui marcher dessus. `frame` ne convenait pas — il tourne
+       deja pendant le decompte. */
+    if (!this.__memeDepart && this.intro <= 0 && !this.over) {
+      this.__memeAttente = (this.__memeAttente || 0) + 1;
+      if (this.__memeAttente > 86) {
+        this.__memeDepart = true;
+        pose(this, tire(DEPART, []), '#7ef08a');
+      }
+    }
+    return r;
+  };
+
+  /* --- les K.O. --- */
+  if (typeof Match.prototype.onKO === 'function') {
+    const koOrig = Match.prototype.onKO;
+    Match.prototype.onKO = function (f, killer, dir) {
+      const r = koOrig.apply(this, arguments);
+      try {
+        this.__memeKO = (this.__memeKO || 0);
+        if (!this.over && this.__memeRepos <= 0 && this.__memeKO < REGLES.maxKO &&
+            Math.random() < REGLES.chanceKO) {
+          this.__memeKO++;
+          pose(this, tire(KO, this.__memeVus || []), (killer && killer.color) || '#ff6b2c');
+        } else if (!this.over && !this.__memeDerniere && this.__memeRepos <= 0 &&
+                   f && f.stocks === 1 && Math.random() < REGLES.chanceDerniere) {
+          /* la dernière vie : le moment le plus tendu du combat, et
+             celui où une phrase porte le plus */
+          this.__memeDerniere = true;
+          pose(this, tire(DERNIERE, this.__memeVus || []), (f && f.color) || '#ffd166');
+        }
+      } catch (e) {}
+      return r;
+    };
+  }
+
+  /* --- la fin --- */
+  if (typeof Match.prototype.finish === 'function') {
+    const finOrig = Match.prototype.finish;
+    Match.prototype.finish = function (winner) {
+      const r = finOrig.apply(this, arguments);
+      try {
+        this.__memeRepos = 0;
+        pose(this, winner ? tire(FIN, this.__memeVus || []) : EGALITE[0],
+             winner ? (winner.color || '#ffd166') : '#9aa5b8');
+      } catch (e) {}
+      return r;
+    };
+  }
+
+  /* --- le dessin, juste avant les jauges --- */
+  if (typeof Match.prototype.drawHud === 'function') {
+    const hudOrig = Match.prototype.drawHud;
+    Match.prototype.drawHud = function (ctx) {
+      try { dessine(this, ctx); } catch (e) {}
+      return hudOrig.apply(this, arguments);
+    };
+  }
+
+  window.MEMES_PEI = { DEPART, KO, DERNIERE, FIN, EGALITE, REGLES };
+})();
+
+
+/* ===== 71-mise-en-forme.js ===== */
+/* ============================================================
+   SMASH PÉI — LES TEXTES QUI SE FONT COUPER
+
+   Le joueur envoie une photo : la pastille RÉGLAGES tranchée en
+   deux, en haut du panneau des règles. Plutôt que de corriger cette
+   pastille et de passer à la suite, on a cherché TOUS les textes
+   coupés du jeu, écran par écran et format par format, avec une
+   mesure automatique : un élément est « coupé » quand il dépasse de
+   la boîte d'un parent qui rogne ce qui sort, et que rien ne permet
+   d'aller le chercher — pas de défilement, pas de repli.
+
+   Trente-six signalements bruts, dont trente d'inoffensifs : une
+   carte à moitié visible en bas d'une liste qui défile n'est pas un
+   défaut, c'est une liste. Restaient deux vrais défauts :
+
+     1. LA PASTILLE RÉGLAGES, posée à cheval sur le bord supérieur du
+        panneau (top: -9px). Corrigée dans le fichier de l'écran de
+        préparation : elle est maintenant À L'INTÉRIEUR, là où
+        aucun parent ne peut la rogner.
+
+     2. LES FICHES DE JOUEUR EN PORTRAIT. Sur un téléphone tenu
+        debout, les quatre emplacements sont rangés en deux colonnes
+        de cent quatre-vingt-sept pixels — alors qu'une fiche en
+        réclame deux cent cinquante-sept. Les fiches P2 et P4
+        sortaient donc de l'écran de soixante et un pixels, et le
+        niveau du bot s'y lisait « NIV 2 · MARM… ». C'est ce fichier
+        qui la corrige.
+
+   La cause de fond, pour les fiches, est une règle de grille peu
+   connue : un élément de grille refuse par défaut de rétrécir sous
+   sa propre largeur minimale. Deux colonnes de 1fr ne suffisent donc
+   pas à faire tenir quoi que ce soit — il faut EN PLUS autoriser le
+   rétrécissement.
+   ============================================================ */
+(function miseEnForme() {
+  const st = document.createElement('style');
+  st.id = 'coupe-style';
+  /* ATTENTION : chaine gabarit JavaScript. Aucun accent grave ici. */
+  st.textContent = `
+/* ============================================================
+   1) UNE FICHE DE JOUEUR PEUT RETRECIR
+   ============================================================ */
+.slot { min-width: 0; }
+.slot > * { min-width: 0; }
+.slot .info { min-width: 0; }
+/* Le sous-titre etait le seul texte sans garde-fou : quand aucun
+   combattant n'est choisi, il porte la phrase d'aide en entier et
+   poussait la fiche hors de l'ecran. Deux lignes, puis on coupe
+   proprement, avec des points de suspension. */
+.slot .info span {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden; line-height: 1.25;
+}
+.slot .ctrls { min-width: 0; }
+.slot .ctrls .chip {
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* ============================================================
+   2) TELEPHONE TENU DEBOUT : UNE SEULE COLONNE
+
+   Deux fiches cote a cote sur trois cent quatre-vingt-dix pixels ne
+   tiennent pas, et ne tiendront jamais : la colonne du milieu tombe
+   a cinquante-cinq pixels, ou meme un mot seul deborde. On empile.
+   Le critere est la LARGEUR seule, pas l'orientation : un telephone
+   etroit tenu de travers a exactement le meme probleme.
+   ============================================================ */
+@media (max-width: 620px) {
+  /* Selecteur volontairement lourd : la mise en page telephone pose
+     deja ses deux colonnes en !important, et elle installe sa feuille
+     de style APRES celle-ci. A poids egal, c'est la derniere qui
+     gagne — il faut donc peser plus lourd, pas arriver plus tard. */
+  #app.mob #slots.slots, #app #slots.slots, #slots.slots {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: repeat(4, auto) !important;
+  }
+  #app.mob .slot { padding: 8px 10px; }
+  #app.mob .slot .pnum { width: 1.7em; }
+}
+
+/* ============================================================
+   3) LES RANGEES D'ONGLETS QUI DEFILENT
+
+   Elles ne coupaient rien d'inatteignable — on peut les faire
+   glisser — mais un onglet coupe en deux ressemble a un defaut.
+   On leur rend une marge de fin et un repere de defilement.
+   ============================================================ */
+.sf-tabs, .mob-chips, .data-tabs, #opt-tabs {
+  scrollbar-width: none;
+}
+.sf-tabs::after, .data-tabs::after, #opt-tabs::after {
+  content: ''; flex: 0 0 10px;
+}
+
+/* ============================================================
+   4) LA REGLE GENERALE
+
+   Un libelle en pastille ne doit jamais etre pose a cheval sur le
+   bord de son panneau : c'est une mise en forme qui ne survit pas au
+   premier parent qui rogne. On le rappelle ici pour les panneaux qui
+   en portent un.
+   ============================================================ */
+[data-titre] { position: relative; }
+`;
+  document.head.appendChild(st);
 })();
 
 </script>
