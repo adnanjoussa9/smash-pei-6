@@ -2692,6 +2692,7 @@ const DEFAULT_OPTS = {
   shake: 1, hitstop: 1, dmgNumbers: true, showFps: false, showHitboxes: false,
   quality: 'auto', lang: 'fr', cameraZoom: 1, particles: 1, uiSounds: true, cosAll: false,
   tempoAssist: true,
+  voix: true,          // les repliques creoles dites a voix haute pendant un combat
   replays: true, replayMode: 'offer', tags: 'always', mastery: true, padRumble: true, touch: 'auto', touchScale: 1, touchOpacity: 0.82, touchHaptics: true, touchProfiled: false,
   touchLayout: null   // disposition tactile personnalisée : { active, items } — voir TouchLayout (17b) et load() ci-dessous
 };
@@ -7708,6 +7709,619 @@ window.__SUPERS_TARDIFS.push(function () {
 });
 
 
+/* ===== 03j-communautes.js ===== */
+/* ============================================================
+   SMASH PÉI — NEUF COMBATTANTS, NEUF COMMUNAUTÉS
+
+   Le joueur demande « un perso pour chaque communauté : zarabe,
+   chinois, malbar, zoreil, et tous les autres ».
+
+   C'est la demande la plus délicate de tout le projet, et elle mérite
+   qu'on dise comment elle a été traitée, parce qu'il y a deux façons
+   de la remplir et une seule est bonne.
+
+   LA MAUVAISE : donner à chacun un visage, une couleur de peau, un
+   accent. C'est le chemin le plus court vers la caricature, et il
+   produirait exactement le contraire de ce qui est demandé — une
+   galerie de types au lieu d'une galerie de gens.
+
+   LA BONNE, celle qui est suivie ici : ancrer chaque combattant dans
+   une PRATIQUE — un métier, un instrument, une fête, un savoir-faire,
+   une mémoire. Ce que les Réunionnais FONT, pas ce à quoi ils
+   ressemblent. Le porteur de kavadi se reconnaît à son arche, pas à
+   ses traits ; le danseur de lion à son costume ; le maron à sa
+   connaissance des remparts. On peut être fier d'une pratique ; on
+   n'est jamais fier d'un stéréotype.
+
+   Trois règles s'appliquent partout dans ce fichier :
+
+     1. AUCUN TRAIT PHYSIQUE ETHNIQUE. Les silhouettes, les têtes et
+        les couleurs de peau sont distribuées comme pour le reste du
+        casting, sans jamais servir à « marquer » une communauté.
+
+     2. LA PRATIQUE DEVIENT LA MÉCANIQUE. Le kavadi est un exercice
+        d'endurance : le personnage a de l'armure. Le lion de Nouvel
+        An se danse à deux et se nourrit du tambour : le personnage
+        monte en puissance au rythme. Le maron connaît les remparts :
+        il grimpe. Le sens de la culture doit se retrouver DANS LES
+        DOIGTS du joueur, sinon ce n'est qu'un costume.
+
+     3. RIEN DE SACRÉ N'EST TOURNÉ EN JEU. La marche sur le feu, par
+        exemple, n'apparaît jamais comme un gag : elle inspire une
+        mécanique d'endurance, ce qu'elle est réellement.
+
+   Et le neuvième combattant n'est aucune communauté en particulier :
+   c'est TI KRÉOL, qui emprunte le spécial de son adversaire. Le
+   métissage n'est pas une case en plus dans la liste, c'est ce qui
+   se passe entre les cases — alors il fallait le jouer, pas
+   l'illustrer.
+
+   Cette lecture est celle d'un regard extérieur : si un choix sonne
+   faux à quelqu'un de l'île, c'est ce choix-là qu'il faut changer, et
+   pas la peine de garder la façade.
+   ============================================================ */
+
+/* ---------- TI KAVADI — l'arche portée ----------
+   Le kavadi est une arche de bois et de plumes qu'on porte sur les
+   épaules pendant des heures. C'est un exercice d'endurance avant
+   d'être un ornement : d'où un combattant lourd, lent, qui encaisse
+   là où les autres reculent, et dont l'arche balaye tout autour de
+   lui quand il tourne. */
+defChar('kavadi', {
+  nFR: 'Ti Kavadi', nEN: 'Kavadi Bearer', nCR: 'Ti Kavadi',
+  tagFR: 'Porteur de l\'arche', tagEN: 'Arch bearer',
+  arch: 'heavy', dmgMul: 1.06, rangeMul: 1.18,
+  stats: { weight: 124, walk: 1.14, run: 2.62, air: 1.02, jump: 15.0, djump: 13.6, grav: 0.76, fall: 17.6, size: 1.08 },
+  pal: { skin: '#b8794c', skin2: '#8d5734', cloth: '#f2c14e', accent: '#d4402f',
+         hand: '#c98d5e', shoe: '#5c3a22', eye: '#1c1008' },
+  build: { width: 1.16, height: 1.06, headScale: 0.96, shape: 'bulky', limbW: 1.14 },
+  /* la gerbe de plumes au-dessus de la tete : c'est ce qu'on voit
+     d'un porteur avant de voir le porteur */
+  features: { head: 'round', crest: 'crest', hair: 'short' },
+  corps: 'tablier',
+  bio: { fr: 'Il porte l\'arche depuis le matin. Ce n\'est pas le poids qui fatigue, c\'est de la reposer.',
+         en: 'He has carried the arch since dawn. The weight is not the hard part — putting it down is.' },
+  specials: {
+    /* Neutre : l'arche tourne autour de lui. Un coup qui n'avance
+       pas mais qui interdit tout le pourtour — la seule façon de
+       jouer un porteur, c'est de tenir sa place. */
+    n: spSpin({ total: 52 }),
+    /* Avant : le pas lourd. Il n'accélère pas, il pèse. */
+    s: spRush({ total: 50, moveX: { s: 12, e: 34, v: 10 }, chargeable: true,
+        hits: [H({ s: 12, e: 34, x: 34, y: -66, w: 96, h: 96, dmg: 12.5, ang: 46, bkb: 52, kbg: 68, sfx: 'smashHit', fx: 'impact' })] }),
+    u: spUp({ riseV: -17.4, total: 50,
+        hits: [H({ s: 9, e: 24, x: 4, y: -112, w: 96, h: 112, dmg: 10.5, ang: 84, bkb: 40, kbg: 84, sfx: 'hit', fx: 'ringUp' })] }),
+    /* Bas : il plante l'arche et tient. L'armure est la traduction
+       exacte de ce qu'est l'épreuve : on ne rend pas les coups, on
+       reste debout. */
+    d: spCounter({ total: 50, window: [4, 30], mul: 1.55, minDmg: 11 })
+  },
+  super: { nameFR: 'MARCHE SUR LE FEU', nameEN: 'FIRE WALK', kind: 'marcheFeu', color: '#f2c14e', dmg: 5.4 }
+});
+
+/* ---------- TI BAZAR — l'étoffe ----------
+   Les boutiques de tissu du centre de Saint-Pierre font partie du
+   paysage de l'île depuis un siècle et demi. On en tire un combattant
+   qui ne frappe presque jamais : il attrape, il enroule, il ramène.
+   Une portée immense, très peu de dégâts bruts. */
+defChar('bazar', {
+  nFR: 'Ti Bazar', nEN: 'Cloth Trader', nCR: 'Ti Bazar',
+  tagFR: 'Rouleaux d\'étoffe', tagEN: 'Bolts of cloth',
+  arch: 'zoner', dmgMul: 0.9, rangeMul: 1.42,
+  stats: { weight: 92, walk: 1.34, run: 3.0, air: 1.28, jump: 16.2, djump: 15.0, grav: 0.63, fall: 15.2, size: 1.0 },
+  pal: { skin: '#a97a52', skin2: '#7d5636', cloth: '#2e8b74', accent: '#e8dcc0',
+         hand: '#bb8d62', shoe: '#43301f', eye: '#180f06' },
+  build: { width: 0.98, height: 1.04, headScale: 1.0, shape: 'slim', limbW: 0.9 },
+  features: { head: 'oval', cape: 'long', hat: 'cap' },
+  corps: 'chemise',
+  bio: { fr: 'Trois mètres de tissu et il te dit ta taille. Six mètres et tu ne bouges plus.',
+         en: 'Three metres of cloth and he knows your size. Six and you are not going anywhere.' },
+  specials: {
+    /* Neutre : le rouleau se déroule et RAMÈNE. C'est une saisie
+       longue portée, pas un tir. */
+    n: spProj({ total: 42, spawn: 12, special: 'tether',
+        proj: { vx: 17, vy: 0, grav: 0, dmg: 4.5, ang: 180, bkb: 10, kbg: 26, w: 30, h: 10, life: 30,
+                kind: 'orb', color: '#e8dcc0', sfx: 'whoosh', pull: true, reflectable: false } }),
+    /* Avant : le coup de rouleau. Long, plat, sans élan — il pousse
+       plus qu'il ne blesse. */
+    s: spRush({ total: 42, moveX: { s: 10, e: 22, v: 8 },
+        hits: [H({ s: 10, e: 28, x: 62, y: -60, w: 130, h: 44, dmg: 8.5, ang: 30, bkb: 62, kbg: 44, sfx: 'whoosh', fx: 'slash' })] }),
+    u: spUp({ riseV: -19.4, total: 46, tether: true,
+        hits: [H({ s: 8, e: 22, x: 4, y: -108, w: 78, h: 108, dmg: 8, ang: 86, bkb: 34, kbg: 86, sfx: 'whoosh', fx: 'ringUp' })] }),
+    /* Bas : la toile tendue. Elle renvoie ce qu'on lui envoie. */
+    d: spReflect({ total: 44, window: [4, 30] })
+  },
+  super: { nameFR: 'GRAND DÉBALLAGE', nameEN: 'THE BIG UNROLL', kind: 'grandDeballage', color: '#2e8b74', dmg: 4.6 }
+});
+
+/* ---------- TI LION — la danse du lion ----------
+   Le lion du Nouvel An chinois se danse à deux sous un costume, au
+   rythme du tambour, et il monte sur des poteaux. Le combattant est
+   donc acrobatique, il enchaîne, et il devient réellement plus fort
+   quand il ne s'arrête pas de bouger. */
+defChar('lion', {
+  nFR: 'Ti Lion', nEN: 'Lion Dancer', nCR: 'Ti Lion',
+  tagFR: 'Danseur de lion', tagEN: 'Lion dancer',
+  arch: 'rushdown', dmgMul: 0.96, rangeMul: 1.02,
+  stats: { weight: 88, walk: 1.62, run: 3.62, air: 1.5, jump: 17.4, djump: 16.4, grav: 0.6, fall: 15.6, size: 0.98 },
+  pal: { skin: '#e0483c', skin2: '#a82a24', cloth: '#f5c542', accent: '#1f9d55',
+         hand: '#f0e6d2', shoe: '#2a1810', eye: '#fff6d8' },
+  build: { width: 1.04, height: 0.98, headScale: 1.18, shape: 'round', limbW: 1.0 },
+  features: { head: 'wide', crest: 'crest', jaws: true },
+  corps: 'plumes',
+  bio: { fr: 'Il faut être deux là-dessous. Le devant décide, l\'arrière suit — et c\'est l\'arrière qui saute.',
+         en: 'It takes two under there. The front decides, the back follows — and the back is the one that jumps.' },
+  specials: {
+    /* Neutre : la gueule claque. Une saisie rapide, courte, qui
+       relance l'enchaînement. */
+    n: spCmdGrab({ total: 40, window: [8, 15], dmg: 11, ang: 72, bkb: 58, kbg: 56 }),
+    /* Avant : le bond du lion, pieds joints, qui franchit du terrain. */
+    s: spRush({ total: 38, moveX: { s: 8, e: 24, v: 17 },
+        hits: [H({ s: 8, e: 24, x: 26, y: -64, w: 76, h: 78, dmg: 9.5, ang: 52, bkb: 44, kbg: 64, sfx: 'hit', fx: 'impact' })] }),
+    /* Haut : la montée aux poteaux, en deux détentes. */
+    u: spUp({ riseV: -21.4, total: 44,
+        hits: [H({ s: 6, e: 20, x: 2, y: -110, w: 72, h: 106, dmg: 8.5, ang: 88, bkb: 32, kbg: 92, sfx: 'whoosh', fx: 'ringUp' })] }),
+    /* Bas : le roulement de tambour. Il ne touche personne — il
+       CHARGE. Le lion qui danse devient un lion qui fait mal. */
+    d: spCharge({ total: 46, spawn: 18, chargeMax: 70,
+        proj: { vx: 12, vy: -2, grav: 0.2, dmg: 7, ang: 361, bkb: 26, kbg: 58, w: 30, h: 30, life: 80,
+                kind: 'orb', color: '#f5c542', sfx: 'fire', trail: true, reflectable: true } })
+  },
+  super: { nameFR: 'RÉVEIL DU LION', nameEN: 'LION AWAKENS', kind: 'reveilLion', color: '#e0483c', dmg: 4.4 }
+});
+
+/* ---------- ZOREIL RANDONÈR — celui qui découvre ----------
+   Arrivé il y a trois semaines, équipé pour l'Himalaya, il fait le
+   Piton des Neiges en tongs par erreur et le raconte à tout le monde.
+   L'affection est de rigueur : c'est une taquinerie, pas un procès —
+   et c'est lui qui a le plus de matériel du casting. */
+defChar('zoreil', {
+  nFR: 'Zoreil Randonèr', nEN: 'Zoreil Hiker', nCR: 'Zorèy Randonèr',
+  tagFR: 'Équipé pour tout', tagEN: 'Kitted out for everything',
+  arch: 'zoner', dmgMul: 0.94, rangeMul: 1.1,
+  stats: { weight: 100, walk: 1.3, run: 2.98, air: 1.2, jump: 15.8, djump: 14.6, grav: 0.66, fall: 15.8, size: 1.0 },
+  pal: { skin: '#e8b48c', skin2: '#c58d64', cloth: '#3d6fb4', accent: '#f26d3d',
+         hand: '#f0c6a2', shoe: '#4a3a2a', eye: '#2d4a6a' },
+  build: { width: 1.0, height: 1.0, headScale: 1.02, shape: 'oval', limbW: 1.0 },
+  /* pas de fagot dans le dos : le valiha en porte deja un, et de loin
+     les deux silhouettes se confondaient. Un parapluie, en revanche,
+     ne ressemble a rien d'autre du casting. */
+  features: { head: 'round', hat: 'cap', prop: 'umbrella', shades: true },
+  corps: 'gilet',
+  bio: { fr: 'Il a la carte, la gourde, les bâtons et la crème. Il lui manque juste de savoir où il va.',
+         en: 'He has the map, the flask, the poles and the sunscreen. He is only missing the destination.' },
+  specials: {
+    /* Neutre : la gourde. Elle vole en cloche et arrose. */
+    n: spProj({ total: 36, spawn: 12,
+        proj: { vx: 12, vy: -7, grav: 0.46, dmg: 7.5, ang: 60, bkb: 24, kbg: 58, w: 26, h: 30, life: 96,
+                kind: 'ball', color: '#7ec8f0', sfx: 'fire', bounce: 1, reflectable: true } }),
+    /* Avant : le coup de bâton de marche. Long et sec. */
+    s: spRush({ total: 40, moveX: { s: 10, e: 22, v: 11 },
+        hits: [H({ s: 10, e: 24, x: 56, y: -62, w: 116, h: 40, dmg: 10, ang: 42, bkb: 54, kbg: 60, sfx: 'hit', fx: 'slash' })] }),
+    /* Haut : le sac gonflable de secours. Il monte haut, il n'a
+       aucune classe, il fonctionne. */
+    u: spUp({ riseV: -20.6, total: 46,
+        hits: [H({ s: 8, e: 22, x: 0, y: -104, w: 84, h: 100, dmg: 8, ang: 82, bkb: 32, kbg: 84, sfx: 'whoosh', fx: 'ringUp' })] }),
+    /* Bas : il plante la tente. Un piège dont il oublie
+       systématiquement l'emplacement. */
+    d: spTrap({ total: 44, spawn: 16,
+        trap: { kind: 'mine', dmg: 13, radius: 96, life: 640, color: '#f26d3d' } })
+  },
+  super: { nameFR: 'AVALANCHE DE MATÉRIEL', nameEN: 'GEAR AVALANCHE', kind: 'avalancheMateriel', color: '#3d6fb4', dmg: 4.8 }
+});
+
+/* ---------- MARON DÉ OT — la mémoire des remparts ----------
+   Les marrons vivaient dans les cirques, là où personne ne montait
+   les chercher. Ce combattant ne se bat pas de face : il grimpe, il
+   surgit, il disparaît. C'est le personnage le plus mobile du jeu, et
+   c'est un hommage, pas un costume. */
+defChar('maron', {
+  nFR: 'Maron dé Ot', nEN: 'Highland Maroon', nCR: 'Maron dé Ot',
+  tagFR: 'L\'homme des remparts', tagEN: 'Man of the ramparts',
+  arch: 'rushdown', dmgMul: 1.0, rangeMul: 1.04,
+  stats: { weight: 90, walk: 1.7, run: 3.78, air: 1.56, jump: 18.0, djump: 17.0, grav: 0.62, fall: 16.2, size: 1.0 },
+  pal: { skin: '#6b4a33', skin2: '#4a3122', cloth: '#3f5f43', accent: '#c9a227',
+         hand: '#7c5940', shoe: '#2a1e14', eye: '#f0e2c0' },
+  build: { width: 1.0, height: 1.06, headScale: 0.98, shape: 'oval', limbW: 0.96 },
+  features: { head: 'oval', hair: 'hair', scarf: true },
+  corps: 'ecorce',
+  bio: { fr: 'Il connaît des sentiers que les cartes ne connaissent pas. Il ne les montre à personne.',
+         en: 'He knows paths the maps do not. He shows them to no one.' },
+  specials: {
+    /* Neutre : la pierre lancée. Rien de plus, rien de moins. */
+    n: spProj({ total: 30, spawn: 10,
+        proj: { vx: 15, vy: -3, grav: 0.34, dmg: 8, ang: 50, bkb: 22, kbg: 62, w: 22, h: 22, life: 84,
+                kind: 'ball', color: '#8d8478', sfx: 'hit', reflectable: true } }),
+    /* Avant : la course en dévers, basse et rapide. */
+    s: spRush({ total: 34, moveX: { s: 7, e: 24, v: 19 },
+        hits: [H({ s: 7, e: 24, x: 24, y: -52, w: 70, h: 62, dmg: 9, ang: 48, bkb: 40, kbg: 66, sfx: 'hit', fx: 'impact' })] }),
+    /* Haut : l'escalade. La plus haute remontée du casting — c'est
+       sa signature, et c'est ce qui le rend presque impossible à
+       achever hors scène. */
+    u: spUp({ riseV: -23.4, total: 50, driftMul: 1.05,
+        hits: [H({ s: 6, e: 26, x: 4, y: -116, w: 68, h: 118, dmg: 8, ang: 88, bkb: 28, kbg: 92, sfx: 'whoosh', fx: 'ringUp' })] }),
+    /* Bas : il s'efface. Pas une esquive : un déplacement dont
+       l'adversaire ne voit pas l'arrivée. */
+    d: spDash({ total: 30, at: 8, dist: 250, ghost: true,
+        hitAfter: { dmg: 9, ang: 58, bkb: 44, kbg: 70, w: 84, h: 78 } })
+  },
+  super: { nameFR: 'APPEL DES CIRQUES', nameEN: 'CALL OF THE CIRQUES', kind: 'appelCirques', color: '#c9a227', dmg: 5.0 }
+});
+
+/* ---------- YAB GÉRANIOM — l'alambic des Hauts ----------
+   Dans les Hauts de l'Ouest on distille le géranium rosat depuis des
+   générations : un alambic, du bois, de la vapeur. Un poids lourd qui
+   contrôle l'espace avec de la vapeur brûlante plutôt qu'avec ses
+   poings. */
+defChar('yab', {
+  nFR: 'Yab Géraniom', nEN: 'Geranium Distiller', nCR: 'Yab Zéraniom',
+  tagFR: 'Alambic des Hauts', tagEN: 'Still of the highlands',
+  arch: 'heavy', dmgMul: 1.08, rangeMul: 1.0,
+  stats: { weight: 130, walk: 1.08, run: 2.5, air: 0.96, jump: 14.6, djump: 13.2, grav: 0.8, fall: 18.2, size: 1.1 },
+  pal: { skin: '#dcae86', skin2: '#b78862', cloth: '#7d6a4f', accent: '#b4c96a',
+         hand: '#e4c0a0', shoe: '#4d3a26', eye: '#3a4a2a' },
+  build: { width: 1.2, height: 1.02, headScale: 0.94, shape: 'bulky', limbW: 1.18 },
+  features: { head: 'bulky', hat: 'straw', mouss: true },
+  corps: 'marmite',
+  bio: { fr: 'Quarante kilos de feuilles pour un flacon d\'essence. Il n\'est pas pressé, l\'alambic non plus.',
+         en: 'Forty kilos of leaves for one small flask. He is in no hurry, and neither is the still.' },
+  specials: {
+    /* Neutre : le jet de vapeur. Court, large, et il POUSSE — c'est
+       une arme de territoire, pas de finition. */
+    n: spProj({ total: 38, spawn: 12,
+        proj: { vx: 8, vy: 0, grav: 0, dmg: 6.5, ang: 70, bkb: 44, kbg: 26, w: 74, h: 54, life: 22,
+                kind: 'orb', color: '#dfeee0', sfx: 'whoosh', grow: 2.4, reflectable: false, burn: true } }),
+    /* Avant : la charge à l'épaule du bûcheron. */
+    s: spRush({ total: 48, moveX: { s: 12, e: 32, v: 12 }, chargeable: true,
+        hits: [H({ s: 12, e: 32, x: 32, y: -66, w: 88, h: 92, dmg: 13.5, ang: 44, bkb: 56, kbg: 70, sfx: 'smashHit', fx: 'impact' })] }),
+    u: spUp({ riseV: -16.8, total: 52,
+        hits: [H({ s: 10, e: 26, x: 2, y: -108, w: 92, h: 108, dmg: 11, ang: 84, bkb: 42, kbg: 82, sfx: 'hit', fx: 'ringUp' })] }),
+    /* Bas : il pose le chaudron. Il chauffe, puis il éclate. */
+    d: spSlam({ total: 54, dropF: 12, dropV: 24,
+        landShock: { dmg: 13, w: 250, h: 70, ang: 72, bkb: 56, kbg: 74 } })
+  },
+  super: { nameFR: 'COUP D\'ALAMBIC', nameEN: 'STILL BLAST', kind: 'coupAlambic', color: '#b4c96a', dmg: 5.2 }
+});
+
+/* ---------- TI MBIWI — les bambous ----------
+   Le m'biwi, ce sont deux tiges de bambou frappées l'une contre
+   l'autre, très vite, à la base de la musique mahoraise et
+   comorienne. Le combattant est donc le plus rapide en cadence du
+   jeu : beaucoup de petits coups liés, peu de puissance brute. */
+defChar('mbiwi', {
+  nFR: 'Ti Mbiwi', nEN: 'Mbiwi Player', nCR: 'Ti Mbiwi',
+  tagFR: 'Deux bambous', tagEN: 'Two bamboo sticks',
+  arch: 'rushdown', dmgMul: 0.86, rangeMul: 1.06,
+  stats: { weight: 84, walk: 1.68, run: 3.7, air: 1.52, jump: 17.0, djump: 16.0, grav: 0.61, fall: 15.4, size: 0.96 },
+  pal: { skin: '#8a5c3c', skin2: '#63402a', cloth: '#e4655e', accent: '#f4d35e',
+         hand: '#9c6c46', shoe: '#3a2718', eye: '#150c05' },
+  build: { width: 0.94, height: 1.0, headScale: 1.02, shape: 'slim', limbW: 0.9 },
+  features: { head: 'oval', prop: 'stick', hair: 'short' },
+  corps: 'canne',
+  bio: { fr: 'Deux bouts de bambou. Il en tire une cadence que personne n\'arrive à suivre, ni en musique ni au combat.',
+         en: 'Two pieces of bamboo. He gets a rhythm out of them nobody can follow — in music or in a fight.' },
+  specials: {
+    /* Neutre : la roulade de bambou. Cinq frappes liées : ça ne tue
+       pas, ça ne laisse pas respirer. */
+    n: spSpin({ total: 44 }),
+    /* Avant : le pas glissé, deux coups. */
+    s: spRush({ total: 32, moveX: { s: 6, e: 20, v: 16 },
+        hits: [H({ s: 6, e: 12, x: 30, y: -60, w: 74, h: 60, dmg: 4.5, ang: 80, bkb: 12, kbg: 20, hitlag: 0.6, sfx: 'hitLight', fx: 'ring', link: true }),
+               H({ s: 14, e: 22, x: 34, y: -60, w: 80, h: 64, dmg: 7, ang: 46, bkb: 44, kbg: 64, sfx: 'hit', fx: 'impact' })] }),
+    u: spUp({ riseV: -20.2, total: 42,
+        hits: [H({ s: 6, e: 20, x: 2, y: -102, w: 70, h: 100, dmg: 7.5, ang: 86, bkb: 30, kbg: 88, sfx: 'whoosh', fx: 'ringUp' })] }),
+    /* Bas : la contre-mesure. Il attend le temps fort. */
+    d: spCounter({ total: 38, window: [3, 22], mul: 1.5, minDmg: 8 })
+  },
+  super: { nameFR: 'CADENCE MBIWI', nameEN: 'MBIWI CADENCE', kind: 'cadenceMbiwi', color: '#e4655e', dmg: 2.6, count: 16 }
+});
+
+/* ---------- VALIHA — la corde et le poing ----------
+   Le valiha est la cithare tubulaire malgache ; le moringue
+   réunionnais descend du moraingy malgache. Un combattant qui joue
+   sur les deux : il frappe en boxeur, et sa musique voyage. */
+defChar('valiha', {
+  nFR: 'Valiha Kèr', nEN: 'Valiha Heart', nCR: 'Valiha Kèr',
+  tagFR: 'La corde et le poing', tagEN: 'The string and the fist',
+  arch: 'balanced', dmgMul: 1.0, rangeMul: 1.12,
+  stats: { weight: 98, walk: 1.44, run: 3.24, air: 1.34, jump: 16.4, djump: 15.2, grav: 0.64, fall: 15.8, size: 1.0 },
+  pal: { skin: '#7a5136', skin2: '#573723', cloth: '#c86a2e', accent: '#e9d8a6',
+         hand: '#8d6041', shoe: '#3d2a1a', eye: '#160d05' },
+  build: { width: 1.0, height: 1.02, headScale: 1.0, shape: 'oval', limbW: 1.02 },
+  features: { head: 'round', back: 'canne', hair: 'short' },
+  corps: 'canne',
+  bio: { fr: 'Le moringue vient de chez lui. La musique aussi. Il n\'a jamais vu de raison de les séparer.',
+         en: 'Moringue came from his country. So did the music. He never saw a reason to keep them apart.' },
+  specials: {
+    /* Neutre : une note tenue qui traverse. Lente, large, elle
+       recouvre l'écran plus qu'elle ne le perce. */
+    n: spProj({ total: 40, spawn: 14,
+        proj: { vx: 9, vy: 0, grav: 0, dmg: 7, ang: 361, bkb: 20, kbg: 58, w: 44, h: 44, life: 110,
+                kind: 'orb', color: '#e9d8a6', sfx: 'fire', trail: true, grow: 0.5, reflectable: true } }),
+    /* Avant : le direct du moringue, pied d'appui planté. */
+    s: spRush({ total: 38, moveX: { s: 9, e: 22, v: 13 },
+        hits: [H({ s: 9, e: 24, x: 40, y: -64, w: 90, h: 58, dmg: 11.5, ang: 40, bkb: 52, kbg: 68, sfx: 'smashHit', fx: 'impact' })] }),
+    /* Haut : le coup de pied retourné, la figure du moringue. */
+    u: spUp({ riseV: -19.6, total: 46,
+        hits: [H({ s: 7, e: 24, x: 8, y: -106, w: 86, h: 104, dmg: 10, ang: 84, bkb: 36, kbg: 88, sfx: 'hit', fx: 'ringUp' })] }),
+    /* Bas : l'accord qui soigne. Le seul soin du casting qui coûte
+       du temps plutôt que du risque. */
+    d: spHeal({ total: 66, amount: 14, at: 28 })
+  },
+  super: { nameFR: 'CORDES DU PAYS', nameEN: 'STRINGS OF HOME', kind: 'cordesPays', color: '#c86a2e', dmg: 3.2, count: 14 }
+});
+
+/* ---------- TI KRÉOL — celui qui prend un peu de chacun ----------
+   Il n'appartient à aucune communauté de la liste, et c'est le
+   propos : à La Réunion, le créole est ce qui se fabrique ENTRE les
+   communautés. Son spécial neutre copie celui de l'adversaire d'en
+   face. Aucun autre combattant du jeu n'a de moveset qui change en
+   cours de partie. */
+defChar('kreol', {
+  nFR: 'Ti Kréol', nEN: 'Ti Kreol', nCR: 'Ti Kréol',
+  tagFR: 'Un peu de tout le monde', tagEN: 'A bit of everyone',
+  arch: 'balanced', dmgMul: 0.98, rangeMul: 1.06,
+  stats: { weight: 96, walk: 1.5, run: 3.3, air: 1.38, jump: 16.6, djump: 15.4, grav: 0.64, fall: 15.6, size: 1.0 },
+  pal: { skin: '#c08a5e', skin2: '#95643f', cloth: '#4aa3c8', accent: '#f2b134',
+         hand: '#d09c72', shoe: '#3a2b1c', eye: '#1a1108' },
+  build: { width: 1.0, height: 1.0, headScale: 1.02, shape: 'oval', limbW: 1.0 },
+  features: { head: 'round', scarf: true, hair: 'short' },
+  corps: 'chemise',
+  bio: { fr: 'Demande-lui d\'où il vient : il te répondra par une liste, et il aura raison sur toute la ligne.',
+         en: 'Ask him where he is from: he answers with a list, and every item is true.' },
+  specials: {
+    /* Neutre : l'emprunt. Voir 03j : il prend le spécial neutre de
+       son vis-à-vis. Ici on ne déclare que le repli, celui qu'il
+       joue quand il est seul. */
+    n: spProj({ total: 34, spawn: 12,
+        proj: { vx: 13, vy: 0, grav: 0, dmg: 7, ang: 361, bkb: 22, kbg: 58, w: 26, h: 26, life: 90,
+                kind: 'ball', color: '#f2b134', sfx: 'fire', trail: true, reflectable: true } }),
+    s: spRush({ total: 38, moveX: { s: 9, e: 24, v: 14 },
+        hits: [H({ s: 9, e: 24, x: 30, y: -60, w: 78, h: 70, dmg: 10, ang: 46, bkb: 48, kbg: 66, sfx: 'hit', fx: 'impact' })] }),
+    u: spUp({ riseV: -19.8, total: 46,
+        hits: [H({ s: 8, e: 22, x: 4, y: -104, w: 76, h: 100, dmg: 9, ang: 84, bkb: 36, kbg: 88, sfx: 'whoosh', fx: 'ringUp' })] }),
+    /* Bas : la table partagée. Il soigne un peu et il repart. */
+    d: spHeal({ total: 54, amount: 9, at: 22 })
+  },
+  super: { nameFR: 'GRAND KABAR', nameEN: 'BIG KABAR', kind: 'grandKabar', color: '#4aa3c8', dmg: 3.6, count: 12 }
+});
+
+/* ============================================================
+   TI KRÉOL EMPRUNTE
+
+   La règle tient en une phrase : au moment où il lance son spécial
+   neutre, il joue celui de l'adversaire le plus proche. Ce n'est pas
+   un gadget visuel — le moveset change réellement, et le joueur doit
+   savoir ce qu'il vient de voler.
+   ============================================================ */
+window.__SUPERS_TARDIFS = window.__SUPERS_TARDIFS || [];
+window.__SUPERS_TARDIFS.push(function () {
+  if (typeof Fighter === 'undefined' || !Fighter.prototype || !Fighter.prototype.startMove) return;
+  const orig = Fighter.prototype.startMove;
+  Fighter.prototype.startMove = function (key) {
+    try {
+      const base = this.char && (this.char.__base || this.char);
+      if (key === 'nB' && base && base.id === 'kreol' && this.M) {
+        /* l'adversaire le plus proche, celui qu'on regarde */
+        let cible = null, d2 = Infinity;
+        for (const o of this.M.fighters) {
+          if (o === this || !o.alive) continue;
+          if (this.M.rules.teams && o.team === this.team) continue;
+          const d = (o.cx - this.cx) * (o.cx - this.cx) + (o.cy - this.cy) * (o.cy - this.cy);
+          if (d < d2) { d2 = d; cible = o; }
+        }
+        const emprunt = cible && cible.char && cible.char.moves && cible.char.moves.nB;
+        if (emprunt && this.moves && this.moves.nB !== emprunt) {
+          this.moves.nB = emprunt;
+          this.__emprunte = (cible.char.__base || cible.char).id;
+          /* on le DIT : un moveset qui change sans prévenir est un
+             bogue du point de vue du joueur, pas une mécanique */
+          if (this.M.banner && this.slot && this.slot.kind === 'human') {
+            const nm = charName(cible.char.__base || cible.char, this.M.lang);
+            this.M.banner((this.M.lang === 'en' ? 'BORROWED: ' : 'EMPRUNTÉ : ') + nm, '#4aa3c8');
+          }
+        }
+      }
+    } catch (e) {}
+    return orig.call(this, key);
+  };
+});
+
+/* ============================================================
+   LES SUPERS DES NEUF
+
+   Chacun est une mise en scène de la pratique du personnage, jamais
+   un simple gros dégât. Tout est calculé sur l'image locale : rien
+   n'est tiré au sort, pour que le réseau reste synchronisé.
+   ============================================================ */
+window.__SUPERS_TARDIFS.push(function () {
+  const MIENS = {
+    marcheFeu: 1, grandDeballage: 1, reveilLion: 1, avalancheMateriel: 1,
+    appelCirques: 1, coupAlambic: 1, cadenceMbiwi: 1, cordesPays: 1, grandKabar: 1
+  };
+  const orig = Fighter.prototype.runSuper;
+
+  Fighter.prototype.runSuper = function () {
+    const s = this.char.super;
+    if (!s || !MIENS[s.kind]) return orig.call(this);
+
+    const f = this.mf;
+    if (f === 18) {
+      this.M.banner(this.M.lang === 'en' ? s.nameEN : s.nameFR, s.color);
+      Audio2.play('super');
+      this.M.shake(18);
+    }
+    if (f < 18 || f > 62) return;
+
+    const t = f - 18;                       // image locale : 0 → 44
+    const dir = this.facing;
+    const plat = this.M.mainPlat();
+    const solY = plat ? plat.y : this.y;
+    const B = this.M.stage.bounds;
+
+    switch (s.kind) {
+
+      /* ---- TI KAVADI : le sol devient une braise, d'un bord à
+         l'autre. On avance dessus sans se presser. ---- */
+      case 'marcheFeu': {
+        if (t % 3 === 0 && t <= 42) {
+          const n = t / 3;                               // 0 → 14
+          const px = B.left + 90 + n * ((B.right - B.left - 180) / 14);
+          this.M.spawnHitbox(this, {
+            x: px - 70, y: solY - 76, w: 140, h: 78,
+            dmg: s.dmg, ang: 80, bkb: 22, kbg: 62, life: 8,
+            fx: 'impact', color: s.color, id: 'feu' + n
+          });
+          FX.ring(px, solY - 30, 62, s.color, 14, 5, 2.0, 0.4, n * 0.5);
+        }
+        if (t === 44) this.M.shake(12);
+        break;
+      }
+
+      /* ---- TI BAZAR : les rouleaux se déroulent en éventail et
+         balayent la moitié de la scène devant lui. ---- */
+      case 'grandDeballage': {
+        if (t % 4 === 0 && t <= 40) {
+          const n = t / 4;                               // 0 → 10
+          const port = 150 + n * 78;
+          this.M.spawnHitbox(this, {
+            x: this.x + (dir > 0 ? 40 : -40 - port), y: solY - 150 - (n % 3) * 34,
+            w: port, h: 56,
+            dmg: s.dmg, ang: 34, bkb: 30, kbg: 52, life: 6,
+            fx: 'slash', color: s.color, id: 'etof' + n
+          });
+        }
+        break;
+      }
+
+      /* ---- TI LION : trois bonds, de plus en plus loin, avec la
+         gueule qui claque à l'atterrissage. ---- */
+      case 'reveilLion': {
+        const etape = Math.floor(t / 15);                // 0,1,2
+        const dedans = t % 15;
+        if (dedans === 0) {
+          this.vy = -17 - etape * 2;
+          this.vx = dir * (13 + etape * 3);
+          Audio2.play('whoosh');
+        }
+        if (dedans === 9) {
+          this.M.spawnHitbox(this, {
+            x: this.x - 84, y: this.y - 128, w: 168, h: 138,
+            dmg: s.dmg * (etape === 2 ? 2.4 : 1), ang: etape === 2 ? 46 : 88,
+            bkb: etape === 2 ? 62 : 22, kbg: etape === 2 ? 76 : 44, life: 6,
+            fx: 'impact', color: s.color, id: 'lion' + etape
+          });
+          FX.ring(this.x, this.y - 60, 90, s.color, 18, 7, 2.4);
+        }
+        break;
+      }
+
+      /* ---- ZOREIL : tout son barda lui tombe dessus, et sur les
+         autres. C'est le seul super du jeu qui soit une maladresse. ---- */
+      case 'avalancheMateriel': {
+        if (t % 3 === 0 && t <= 42) {
+          const n = t / 3;
+          const px = this.x + ((n % 2 ? 1 : -1) * (60 + n * 46)) * dir;
+          this.M.spawnFalling({
+            x: clamp(px, B.left + 60, B.right - 60), y: -640, r: 24,
+            dmg: s.dmg, ang: 66, bkb: 26, kbg: 52, color: n % 3 ? s.color : '#f26d3d'
+          });
+        }
+        break;
+      }
+
+      /* ---- MARON DÉ OT : il monte sur le rempart et fait tomber
+         les pierres. La scène entière est balayée par en haut. ---- */
+      case 'appelCirques': {
+        if (t === 0) { this.vy = -22; this.M.shake(10); }
+        if (t % 2 === 0 && t >= 8 && t <= 42) {
+          const n = (t - 8) / 2;                          // 0 → 17
+          const px = B.left + 70 + ((n * 311) % Math.max(1, (B.right - B.left - 140)));
+          this.M.spawnFalling({
+            x: px, y: -700, r: 26, dmg: s.dmg, ang: 74, bkb: 28, kbg: 58, color: '#8d8478'
+          });
+        }
+        break;
+      }
+
+      /* ---- YAB : l'alambic monte en pression, puis lâche. Tout
+         l'intérêt est dans l'attente. ---- */
+      case 'coupAlambic': {
+        if (t < 28) {
+          if (t % 4 === 0) FX.ring(this.x, this.y - 70, 40 + t * 2.6, s.color, 12, 4, 1.4);
+        } else if (t === 28) {
+          this.M.shake(24);
+          Audio2.play('smashHit');
+          for (const c of [-1, 1]) {
+            this.M.spawnHitbox(this, {
+              x: this.x + (c > 0 ? 20 : -420), y: solY - 220, w: 400, h: 230,
+              dmg: s.dmg * 4.2, ang: c > 0 ? 42 : 138, bkb: 78, kbg: 82, life: 10,
+              fx: 'impact', color: s.color, id: 'alam' + c
+            });
+          }
+          FX.ring(this.x, this.y - 80, 300, s.color, 30, 12, 3.4);
+        }
+        break;
+      }
+
+      /* ---- TI MBIWI : seize frappes en quatre secondes, autour de
+         lui. Chacune est faible ; l'ensemble ne laisse pas sortir. ---- */
+      case 'cadenceMbiwi': {
+        if (t % 3 === 0 && t <= 45) {
+          const n = t / 3;
+          const cote = (n % 2 === 0) ? 1 : -1;
+          this.M.spawnHitbox(this, {
+            x: this.x + (cote > 0 ? 10 : -140), y: this.y - 122, w: 130, h: 122,
+            dmg: s.dmg, ang: n >= 14 ? 44 : 92, bkb: n >= 14 ? 66 : 10,
+            kbg: n >= 14 ? 78 : 16, life: 4,
+            fx: 'ring', color: s.color, id: 'mbiwi' + n
+          });
+          if (n % 2 === 0) FX.ring(this.x + cote * 60, this.y - 70, 46, s.color, 10, 4, 1.6);
+        }
+        break;
+      }
+
+      /* ---- VALIHA : des ondes qui partent de lui et s'élargissent.
+         Elles traversent la scène des deux côtés. ---- */
+      case 'cordesPays': {
+        if (t % 3 === 0 && t <= 42) {
+          const n = t / 3;                                // 0 → 14
+          const r = 70 + n * 62;
+          for (const c of [-1, 1]) {
+            this.M.spawnHitbox(this, {
+              x: this.x + c * r - 46, y: this.y - 130, w: 92, h: 150,
+              dmg: s.dmg, ang: 361, bkb: 16 + n * 3, kbg: 40 + n * 2, life: 5,
+              fx: 'ring', color: s.color, id: 'onde' + n + c
+            });
+          }
+          FX.ring(this.x, this.y - 60, r, s.color, 16, 5, 2.0, 0.36);
+        }
+        break;
+      }
+
+      /* ---- TI KRÉOL : le kabar. Le sol bat la mesure, et tout le
+         monde est invité, de gré ou de force. ---- */
+      case 'grandKabar': {
+        if (t % 4 === 0 && t <= 44) {
+          const n = t / 4;                                // 0 → 11
+          const ecart = 120 + n * 96;
+          for (const c of [-1, 1]) {
+            this.M.spawnHitbox(this, {
+              x: this.x + c * ecart - 74, y: solY - 108, w: 148, h: 112,
+              dmg: s.dmg, ang: n === 11 ? 50 : 88, bkb: n === 11 ? 70 : 14,
+              kbg: n === 11 ? 80 : 22, life: 6,
+              fx: 'impact', color: n % 2 ? s.color : '#f2b134', id: 'kabar' + n + c
+            });
+          }
+          this.M.shake(4);
+        }
+        break;
+      }
+    }
+  };
+});
+
+
 /* ===== 03c-charfinal.js ===== */
 /* ---------- finalisation : construit les movesets ---------- */
 const CHAR_LIST = [];
@@ -12330,9 +12944,15 @@ function entrainePlat(M, p, ax) {
 /* ============================================================
    1. LA ROUTE DU LITTORAL
    ============================================================ */
-STAGES.littoral = makeStage({
-  id: 'littoral', nFR: 'Route du Littoral', nEN: 'Coastal Road', nCR: 'Rout Litoral',
-  tagFR: 'Falaise & houle', tagEN: 'Cliff & swell', music: 'kabar',
+/* DOUBLON CORRIGE — cette arene s'appelait aussi `littoral`, comme
+   celle de 04-stages.js. Deux `STAGES.littoral = ...` dans le meme
+   fichier assemble : la seconde ecrasait la premiere en silence
+   depuis son ajout, et le jeu affichait une arene de moins que ce
+   qu'il contenait. Elle prend donc son vrai nom : le viaduc, qui est
+   un ouvrage different de l'ancienne route de falaise. */
+STAGES.viaduc = makeStage({
+  id: 'viaduc', nFR: 'Viaduc du Littoral', nEN: 'Coastal Viaduct', nCR: 'Viadik Litoral',
+  tagFR: 'Sur la mer, en pleine houle', tagEN: 'Over the sea, in the swell', music: 'kabar',
   tint: '#4d7f9c', night: false,
   plats: [
     /* la chaussée, très longue : on peut vraiment courir */
@@ -13579,6 +14199,681 @@ STAGES.portouest = makeStage({
       M.timers.push({ f: 48, run: () => {
         M.spawnHazard({ x: 1500, y: -190, w: 260, h: 240, vx: -10, life: 130,
           dmg: 5, ang: 170, bkb: 30, kbg: 20, kind: 'wave', color: '#bfe9ff' });
+      } });
+    }
+  }
+});
+
+
+/* ===== 04j-newstages9.js ===== */
+/* ============================================================
+   SMASH PÉI — TROIS ARÈNES DE PLUS, ENCORE PLUS GRANDES
+
+   Le joueur redemande des arènes « plus interactives et encore plus
+   grandes ». La mesure de la fois précédente donnait une largeur
+   médiane de 3 450 px ; ces trois-là sont toutes au-dessus, et
+   surtout chacune apporte un ÉLÉMENT QU'ON MANIPULE — pas seulement
+   un danger qu'on subit :
+
+   · NOUVÈL AN, RUE DU GRAND MARCHÉ — le Nouvel An chinois à
+     Saint-Denis, la nuit. Trois niveaux de toits et de balcons, et
+     un CHAR DE PARADE qui traverse lentement la rue : c'est une
+     plateforme mouvante de vingt secondes, la plus longue traversée
+     du jeu. Les pétards sont annoncés par la fumée avant de partir.
+
+   · PETITE FRANCE, LES ALAMBICS — les Hauts de l'Ouest, en
+     terrasses. On y trouve les CHEMINÉES DE VAPEUR : on peut se
+     poser dessus pour se faire propulser, ou les subir. C'est le
+     premier élément d'arène du jeu qui SERT à quelque chose plutôt
+     que de punir — un joueur qui les connaît remonte plus vite que
+     les autres.
+
+   · LE DIMITILE, AU LEVER DU JOUR — le piton où les marrons se
+     réfugiaient, au-dessus de l'Entre-Deux. La plus haute arène du
+     jeu et de loin : on y meurt par le haut. Le vent de crête souffle
+     par bourrasques annoncées, et il n'inflige aucun dégât : il
+     DÉPLACE. Toute la difficulté est de savoir où l'on sera dans
+     deux secondes.
+
+   Règle inchangée : chaque menace s'annonce au moins quarante images
+   avant de frapper.
+   ============================================================ */
+
+if (typeof entrainePlat !== 'function') {
+  window.entrainePlat = function (M, p, ax, ay) {
+    for (const f of M.fighters) {
+      if (!f.alive || !f.grounded || f.platform !== p) continue;
+      f.x += ax || 0;
+      if (ay) f.y += ay;
+      f.vx += (ax || 0) * 0.06;
+    }
+  };
+}
+
+/* ============================================================
+   1. NOUVÈL AN — la rue en fête
+   ============================================================ */
+STAGES.nouvelan = makeStage({
+  id: 'nouvelan', nFR: 'Nouvèl An, Grand Marché', nEN: 'New Year, Market Street', nCR: 'Nouvèl An',
+  tagFR: 'Lanternes, lion et pétards', tagEN: 'Lanterns, lion and firecrackers',
+  music: 'kabar', tint: '#ff6b4a', night: true,
+  plats: [
+    /* la rue : le sol principal, très large */
+    { x: -1700, y: 0, w: 3400, h: 200 },
+    /* les auvents des boutiques, à hauteur d'homme */
+    { x: -1440, y: -250, w: 420, h: 24, pass: true },
+    { x: 1020, y: -250, w: 420, h: 24, pass: true },
+    /* les balcons du premier étage */
+    { x: -1120, y: -520, w: 520, h: 26, pass: true },
+    { x: 600, y: -520, w: 520, h: 26, pass: true },
+    /* la guirlande de lanternes tendue en travers de la rue */
+    { x: -320, y: -640, w: 640, h: 22, pass: true },
+    /* les toits */
+    { x: -1520, y: -820, w: 460, h: 26, pass: true },
+    { x: 1060, y: -820, w: 460, h: 26, pass: true },
+    /* LE CHAR DE PARADE : plateforme pleine, pilotée par update() */
+    { x: -260, y: -190, w: 300, h: 34, pass: false, char: true }
+  ],
+  bounds: { left: -2100, right: 2100, top: -1700, bottom: 900 },
+  spawns: [{ x: -700, y: -320 }, { x: 700, y: -320 }, { x: -240, y: -700 }, { x: 240, y: -700 }],
+  respawn: { x: 0, y: -900 },
+
+  sky(ctx, t) {
+    Paint.sky(ctx, [[0, '#0b0a1e'], [0.45, '#241033'], [1, '#4a1a2c']], -4200, -2400, 8400, 3400);
+    /* la lune basse, entre les toits */
+    ctx.fillStyle = 'rgba(255,240,210,.9)';
+    ctx.beginPath(); ctx.arc(-900, -1320, 46, 0, Math.PI * 2); ctx.fill();
+    for (let i = 0; i < 40; i++) {
+      const r = makeRng(900 + i);
+      ctx.globalAlpha = 0.25 + r() * 0.5;
+      ctx.fillStyle = '#fff8e0';
+      ctx.fillRect(-2000 + r() * 4000, -1600 + r() * 500, 2, 2);
+    }
+    ctx.globalAlpha = 1;
+  },
+
+  far(ctx, t) {
+    /* les façades de la rue, en enfilade : c'est la perspective qui
+       fait la ville, pas le détail */
+    const rng = makeRng(5511);
+    for (let i = 0; i < 22; i++) {
+      const x = -2200 + i * 205;
+      const h = 420 + rng() * 620;
+      ctx.fillStyle = i % 2 ? '#241a28' : '#1c1420';
+      ctx.fillRect(x, -h, 190, h + 300);
+      /* les fenêtres allumées : une ville vit par ses fenêtres */
+      for (let j = 0; j < 5; j++) {
+        for (let k = 0; k < 3; k++) {
+          if (rng() > 0.55) continue;
+          ctx.fillStyle = rng() > 0.5 ? 'rgba(255,196,110,.8)' : 'rgba(255,140,90,.55)';
+          ctx.fillRect(x + 24 + k * 56, -h + 46 + j * 92, 30, 44);
+        }
+      }
+    }
+    /* LA FOULE, sur les trottoirs, DERRIÈRE les façades du fond.
+       Elle était d'abord dans le plan intermédiaire, à hauteur des
+       combattants : une rangée de pastilles colorées barrait tout
+       l'écran et on ne lisait plus le combat. Une foule doit se
+       deviner, pas se compter. */
+    ctx.save();
+    ctx.globalAlpha = 0.45;
+    Paint.crowd(ctx, 130, -2400, 2400, t, 331, ['#7a3a34', '#8a7030', '#2f5f74', '#6a6455', '#245a3c']);
+    ctx.restore();
+    /* la barrière du service d'ordre, devant elle */
+    ctx.fillStyle = 'rgba(20,16,26,.85)';
+    ctx.fillRect(-2400, 96, 4800, 10);
+    for (let x = -2400; x < 2400; x += 84) ctx.fillRect(x, 96, 8, 46);
+  },
+
+  mid(ctx, t) {
+    /* LA GUIRLANDE. Deux câbles tendus en travers de la rue, avec
+       leurs lanternes : c'est la signature visuelle de la scène. */
+    for (const yy of [-660, -880]) {
+      ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-1900, yy - 40);
+      ctx.quadraticCurveTo(0, yy + 30, 1900, yy - 40);
+      ctx.stroke();
+      for (let i = 0; i < 22; i++) {
+        const u = i / 21;
+        const x = -1900 + u * 3800;
+        const y = (yy - 40) + Math.sin(u * Math.PI) * 70;
+        Paint.lantern(ctx, x, y + 26, 13, i % 3 ? '#ff4b3e' : '#ffc93c', t, i);
+        ctx.strokeStyle = 'rgba(0,0,0,.5)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + 14); ctx.stroke();
+      }
+    }
+  },
+
+  ground(ctx, t) {
+    /* la chaussée mouillée : c'est le reflet qui donne la nuit */
+    const g = ctx.createLinearGradient(0, 0, 0, 200);
+    g.addColorStop(0, '#3a3040'); g.addColorStop(1, '#1a1422');
+    ctx.fillStyle = g; ctx.fillRect(-1700, 0, 3400, 200);
+    ctx.strokeStyle = 'rgba(255,150,90,.16)'; ctx.lineWidth = 6;
+    for (let i = 0; i < 26; i++) {
+      const x = -1650 + i * 130;
+      ctx.beginPath(); ctx.moveTo(x, 6); ctx.lineTo(x + Math.sin(t * 0.02 + i) * 8, 190); ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(255,209,102,.1)';
+    ctx.fillRect(-1700, 0, 3400, 8);
+
+    /* les auvents et balcons, dessinés comme du bois peint */
+    for (const p of this.plats) {
+      if (p.char || !p.pass) continue;
+      ctx.fillStyle = p.y < -700 ? '#3a2436' : '#5a2c2c';
+      ctx.fillRect(p.x, p.y, p.w, p.h);
+      ctx.fillStyle = 'rgba(255,209,102,.5)';
+      ctx.fillRect(p.x, p.y, p.w, 4);
+      /* les tuiles en écaille de l'auvent */
+      ctx.fillStyle = 'rgba(0,0,0,.35)';
+      for (let x = p.x + 6; x < p.x + p.w - 6; x += 22) ctx.fillRect(x, p.y + p.h, 16, 9);
+    }
+
+    /* LE CHAR DE PARADE : un lion de tissu monté sur une charrette */
+    const ch = this.plats.find(p => p.char);
+    if (ch) {
+      ctx.save();
+      ctx.translate(ch.x + ch.w / 2, ch.y);
+      /* la charrette */
+      ctx.fillStyle = '#8a2f26'; ctx.fillRect(-ch.w / 2, 0, ch.w, ch.h);
+      ctx.fillStyle = '#ffc93c'; ctx.fillRect(-ch.w / 2, 0, ch.w, 5);
+      /* les roues, qui tournent avec le déplacement */
+      ctx.fillStyle = '#2a1a12';
+      for (const rx of [-ch.w / 2 + 44, ch.w / 2 - 44]) {
+        ctx.beginPath(); ctx.arc(rx, ch.h + 22, 24, 0, Math.PI * 2); ctx.fill();
+        ctx.save(); ctx.translate(rx, ch.h + 22); ctx.rotate(ch.x * 0.02);
+        ctx.strokeStyle = '#c8a06a'; ctx.lineWidth = 3;
+        for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 4); ctx.beginPath(); ctx.moveTo(-20, 0); ctx.lineTo(20, 0); ctx.stroke(); }
+        ctx.restore();
+      }
+      /* la tête du lion, qui balance */
+      const b = Math.sin(t * 0.09) * 0.14;
+      ctx.save(); ctx.translate(0, -46); ctx.rotate(b);
+      ctx.fillStyle = '#e0483c';
+      ctx.beginPath(); ctx.ellipse(0, 0, 62, 46, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#f5c542';
+      ctx.beginPath(); ctx.ellipse(0, -14, 40, 22, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff';
+      for (const s2 of [-1, 1]) { ctx.beginPath(); ctx.arc(s2 * 22, -10, 11, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = '#160c08';
+      for (const s2 of [-1, 1]) { ctx.beginPath(); ctx.arc(s2 * 22 + Math.sin(t * 0.05) * 3, -10, 5, 0, Math.PI * 2); ctx.fill(); }
+      ctx.fillStyle = '#1f9d55';
+      ctx.beginPath(); ctx.ellipse(0, 26, 34, 12, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+      ctx.restore();
+    }
+  },
+
+  fore(ctx, t) {
+    /* les banderoles au premier plan : elles donnent la profondeur */
+    ctx.save();
+    ctx.globalAlpha = 0.85;
+    for (let i = 0; i < 8; i++) {
+      const x = -1800 + i * 480 + Math.sin(t * 0.01 + i) * 12;
+      ctx.fillStyle = i % 2 ? 'rgba(224,72,60,.8)' : 'rgba(245,197,66,.8)';
+      ctx.beginPath();
+      ctx.moveTo(x, -1000); ctx.lineTo(x + 46, -1000);
+      ctx.lineTo(x + 46, -820 + Math.sin(t * 0.03 + i) * 10); ctx.lineTo(x + 23, -790);
+      ctx.lineTo(x, -820 - Math.sin(t * 0.03 + i) * 10);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  },
+
+  update(M, t) {
+    /* LE CHAR. Il descend la rue d'un bout à l'autre, très lentement,
+       puis repart. Vingt secondes de traversée : on peut monter
+       dessus, s'y battre, en tomber, y remonter. */
+    const ch = this.plats.find(p => p.char);
+    if (!ch) return;
+    const cycle = 1200;
+    const k = (t % cycle) / cycle;
+    const u = 0.5 - Math.cos(k * Math.PI * 2) * 0.5;
+    const cible = -1420 + u * 2540;
+    const dx = cible - ch.x;
+    ch.x = cible;
+    entrainePlat(M, ch, dx, 0);
+  },
+
+  ambient(fx, t) {
+    if (Math.random() < 0.4) fx.spark(rnd(-1800, 1800), rnd(-900, -200), rnd(-0.6, 0.6), rnd(-1.4, -0.4), '#ffc93c', rnd(30, 70), 2);
+    if (Math.random() < 0.1) fx.spark(rnd(-1700, 1700), 40, rnd(-2, 2), rnd(-4, -1), '#ff4b3e', rnd(20, 44), 3);
+  },
+
+  hazard(M, t) {
+    /* LES PÉTARDS. Ils s'annoncent par la fumée, puis claquent en
+       chapelet le long d'un trottoir. Aucun ne tue : ils poussent
+       vers le centre de la rue, ce qui rassemble tout le monde. */
+    if (t % 820 === 240) {
+      const cote = ((t / 820) | 0) % 2 ? 1 : -1;
+      M.ticker(M.lang === 'en' ? 'FIRECRACKERS' : 'PÉTARDS', '#ff4b3e');
+      M.warn(cote * 1150, -80, 62);
+      M.timers.push({ f: 62, run: () => {
+        try { Audio2.play('explode'); } catch (e) {}
+        for (let i = 0; i < 5; i++) {
+          M.timers.push({ f: i * 7, run: () => {
+            M.spawnHitbox(null, {
+              x: cote * (1400 - i * 190) - 60, y: -120, w: 120, h: 130,
+              dmg: 4, ang: cote > 0 ? 160 : 20, bkb: 34, kbg: 16, life: 8,
+              fx: 'impact', color: '#ff4b3e', id: 'petard' + t + i
+            });
+            FX.ring(cote * (1400 - i * 190), -80, 54, '#ffc93c', 12, 5, 2.0);
+          } });
+        }
+      } });
+    }
+    /* LA PLUIE DE CONFETTIS ENFLAMMÉS, une fois par minute, au
+       centre : elle chasse les campeurs du char. */
+    if (t % 1560 === 900) {
+      M.banner(M.lang === 'en' ? 'FIRE RAIN !' : 'PLUIE DE FEU !', '#ffc93c');
+      M.timers.push({ f: 54, run: () => {
+        for (let i = 0; i < 9; i++) {
+          M.timers.push({ f: i * 5, run: () => {
+            M.spawnFalling({ x: -520 + i * 130, y: -1500, r: 20,
+              dmg: 6, ang: 70, bkb: 22, kbg: 44, color: '#ffc93c' });
+          } });
+        }
+      } });
+    }
+  }
+});
+
+/* ============================================================
+   2. PETITE FRANCE — les alambics des Hauts
+   ============================================================ */
+STAGES.petitefrance = makeStage({
+  id: 'petitefrance', nFR: 'Petite France', nEN: 'Petite France', nCR: 'Ti Frans',
+  tagFR: 'Terrasses & cheminées de vapeur', tagEN: 'Terraces & steam vents',
+  music: 'maido', tint: '#b4c96a',
+  plats: [
+    /* la terrasse basse : le sol principal */
+    { x: -1750, y: 0, w: 3500, h: 220 },
+    /* les murets de pierre sèche qui étagent le champ */
+    { x: -1520, y: -230, w: 620, h: 40, solid: true },
+    { x: 900, y: -230, w: 620, h: 40, solid: true },
+    /* le deuxième étage de terrasses */
+    { x: -1160, y: -470, w: 520, h: 26, pass: true },
+    { x: 640, y: -470, w: 520, h: 26, pass: true },
+    /* le toit de l'alambic, au centre */
+    { x: -280, y: -400, w: 560, h: 30, pass: true },
+    /* la passerelle du haut */
+    { x: -420, y: -720, w: 840, h: 24, pass: true },
+    /* les deux plus hautes vires */
+    { x: -1500, y: -690, w: 340, h: 24, pass: true },
+    { x: 1160, y: -690, w: 340, h: 24, pass: true }
+  ],
+  bounds: { left: -2150, right: 2150, top: -1600, bottom: 900 },
+  spawns: [{ x: -760, y: -340 }, { x: 760, y: -340 }, { x: -220, y: -560 }, { x: 220, y: -560 }],
+  respawn: { x: 0, y: -880 },
+
+  /* LES CHEMINÉES DE VAPEUR. Trois positions fixes, connues, avec un
+     cycle lisible : la vapeur monte, on la voit venir, et quand elle
+     part elle PROPULSE au lieu de blesser. C'est le seul élément
+     d'arène du jeu dont on se sert volontairement. */
+  souffles: [{ x: -820, p: 0 }, { x: 0, p: 210 }, { x: 820, p: 420 }],
+
+  sky(ctx, t) {
+    Paint.sky(ctx, [[0, '#6fa3c4'], [0.4, '#a8c8cc'], [1, '#e2e6cf']], -4300, -2300, 8600, 3300);
+    for (let i = 0; i < 8; i++)
+      Paint.cloud(ctx, -2400 + ((i * 700 + t * 0.24) % 5400), -1300 + (i % 3) * 130, 2.2, '#ffffff', 0.72);
+  },
+
+  far(ctx, t) {
+    Paint.ridge(ctx, 61, -2800, 2800, 300, 700, '#5d7f6a', '#33503f', 70);
+    Paint.ridge(ctx, 62, -2800, 2800, 180, 440, '#48664f', '#26402f', 58);
+    /* les grands cryptomerias, en rideau */
+    const rng = makeRng(818);
+    for (let i = 0; i < 30; i++) {
+      const x = -2600 + i * 180 + rng() * 60;
+      const h = 240 + rng() * 200;
+      ctx.fillStyle = rgba('#22402c', 0.7);
+      ctx.beginPath();
+      ctx.moveTo(x - 34, -180); ctx.lineTo(x, -180 - h); ctx.lineTo(x + 34, -180);
+      ctx.closePath(); ctx.fill();
+    }
+  },
+
+  mid(ctx, t) {
+    /* Le champ de geranium en rangs. Il etait dessine a hauteur de
+       combattant : les tirets verts couraient en travers de tout
+       l'ecran et le regard n'accrochait plus les personnages. Les
+       rangs descendent donc SOUS la ligne de jeu, la ou ils
+       expliquent le decor sans le disputer. */
+    for (let r = 0; r < 7; r++) {
+      const y = 20 + r * 30;
+      ctx.fillStyle = rgba('#6d8a4c', 0.34 + r * 0.05);
+      for (let x = -2200; x < 2200; x += 48)
+        ctx.fillRect(x + (r % 2 ? 22 : 0), y, 32, 11);
+    }
+    /* les murets de pierre sèche */
+    for (const p of this.plats) {
+      if (!p.solid) continue;
+      ctx.fillStyle = '#8b8375'; ctx.fillRect(p.x, p.y, p.w, p.h);
+      const rng = makeRng(Math.abs(p.x));
+      ctx.fillStyle = 'rgba(0,0,0,.22)';
+      for (let x = p.x; x < p.x + p.w; x += 30)
+        ctx.fillRect(x + rng() * 6, p.y + rng() * 20, 22, 12);
+      ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fillRect(p.x, p.y, p.w, 4);
+    }
+  },
+
+  ground(ctx, t) {
+    const g = ctx.createLinearGradient(0, 0, 0, 220);
+    g.addColorStop(0, '#55603a'); g.addColorStop(1, '#22260f');
+    ctx.fillStyle = g; ctx.fillRect(-1750, 0, 3500, 220);
+    ctx.fillStyle = 'rgba(180,201,106,.5)'; ctx.fillRect(-1750, 0, 3500, 7);
+    /* les touffes du talus : sans elles, la terrasse est un aplat */
+    const rg = makeRng(3131);
+    ctx.fillStyle = 'rgba(120,145,80,.5)';
+    for (let i = 0; i < 90; i++) {
+      const x = -1740 + rg() * 3480, y = 12 + rg() * 180;
+      ctx.beginPath();
+      ctx.moveTo(x, y); ctx.lineTo(x + 4, y - 12 - rg() * 12); ctx.lineTo(x + 9, y);
+      ctx.closePath(); ctx.fill();
+    }
+
+    /* L'ALAMBIC, au centre : la cuve de cuivre, le serpentin, le
+       fourneau. C'est le point de repère de toute l'arène. */
+    ctx.save();
+    ctx.translate(0, -400);
+    /* Le bati de l'alambic. Il faisait 520 px de large sur 370 de
+       haut, d'un seul brun clair : a la distance de jeu, c'etait un
+       mur qui remplissait la moitie de l'ecran. Il est reduit, fonce,
+       et ouvert au milieu — on voit la cuve DANS le bati au lieu de
+       voir une planche. */
+    ctx.fillStyle = '#4e3418';
+    ctx.fillRect(-190, 30, 380, 370);
+    ctx.fillStyle = 'rgba(0,0,0,.34)';
+    for (let i = 0; i < 9; i++) ctx.fillRect(-190, 44 + i * 40, 380, 5);
+    /* l'ouverture du fourneau : c'est elle qui donne la profondeur */
+    ctx.fillStyle = '#160d05';
+    ctx.fillRect(-150, 210, 300, 190);
+    ctx.fillStyle = 'rgba(255,140,60,.18)';
+    ctx.fillRect(-150, 210, 300, 190);
+    /* les montants d'angle, pour que ce ne soit pas un aplat */
+    ctx.fillStyle = '#3a2610';
+    ctx.fillRect(-198, 24, 22, 380); ctx.fillRect(176, 24, 22, 380);
+    /* la cuve */
+    ctx.fillStyle = '#c98a3c';
+    ctx.beginPath(); ctx.ellipse(-40, 200, 76, 104, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,240,200,.28)';
+    ctx.beginPath(); ctx.ellipse(-66, 164, 22, 46, -0.3, 0, Math.PI * 2); ctx.fill();
+    /* le chapiteau et le col de cygne */
+    ctx.fillStyle = '#a86f2c';
+    ctx.beginPath(); ctx.moveTo(-104, 108); ctx.lineTo(24, 108); ctx.lineTo(-40, 40); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#c98a3c'; ctx.lineWidth = 15;
+    ctx.beginPath(); ctx.moveTo(-40, 44); ctx.quadraticCurveTo(120, 20, 146, 190); ctx.stroke();
+    /* le feu sous la cuve, qui respire */
+    const fl = 0.7 + Math.sin(t * 0.14) * 0.3;
+    ctx.fillStyle = rgba('#ff8a2c', 0.7 * fl);
+    ctx.beginPath(); ctx.ellipse(-40, 330, 54 * fl, 30 * fl, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = rgba('#ffe08a', 0.6 * fl);
+    ctx.beginPath(); ctx.ellipse(-40, 336, 26 * fl, 16 * fl, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+
+    /* les planches des terrasses */
+    for (const p of this.plats) {
+      if (!p.pass) continue;
+      ctx.fillStyle = '#6a4a2c'; ctx.fillRect(p.x, p.y, p.w, p.h);
+      ctx.fillStyle = 'rgba(255,255,255,.12)'; ctx.fillRect(p.x, p.y, p.w, 3);
+      ctx.fillStyle = 'rgba(0,0,0,.3)';
+      for (let x = p.x + 10; x < p.x + p.w; x += 54) ctx.fillRect(x, p.y + 4, 3, p.h - 6);
+    }
+
+    /* LES CHEMINÉES DE VAPEUR : leur socle, et le panache qui monte
+       quand elles sont chargées. On voit venir de loin. */
+    for (const s of this.souffles) {
+      ctx.fillStyle = '#7a6a52';
+      ctx.fillRect(s.x - 30, -70, 60, 74);
+      ctx.fillStyle = '#5a4c3a';
+      ctx.fillRect(s.x - 38, -78, 76, 14);
+      const ph = ((t + s.p) % 420) / 420;
+      /* la charge : le panache grandit pendant les deux tiers du
+         cycle, puis part */
+      const charge = ph < 0.72 ? ph / 0.72 : 0;
+      if (charge > 0.05) {
+        ctx.save();
+        ctx.globalAlpha = 0.14 + charge * 0.5;
+        ctx.fillStyle = '#e8f2e4';
+        for (let i = 0; i < 5; i++) {
+          const yy = -90 - i * 40 * charge;
+          const rr = 22 + i * 12 * charge;
+          ctx.beginPath();
+          ctx.arc(s.x + Math.sin(t * 0.06 + i) * 8, yy, rr, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+    }
+  },
+
+  fore(ctx, t) {
+    ctx.save(); ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#2c3a24';
+    for (let i = 0; i < 12; i++) {
+      const x = -2100 + i * 380;
+      ctx.beginPath();
+      ctx.moveTo(x, 400); ctx.quadraticCurveTo(x + 40, 120, x + 10, 40);
+      ctx.quadraticCurveTo(x + 90, 130, x + 70, 400);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+  },
+
+  ambient(fx, t) {
+    if (Math.random() < 0.3) fx.leaf(rnd(-2000, 2000), -1100, 0.8);
+    if (Math.random() < 0.12) fx.spark(rnd(-2000, 2000), rnd(-400, 0), rnd(-0.4, 0.4), -0.6, '#e8f2e4', rnd(40, 90), 2);
+  },
+
+  hazard(M, t) {
+    /* LA VAPEUR. Trois cheminées, décalées de sept secondes, avec un
+       cycle de sept secondes chacune : il y a donc toujours une
+       cheminée sur le point de partir, et le joueur qui les a
+       apprises sait laquelle. Elle ne fait presque aucun dégât : son
+       rôle est d'ENVOYER EN HAUT. */
+    for (const s of this.souffles) {
+      if ((t + s.p) % 420 !== 300) continue;
+      M.warn(s.x, -120, 42);
+      M.timers.push({ f: 42, run: () => {
+        try { Audio2.play('whoosh', { power: 0.9 }); } catch (e) {}
+        FX.ring(s.x, -90, 90, '#e8f2e4', 22, 8, 2.6);
+        M.spawnHitbox(null, {
+          x: s.x - 54, y: -560, w: 108, h: 500,
+          dmg: 2.5, ang: 90, bkb: 62, kbg: 14, life: 22,
+          fx: 'ring', color: '#e8f2e4', id: 'vap' + t + s.x
+        });
+      } });
+    }
+    /* LE COUP DE FROID DES HAUTS : une fois toutes les vingt-cinq
+       secondes, la brume tombe et ralentit tout le monde de la même
+       façon. Elle ne blesse personne — elle change le rythme. */
+    if (t % 1500 === 700) {
+      M.ticker(M.lang === 'en' ? 'THE MIST FALLS' : 'LA BRUME TOMBE', '#dfeee0');
+      M.timers.push({ f: 60, run: () => {
+        for (const f of M.fighters) if (f.alive) f.buffs.slow = Math.max(f.buffs.slow || 0, 150);
+      } });
+    }
+  }
+});
+
+/* ============================================================
+   3. LE DIMITILE — le refuge des marrons
+   ============================================================ */
+/* NOTE — cette arène s'appelait d'abord « Piton des Neiges », et cet
+   identifiant était DÉJÀ PRIS par l'arène ajoutée en 04e : elle
+   l'aurait silencieusement remplacée, et le jeu aurait perdu une
+   arène sans rien dire. C'est exactement le genre d'erreur qu'un
+   simple comptage attrape et qu'une relecture laisse passer.
+   Elle devient donc LE DIMITILE — le piton au-dessus de l'Entre-Deux
+   où les marrons se réfugiaient. Le lieu colle mieux au propos, et
+   il n'était pas encore dans le jeu. */
+STAGES.dimitile = makeStage({
+  id: 'dimitile', nFR: 'Le Dimitile', nEN: 'Le Dimitile', nCR: 'Lo Dimitil',
+  tagFR: 'Le refuge des marrons, au lever du jour', tagEN: 'The maroons\' refuge at dawn',
+  music: 'maido', tint: '#c8d8f0',
+  plats: [
+    /* le sommet : une arête étroite, pas une place */
+    { x: -700, y: 0, w: 1400, h: 240 },
+    /* les deux épaules, plus bas et plus loin */
+    { x: -1900, y: 120, w: 800, h: 300 },
+    { x: 1100, y: 120, w: 800, h: 300 },
+    /* les blocs de la crête */
+    { x: -1080, y: -180, w: 300, h: 30, pass: true },
+    { x: 780, y: -180, w: 300, h: 30, pass: true },
+    /* les vires hautes : c'est là que se joue le combat */
+    { x: -520, y: -420, w: 380, h: 26, pass: true },
+    { x: 140, y: -420, w: 380, h: 26, pass: true },
+    { x: -230, y: -700, w: 460, h: 26, pass: true },
+    /* la pointe, tout en haut, pour un seul */
+    { x: -110, y: -960, w: 220, h: 26, pass: true }
+  ],
+  bounds: { left: -2400, right: 2400, top: -2000, bottom: 1000 },
+  spawns: [{ x: -380, y: -540 }, { x: 380, y: -540 }, { x: -140, y: -820 }, { x: 140, y: -820 }],
+  respawn: { x: 0, y: -1100 },
+
+  sky(ctx, t) {
+    /* le lever du jour vu de 3 070 m : la lumière arrive par en bas,
+       sur la mer de nuages, et le zénith reste nuit */
+    Paint.sky(ctx, [[0, '#0d1330'], [0.32, '#2a3468'], [0.6, '#8a5a8c'], [0.82, '#e8845a'], [1, '#ffc98a']],
+              -4800, -2600, 9600, 3800);
+    ctx.fillStyle = 'rgba(255,236,190,.95)';
+    ctx.beginPath(); ctx.arc(980, -260, 62, 0, Math.PI * 2); ctx.fill();
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.3;
+    const g = ctx.createRadialGradient(980, -260, 20, 980, -260, 620);
+    g.addColorStop(0, 'rgba(255,220,150,.7)'); g.addColorStop(1, 'rgba(255,180,110,0)');
+    ctx.fillStyle = g; ctx.fillRect(360, -880, 1240, 1240);
+    ctx.restore();
+    for (let i = 0; i < 30; i++) {
+      const r = makeRng(3300 + i);
+      ctx.globalAlpha = 0.3 + r() * 0.5;
+      ctx.fillStyle = '#e8f0ff';
+      ctx.fillRect(-2400 + r() * 4800, -2000 + r() * 700, 2, 2);
+    }
+    ctx.globalAlpha = 1;
+  },
+
+  far(ctx, t) {
+    /* LA MER DE NUAGES. C'est elle qui dit l'altitude : tout ce qui
+       est en dessous a disparu. */
+    for (let l = 0; l < 4; l++) {
+      const y = 120 + l * 90;
+      ctx.fillStyle = rgba(l % 2 ? '#e6ecf8' : '#cdd8ef', 0.55 - l * 0.08);
+      ctx.beginPath();
+      ctx.moveTo(-3000, y + 400);
+      for (let x = -3000; x <= 3000; x += 90)
+        ctx.lineTo(x, y + Math.sin(x * 0.0016 + t * 0.004 + l) * 34 + Math.cos(x * 0.0037 + l * 2) * 20);
+      ctx.lineTo(3000, y + 400); ctx.closePath(); ctx.fill();
+    }
+    /* les sommets voisins qui émergent des nuages */
+    Paint.ridge(ctx, 71, -3000, 3000, 120, 300, '#3a4468', '#232a48', 60);
+  },
+
+  mid(ctx, t) {
+    /* les grandes dalles de la crête */
+    const rng = makeRng(4141);
+    for (let i = 0; i < 18; i++) {
+      const x = -2200 + i * 250 + rng() * 60;
+      const h = 100 + rng() * 220;
+      /* volontairement sombres : un combattant se lit sur un fond
+         fonce, jamais sur un fond de la meme valeur que lui */
+      ctx.fillStyle = rgba('#2e3450', 0.85);
+      ctx.beginPath();
+      ctx.moveTo(x - 70, 200); ctx.lineTo(x - 20, 200 - h);
+      ctx.lineTo(x + 30, 200 - h * 0.7); ctx.lineTo(x + 80, 200);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = rgba('#4a5474', 0.5);
+      ctx.beginPath();
+      ctx.moveTo(x - 20, 200 - h); ctx.lineTo(x + 30, 200 - h * 0.7); ctx.lineTo(x + 8, 200);
+      ctx.closePath(); ctx.fill();
+    }
+  },
+
+  ground(ctx, t) {
+    for (const p of this.plats) {
+      if (p.pass) continue;
+      /* la roche du sommet : sombre en bas, givrée en haut */
+      const g = ctx.createLinearGradient(0, p.y, 0, p.y + p.h);
+      g.addColorStop(0, '#7c8296'); g.addColorStop(0.25, '#4a5064'); g.addColorStop(1, '#22263a');
+      ctx.fillStyle = g; ctx.fillRect(p.x, p.y, p.w, p.h);
+      /* le givre du matin sur l'arête */
+      ctx.fillStyle = 'rgba(232,240,255,.8)'; ctx.fillRect(p.x, p.y, p.w, 8);
+      ctx.fillStyle = 'rgba(232,240,255,.3)';
+      const rng = makeRng(Math.abs(p.x) + 7);
+      for (let x = p.x; x < p.x + p.w; x += 26)
+        ctx.fillRect(x + rng() * 8, p.y + 8, 12, 5 + rng() * 12);
+      /* les strates */
+      ctx.fillStyle = 'rgba(0,0,0,.2)';
+      for (let i = 1; i < 6; i++) ctx.fillRect(p.x, p.y + i * 38, p.w, 6);
+    }
+    for (const p of this.plats) {
+      if (!p.pass) continue;
+      ctx.fillStyle = '#5c6274'; ctx.fillRect(p.x, p.y, p.w, p.h);
+      ctx.fillStyle = 'rgba(232,240,255,.75)'; ctx.fillRect(p.x, p.y, p.w, 5);
+    }
+    /* le cairn du sommet : tout randonneur de l'île le connaît */
+    ctx.save();
+    ctx.translate(0, -960);
+    const pierres = [[0, 0, 34], [-8, -26, 27], [6, -48, 21], [-4, -66, 15], [2, -80, 10]];
+    for (const [px, py, r] of pierres) {
+      ctx.fillStyle = '#6a7084';
+      ctx.beginPath(); ctx.ellipse(px, py, r, r * 0.72, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(232,240,255,.5)';
+      ctx.beginPath(); ctx.ellipse(px, py - r * 0.4, r * 0.8, r * 0.24, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  },
+
+  fore(ctx, t) {
+    /* la neige poudreuse soulevée par le vent, au premier plan */
+    ctx.save(); ctx.globalAlpha = 0.4;
+    ctx.fillStyle = '#eef4ff';
+    for (let i = 0; i < 60; i++) {
+      const rng = makeRng(600 + i);
+      const x = -2600 + ((rng() * 5200 + t * (2 + rng() * 5)) % 5200);
+      const y = -700 + rng() * 1100 + Math.sin(t * 0.03 + i) * 20;
+      ctx.fillRect(x, y, 3 + rng() * 4, 2);
+    }
+    ctx.restore();
+  },
+
+  ambient(fx, t) {
+    if (Math.random() < 0.5) fx.spark(rnd(-2300, 2300), rnd(-1000, 200), rnd(2, 6), rnd(-1, 1), '#eef4ff', rnd(30, 70), 2);
+    if (Math.random() < 0.02) fx.bird(rnd(-2000, 2000), rnd(-1400, -700));
+  },
+
+  hazard(M, t) {
+    /* LA BOURRASQUE. Elle ne blesse pas : elle POUSSE, longtemps et
+       fort, dans une direction annoncée. Sur une arête, c'est bien
+       plus dangereux qu'un projectile — et parfaitement évitable si
+       on se met à l'abri d'un bloc. */
+    if (t % 900 === 300) {
+      const sens = ((t / 900) | 0) % 2 ? 1 : -1;
+      M.banner(M.lang === 'en' ? (sens > 0 ? 'GUST →' : '← GUST') : (sens > 0 ? 'BOURRASQUE →' : '← BOURRASQUE'), '#cdd8ef');
+      try { Audio2.play('whoosh', { power: 0.7 }); } catch (e) {}
+      M.timers.push({ f: 54, run: () => {
+        /* le champ s'appelle `power`, pas `force` : avec le mauvais
+           nom, la derive valait NaN et la position du combattant
+           devenait non finie — le combat continuait avec des
+           personnages nulle part. Un test de valeurs finies l'a
+           attrape ; a l'oeil, on n'aurait vu qu'un bogue etrange. */
+        M.wind = { dir: sens, power: 0.30, frames: 260 };
+        for (let i = 0; i < 5; i++)
+          M.timers.push({ f: i * 12, run: () => FX.ring(sens * -1800 + sens * i * 700, -400, 120, '#cdd8ef', 20, 6, 2.4, 0.3) });
+      } });
+    }
+    /* LA CORNICHE QUI LÂCHE. Un seul bloc, annoncé, et jamais celui
+       du milieu : on ne coupe pas l'arène en deux. */
+    if (t % 1320 === 760) {
+      const cote = ((t / 1320) | 0) % 2 ? 1 : -1;
+      M.warn(cote * 930, -220, 70);
+      M.timers.push({ f: 70, run: () => {
+        try { Audio2.play('explode'); } catch (e) {}
+        M.shake(12);
+        for (let i = 0; i < 4; i++)
+          M.spawnFalling({ x: cote * (830 + i * 70), y: -1400, r: 24,
+            dmg: 8, ang: 74, bkb: 26, kbg: 52, color: '#7c8296' });
       } });
     }
   }
@@ -16122,8 +17417,14 @@ class Fighter {
     if (this.M.wind && this.M.wind.frames > 0 && !this.grounded) {
       /* Le vent pousse vers une vitesse de dérive, il n'accélère pas
          indéfiniment : voir PHYS.windDrift. */
-      const derive = this.M.wind.dir * this.M.wind.power * PHYS.windDrift;
-      this.vx += (derive - this.vx) * PHYS.windPull;
+      /* Un vent dont la puissance n'est pas declaree — champ mal
+         nomme dans une arene — produisait NaN, et NaN se propageait
+         a la position du combattant pour le reste du combat. Une
+         valeur par defaut coute un `||` et supprime la panne. */
+      const puiss = (typeof this.M.wind.power === 'number' && isFinite(this.M.wind.power))
+        ? this.M.wind.power : 0.3;
+      const derive = this.M.wind.dir * puiss * PHYS.windDrift;
+      if (isFinite(derive)) this.vx += (derive - this.vx) * PHYS.windPull;
     }
 
     const px = this.x, py = this.y;
@@ -22053,7 +23354,7 @@ Object.assign(I18N.fr, {
   oVolM: 'Volume général', oVolS: 'Effets sonores', oVolMu: 'Musique',
   oShake: 'Secousses écran', oHitstop: 'Impact (freeze)', oDmg: 'Chiffres de dégâts',
   oFps: 'Afficher les FPS', oHit: 'Afficher les hitboxes', oPart: 'Particules',
-  oQual: 'Qualité de rendu', oLang: 'Langue', oUi: 'Sons de menu',
+  oQual: 'Qualité de rendu', oLang: 'Langue', oUi: 'Sons de menu', oVoix: 'Voix créoles',
   press: 'CLIQUE OU APPUIE SUR ENTRÉE', pressKey: 'Appuie sur une touche…',
   xpGain: 'EXPÉRIENCE', xpDmg: 'Dégâts', xpKo: 'KO', xpWin: 'Victoire',
   xpMatch: 'Match', xpWave: 'Vagues', levelUp: 'NIVEAU SUPÉRIEUR !', newItem: 'DÉBLOQUÉ',
@@ -22082,7 +23383,7 @@ Object.assign(I18N.cr, {
   oVolM: 'Volim total', oVolS: 'Bri', oVolMu: 'Mizik',
   oShake: 'Sékous lékran', oHitstop: 'Frèz dsi kou', oDmg: 'Shif déga',
   oFps: 'Montré FPS', oHit: 'Montré hitbox', oPart: 'Partikil',
-  oQual: 'Kalité', oLang: 'Lang', oUi: 'Bri menu',
+  oQual: 'Kalité', oLang: 'Lang', oUi: 'Bri menu', oVoix: 'Voi kréol',
   pressKey: 'Apiy dsi in bouton…',
   xpGain: 'EKSPÉRYANS', xpDmg: 'Déga', xpKo: 'KO', xpWin: 'Viktwar',
   xpMatch: 'Batay', xpWave: 'Vag', levelUp: 'NIVO AN PLIS !', newItem: 'DÉBLOKÉ',
@@ -22111,7 +23412,7 @@ Object.assign(I18N.en, {
   oVolM: 'Master volume', oVolS: 'Sound effects', oVolMu: 'Music',
   oShake: 'Screen shake', oHitstop: 'Hit freeze', oDmg: 'Damage numbers',
   oFps: 'Show FPS', oHit: 'Show hitboxes', oPart: 'Particles',
-  oQual: 'Render quality', oLang: 'Language', oUi: 'Menu sounds',
+  oQual: 'Render quality', oLang: 'Language', oUi: 'Menu sounds', oVoix: 'Creole voices',
   pressKey: 'Press a key…',
   xpGain: 'EXPERIENCE', xpDmg: 'Damage', xpKo: 'KOs', xpWin: 'Win',
   xpMatch: 'Match', xpWave: 'Waves', levelUp: 'LEVEL UP !', newItem: 'UNLOCKED',
@@ -22345,6 +23646,7 @@ Object.assign(UI, {
         ${slider('volSfx', T('oVolS'), 0, 1, 0.05, pct)}
         ${slider('volMus', T('oVolMu'), 0, 1, 0.05, pct)}
         ${toggle('uiSounds', T('oUi'))}
+        ${toggle('voix', T('oVoix'))}
       </div>
       <div class="opt-sec" data-sec="image">
         <div class="optcol-t">${T('oSecImage')}</div>
@@ -43293,141 +44595,239 @@ const Visite = {
 
 /* ===== 70-memes.js ===== */
 /* ============================================================
-   SMASH PÉI — LES MOTS DU PAYS
+   SMASH PÉI — LES MOTS DU PAYS, DITS À VOIX HAUTE
 
-   Le jeu se passe à La Réunion, et pendant un combat on n'entendait
-   pas un mot de créole. Le joueur demande des « mèmes créoles » au
-   départ, sur les K.O. et à la fin — en précisant l'essentiel :
+   Première version : un bandeau écrit apparaissait quatre ou cinq
+   fois par combat. Le joueur a corrigé le tir sur les deux points :
 
-       « Il faut pas que ça fasse trop mais que c'est bien placé. »
+       « Il faut que les mèmes soient des voix qu'on entend (avec un
+         bon accent créole réunionnais) et non des écritures ! Il faut
+         mettre moins de mèmes (uniquement à des moments importants
+         dans la partie). »
 
-   C'est une consigne de DOSAGE, et c'est elle qui a guidé l'écriture
-   de ce fichier autant que le contenu. Une phrase qui revient à
-   chaque K.O. cesse d'être drôle au troisième combat ; une phrase
-   qui apparaît pendant un échange gêne la lecture du jeu. Les règles
-   sont donc strictes :
+   Deux changements, donc, et le second compte autant que le premier.
 
-     · UNE au coup d'envoi, une fois la bannière ALLEZ passée ;
-     · sur les K.O., à peine plus d'un sur trois, jamais deux en
-       moins de six secondes, et TROIS AU MAXIMUM par combat ;
-     · une seule au moment où quelqu'un tombe à sa dernière vie ;
-     · UNE à la fin, choisie selon ce qui vient de se passer.
+   1) ON L'ENTEND, ON NE LE LIT PLUS.
 
-   Cela fait quatre à cinq apparitions dans un combat de trois
-   minutes. On les remarque, on ne les subit pas.
+   La voix passe par la synthèse vocale du navigateur, avec une voix
+   FRANÇAISE — et c'est le bon choix, pas un pis-aller : le créole
+   réunionnais est une langue à base lexicale française, donc une
+   voix française qui lit une graphie adaptée sort quelque chose de
+   très proche. Tout le travail est dans cette graphie. On n'écrit
+   pas « zot la vu », qu'une voix française prononcerait « zo la
+   vu », mais « zotte la vu ». Chaque réplique porte donc deux
+   écritures : celle qu'un Réunionnais reconnaît, et celle qu'il faut
+   donner à la machine pour qu'elle la dise juste.
 
-   Sur la forme : le créole est écrit en grand, et la traduction dans
-   la langue de l'interface se glisse en dessous, en petit. Un joueur
-   de l'île lit la première ligne et sourit ; un joueur d'ailleurs lit
-   la seconde et apprend un mot. Personne n'est laissé dehors.
+   S'y ajoutent la prosodie — le créole se parle plus vite et plus
+   haut que le français standard — et une voix légèrement différente
+   par combattant, pour que ce soit LE personnage qui parle.
 
-   Le bandeau se place SOUS le combat et AU-DESSUS des jauges : ni
-   dans les jambes de la bannière K.O., ni par-dessus les dégâts.
+   Le bandeau écrit ne disparaît pas complètement : il reste le
+   filet de sécurité quand aucune voix n'est disponible (certains
+   navigateurs, le son coupé). Mieux vaut lire que rien entendre.
+
+   2) BEAUCOUP MOINS SOUVENT.
+
+   L'ancienne version parlait au coup d'envoi et sur un K.O. sur
+   trois. Le coup d'envoi n'est pas un moment important : c'est le
+   moment où l'on n'a encore rien fait. On ne garde que ce qui compte
+   vraiment dans une partie :
+
+     · LA DERNIÈRE VIE — quand quelqu'un n'a plus qu'un souffle ;
+     · LE K.O. SPECTACULAIRE — l'étoile, ou le K.O. arraché à très
+       haut pourcentage. Pas les autres ;
+     · LA FIN DU MATCH.
+
+   Une à trois répliques par combat au lieu de cinq. On les attend au
+   lieu de les subir.
    ============================================================ */
 (function memes() {
   if (typeof Match === 'undefined' || !Match.prototype) return;
 
   /* ============================================================
-     1) LES PHRASES
+     1) LES RÉPLIQUES
 
-     Du créole réunionnais réel, pas du français déguisé : « aïo »,
-     « bat' karé », « tienbo », « zarboutan » sont des mots qu'on
-     entend, et la traduction française donnée ici est celle du sens,
-     pas du mot à mot.
+     `cr` : l'écriture créole, celle qu'on affiche si l'on doit
+            afficher.
+     `dit`: la même chose écrite POUR UNE VOIX FRANÇAISE. C'est elle
+            qui est prononcée, et elle seule.
      ============================================================ */
-  const DEPART = [
-    { cr: 'Anou zoué !',        fr: 'On y va !',              en: 'Let\'s play!' },
-    { cr: 'Sa i sava chofé !',  fr: 'Ça va chauffer !',       en: 'This is going to get hot!' },
-    { cr: 'Alé, mi atann a ou !', fr: 'Vas-y, je t\'attends !', en: 'Come on, I\'m waiting!' },
-    { cr: 'Tienbo lo kèr !',    fr: 'Accroche-toi !',         en: 'Hold on tight!' },
-    { cr: 'Larg pa lo mor !',   fr: 'Ne lâche rien !',        en: 'Don\'t let go!' },
-    { cr: 'Gard\' a ou !',      fr: 'Fais gaffe à toi !',     en: 'Watch yourself!' },
-    { cr: 'Zot lé paré ?',      fr: 'Vous êtes prêts ?',      en: 'Are you all ready?' }
-  ];
-
-  const KO = [
-    { cr: 'Aïo !',                fr: 'Aïe !',                    en: 'Ouch!' },
-    { cr: 'Ala i vol\' !',        fr: 'Et le voilà qui vole !',   en: 'And off he flies!' },
-    { cr: 'Té, zot la vu sa ?',   fr: 'Eh, vous avez vu ça ?',    en: 'Hey, did you see that?' },
-    { cr: 'Fini bat\' karé !',    fr: 'Fini la balade !',         en: 'Stroll\'s over!' },
-    { cr: 'Anlèr !',              fr: 'En l\'air !',              en: 'Airborne!' },
-    { cr: 'Sa i fé mal, sa !',    fr: 'Ça, ça fait mal !',        en: 'That one hurt!' },
-    { cr: 'Kraz\' net !',         fr: 'Écrasé net !',             en: 'Flattened!' },
-    { cr: 'Salu, bay !',          fr: 'Salut, au revoir !',       en: 'Bye now!' },
-    { cr: 'Out\' zafèr lé fané !', fr: 'Ton affaire est fichue !', en: 'You\'re done for!' }
-  ];
-
   const DERNIERE = [
-    { cr: 'Mi la pa fini !',    fr: 'J\'ai pas dit mon dernier mot !', en: 'I\'m not done yet!' },
-    { cr: 'Alon, ankor inn kou !', fr: 'Allez, encore un coup !', en: 'Come on, one more!' },
-    { cr: 'Tienbo, mon dalon !', fr: 'Tiens bon, l\'ami !',      en: 'Hang in there, mate!' }
+    { cr: 'Mi la pa fini !',       dit: 'Mi la pa fini !',            fr: 'J\'ai pas dit mon dernier mot !', en: 'I\'m not done yet!' },
+    { cr: 'Alon, ankor inn kou !', dit: 'Alon ! Ankor inn kou !',     fr: 'Allez, encore un coup !',         en: 'Come on, one more!' },
+    { cr: 'Tienbo, mon dalon !',   dit: 'Tiin-bo, mon dalon !',       fr: 'Tiens bon, l\'ami !',             en: 'Hang in there!' },
+    { cr: 'Larg pa lo mor !',      dit: 'Largue pa lo morre !',       fr: 'Ne lâche rien !',                 en: 'Don\'t let go!' },
+    { cr: 'Mi tienbo ankor !',     dit: 'Mi tiin-bo ankore !',        fr: 'Je tiens encore !',               en: 'Still standing!' }
+  ];
+
+  const KO_FORT = [
+    { cr: 'Aïo !',               dit: 'Aïe-yo !',                  fr: 'Aïe !',                  en: 'Ouch!' },
+    { cr: 'Ala i vol\' !',       dit: 'Ala i volle !',             fr: 'Et le voilà qui vole !', en: 'And off it flies!' },
+    { cr: 'Té, zot la vu sa ?',  dit: 'Té ! Zotte la vu sa ?',     fr: 'Eh, vous avez vu ça ?',  en: 'Did you see that?' },
+    { cr: 'Anlèr !',             dit: 'An lère !',                 fr: 'En l\'air !',            en: 'Airborne!' },
+    { cr: 'Kraz\' net !',        dit: 'Kraze nette !',             fr: 'Écrasé net !',           en: 'Flattened!' },
+    { cr: 'Salu, bay !',         dit: 'Salu, baï !',               fr: 'Salut, au revoir !',     en: 'Bye now!' }
   ];
 
   const FIN = [
-    { cr: 'Nou la gaingné !',        fr: 'On a gagné !',            en: 'We won!' },
-    { cr: 'Sa mèm !',                fr: 'C\'est ça même !',        en: 'That\'s the one!' },
-    { cr: 'Ala inn zarboutan !',     fr: 'En voilà un pilier !',    en: 'Now that\'s a legend!' },
-    { cr: 'Lo mèt la parlé !',       fr: 'Le maître a parlé !',     en: 'The master has spoken!' },
-    { cr: 'Pèsonn pou arèt a mwin !', fr: 'Personne pour m\'arrêter !', en: 'No one can stop me!' }
+    { cr: 'Nou la gaingné !',         dit: 'Nou la guingné !',           fr: 'On a gagné !',             en: 'We won!' },
+    { cr: 'Sa mèm !',                 dit: 'Sa mème !',                  fr: 'C\'est ça même !',         en: 'That\'s the one!' },
+    { cr: 'Ala inn zarboutan !',      dit: 'Ala inn zarboutan !',        fr: 'En voilà un pilier !',     en: 'Now that\'s a legend!' },
+    { cr: 'Lo mèt la parlé !',        dit: 'Lo mète la parlé !',         fr: 'Le maître a parlé !',      en: 'The master has spoken!' },
+    { cr: 'Pèsonn pou arèt a mwin !', dit: 'Pè-sonne pou arète a mwin !', fr: 'Personne pour m\'arrêter !', en: 'No one stops me!' },
+    { cr: 'Batay la fini !',          dit: 'Bataille la fini !',         fr: 'La bagarre est finie !',   en: 'The fight is over!' }
   ];
 
   const EGALITE = [
-    { cr: 'Ni koné pa kisa !', fr: 'On ne sait même pas qui !', en: 'Nobody even knows who!' }
+    { cr: 'Ni koné pa kisa !', dit: 'Ni koné pa kisa !', fr: 'On ne sait même pas qui !', en: 'Nobody even knows who!' }
   ];
 
   /* ============================================================
      2) LE DOSAGE
 
-     Tout est ici, en clair, pour qu'on puisse le relire d'un coup
-     d'œil : c'est la partie du fichier qui décide si le jeu est
-     agréable ou fatigant.
+     Tout est ici, en clair. C'est cette poignée de nombres qui
+     décide si le jeu est agréable ou fatigant.
      ============================================================ */
   const REGLES = {
-    chanceKO: 0.36,        // à peine plus d'un K.O. sur trois
-    maxKO: 3,              // et jamais plus de trois par combat
-    chanceDerniere: 0.5,   // la dernière vie : une fois, si le sort le veut
-    reposImages: 360,      // six secondes de silence entre deux phrases
-    duree: 118,            // le temps d'affichage, entrée et sortie comprises
-    entree: 10, sortie: 20
+    maxParCombat: 3,       // jamais plus de trois répliques, quoi qu'il arrive
+    reposImages: 420,      // sept secondes de silence minimum entre deux
+    chanceKoFort: 0.55,    // et seulement sur un K.O. qui valait le coup d'œil
+    maxKoFort: 1,          // une seule fois par combat
+    degatsKoFort: 115,     // « très haut pourcentage » : le K.O. arraché de loin
+    duree: 118, entree: 10, sortie: 20   // pour le bandeau de repli seulement
   };
 
+  /* ============================================================
+     3) LA VOIX
+
+     La synthèse vocale du navigateur est asynchrone et capricieuse :
+     la liste des voix arrive parfois après le chargement de la page,
+     parfois jamais. On la relit donc à chaque fois, et on se
+     débrouille sans si elle reste vide.
+     ============================================================ */
+  const Voix = {
+    dispo: false,
+    liste: [],
+
+    moteur() {
+      return (typeof window !== 'undefined' && window.speechSynthesis) || null;
+    },
+
+    /* On veut une voix française. À défaut, n'importe laquelle vaut
+       mieux que le silence — mais on baisse alors la vitesse, parce
+       qu'une voix anglaise lisant du créole a besoin d'air. */
+    relire() {
+      const m = this.moteur();
+      if (!m) { this.dispo = false; return; }
+      let v = [];
+      try { v = m.getVoices() || []; } catch (e) { v = []; }
+      const fr = v.filter(x => /^fr/i.test(x.lang || ''));
+      this.liste = fr.length ? fr : v;
+      this.francais = fr.length > 0;
+      this.dispo = this.liste.length > 0;
+    },
+
+    /* Une voix par combattant, tirée de son identifiant : le même
+       personnage a toujours la même voix, d'un combat à l'autre. */
+    pour(f) {
+      if (!this.liste.length) return null;
+      const cle = (f && f.char && (f.char.__base || f.char).id) || '';
+      let n = 0;
+      for (let i = 0; i < cle.length; i++) n = (n * 31 + cle.charCodeAt(i)) % 9973;
+      return this.liste[n % this.liste.length];
+    },
+
+    /* La prosodie créole : plus vif et un peu plus haut que du
+       français lu. La hauteur varie avec le gabarit du combattant —
+       un colosse parle plus grave, et cela s'entend. */
+    parle(texte, f) {
+      const m = this.moteur();
+      if (!m || !this.dispo || !texte) return false;
+      try {
+        const u = new SpeechSynthesisUtterance(texte);
+        const v = this.pour(f);
+        if (v) { u.voice = v; u.lang = v.lang; }
+        else u.lang = 'fr-FR';
+
+        const poids = (f && f.char && f.char.stats && f.char.stats.weight) || 100;
+        const k = clamp((poids - 72) / (135 - 72), 0, 1);      // 0 plume, 1 colosse
+
+        u.rate = (this.francais ? 1.14 : 0.95) - k * 0.06;
+        u.pitch = 1.22 - k * 0.42;
+        const vol = (typeof Audio2 !== 'undefined')
+          ? clamp((Audio2.volMaster || 0.85) * (Audio2.volSfx || 0.9) * 1.25, 0, 1) : 0.9;
+        u.volume = vol;
+
+        m.cancel();          // une réplique à la fois, jamais deux qui se marchent dessus
+        m.speak(u);
+        return true;
+      } catch (e) { return false; }
+    },
+
+    tais() { const m = this.moteur(); if (m) { try { m.cancel(); } catch (e) {} } }
+  };
+
+  Voix.relire();
+  if (Voix.moteur() && typeof Voix.moteur().addEventListener === 'function') {
+    try { Voix.moteur().addEventListener('voiceschanged', () => Voix.relire()); } catch (e) {}
+  }
+  /* certains navigateurs ne remplissent la liste qu'après un premier
+     geste de l'utilisateur : on retente une fois, sans insister */
+  setTimeout(() => Voix.relire(), 1500);
+
+  /* Le son du jeu commande : voix coupée si le son est coupé. */
+  function sonAutorise() {
+    if (typeof Save !== 'undefined' && Save.data && Save.data.opts && Save.data.opts.voix === false) return false;
+    if (typeof Audio2 === 'undefined') return true;
+    if (Audio2.enabled === false) return false;
+    if ((Audio2.volMaster || 0) <= 0.01) return false;
+    return true;
+  }
+
+  /* ============================================================
+     4) DIRE UNE RÉPLIQUE
+     ============================================================ */
   function tire(liste, evites) {
     const libres = liste.filter(x => evites.indexOf(x.cr) < 0);
     const src = libres.length ? libres : liste;
     return src[Math.floor(Math.random() * src.length)];
   }
 
-  /* ============================================================
-     3) LE BANDEAU
-     ============================================================ */
-  function pose(M, phrase, teinte) {
+  function dis(M, phrase, qui, teinte) {
     if (!phrase) return;
-    M.__meme = { p: phrase, t: 0, col: teinte || '#ffd166' };
+    if ((M.__memeN || 0) >= REGLES.maxParCombat) return;
+    if ((M.__memeRepos || 0) > 0) return;
+    M.__memeN = (M.__memeN || 0) + 1;
     M.__memeRepos = REGLES.reposImages;
     (M.__memeVus || (M.__memeVus = [])).push(phrase.cr);
+
+    const parle = sonAutorise() && Voix.dispo && Voix.parle(phrase.dit || phrase.cr, qui);
+    /* Le bandeau n'apparaît QUE si la voix n'a pas pu sortir : le
+       joueur a demandé de l'entendre, pas de le lire. */
+    if (!parle) M.__meme = { p: phrase, t: 0, col: teinte || '#ffd166' };
   }
 
+  /* ============================================================
+     5) LE BANDEAU DE REPLI
+     ============================================================ */
   function dessine(M, ctx) {
     const m = M.__meme;
     if (!m) return;
     const T = REGLES.duree;
     if (m.t >= T) { M.__meme = null; return; }
-    /* entrée franche, sortie douce : on veut que l'œil l'attrape, pas
-       qu'il la cherche */
     const k = m.t < REGLES.entree ? m.t / REGLES.entree
             : m.t > T - REGLES.sortie ? (T - m.t) / REGLES.sortie : 1;
     const monte = (1 - k) * 16;
 
     const lang = M.lang === 'en' ? 'en' : (M.lang === 'cr' ? 'cr' : 'fr');
     const gros = m.p.cr;
-    /* en créole dans l'interface, la traduction n'a pas lieu d'être */
     const petit = lang === 'cr' ? '' : (m.p[lang] || m.p.fr);
 
     ctx.save();
     ctx.globalAlpha = k;
     ctx.translate(VW / 2, VH - 186 + monte);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 
     ctx.font = '900 46px Bangers, Impact, sans-serif';
     const lg = ctx.measureText(gros).width;
@@ -43436,8 +44836,6 @@ const Visite = {
     const larg = Math.max(lg, lp) + 54;
     const haut = petit ? 76 : 56;
 
-    /* la pastille : assez sombre pour que le texte tienne par-dessus
-       n'importe quel décor, assez discrète pour ne pas cacher le jeu */
     ctx.beginPath();
     const r = haut / 2;
     ctx.moveTo(-larg / 2 + r, -haut / 2);
@@ -43446,11 +44844,8 @@ const Visite = {
     ctx.arcTo(-larg / 2, haut / 2, -larg / 2, -haut / 2, r);
     ctx.arcTo(-larg / 2, -haut / 2, larg / 2, -haut / 2, r);
     ctx.closePath();
-    ctx.fillStyle = 'rgba(8,10,16,.9)';
-    ctx.fill();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = rgba(m.col, 0.7);
-    ctx.stroke();
+    ctx.fillStyle = 'rgba(8,10,16,.9)'; ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = rgba(m.col, 0.7); ctx.stroke();
 
     const yg = petit ? -12 : 0;
     ctx.font = '900 46px Bangers, Impact, sans-serif';
@@ -43458,8 +44853,7 @@ const Visite = {
     ctx.strokeText(gros, 0, yg);
     const g = ctx.createLinearGradient(0, yg - 22, 0, yg + 22);
     g.addColorStop(0, '#ffffff'); g.addColorStop(1, m.col);
-    ctx.fillStyle = g;
-    ctx.fillText(gros, 0, yg);
+    ctx.fillStyle = g; ctx.fillText(gros, 0, yg);
 
     if (petit) {
       ctx.font = '700 15px system-ui, sans-serif';
@@ -43470,72 +44864,66 @@ const Visite = {
   }
 
   /* ============================================================
-     4) LES MOMENTS
-
-     On se branche sur les évènements qui existent déjà. Aucun
-     nouveau compteur dans la boucle de jeu : le bandeau ne coûte
-     rien tant qu'il n'y a rien à dire.
+     6) LES MOMENTS QUI COMPTENT
      ============================================================ */
-
-  /* --- le coup d'envoi --- */
   const majOrig = Match.prototype.update;
   Match.prototype.update = function () {
     const r = majOrig.apply(this, arguments);
     if (this.__memeRepos > 0) this.__memeRepos--;
     if (this.__meme) this.__meme.t++;
-
-    /* on compte les images DEPUIS la fin du decompte : la banniere
-       verte ALLEZ dure soixante-seize images, et le bandeau ne doit
-       pas lui marcher dessus. `frame` ne convenait pas — il tourne
-       deja pendant le decompte. */
-    if (!this.__memeDepart && this.intro <= 0 && !this.over) {
-      this.__memeAttente = (this.__memeAttente || 0) + 1;
-      if (this.__memeAttente > 86) {
-        this.__memeDepart = true;
-        pose(this, tire(DEPART, []), '#7ef08a');
-      }
-    }
     return r;
   };
 
-  /* --- les K.O. --- */
   if (typeof Match.prototype.onKO === 'function') {
     const koOrig = Match.prototype.onKO;
     Match.prototype.onKO = function (f, killer, dir) {
+      /* on relève le pourcentage AVANT le K.O. : après, il est remis
+         a zéro pour la réapparition, et « très haut pourcentage »
+         vaudrait toujours zéro */
+      const pctAvant = (f && f.dmgTaken) || 0;
       const r = koOrig.apply(this, arguments);
       try {
-        this.__memeKO = (this.__memeKO || 0);
-        if (!this.over && this.__memeRepos <= 0 && this.__memeKO < REGLES.maxKO &&
-            Math.random() < REGLES.chanceKO) {
-          this.__memeKO++;
-          pose(this, tire(KO, this.__memeVus || []), (killer && killer.color) || '#ff6b2c');
-        } else if (!this.over && !this.__memeDerniere && this.__memeRepos <= 0 &&
-                   f && f.stocks === 1 && Math.random() < REGLES.chanceDerniere) {
-          /* la dernière vie : le moment le plus tendu du combat, et
-             celui où une phrase porte le plus */
+        if (this.over) return r;
+
+        /* LA DERNIÈRE VIE. Le moment le plus tendu d'un combat, et
+           celui où une phrase porte le plus. C'est le perdant qui
+           parle : il se remet debout. */
+        if (f && f.stocks === 1 && !this.__memeDerniere) {
           this.__memeDerniere = true;
-          pose(this, tire(DERNIERE, this.__memeVus || []), (f && f.color) || '#ffd166');
+          dis(this, tire(DERNIERE, this.__memeVus || []), f, (f && f.color) || '#ffd166');
+          return r;
+        }
+
+        /* LE K.O. SPECTACULAIRE. Pas n'importe lequel : celui qui
+           part en étoile, ou celui arraché à très haut pourcentage —
+           c'est-à-dire celui qu'on a vu venir et qu'on a mérité.
+           Un K.O. ordinaire ne dit rien. */
+        const fort = (this.koCine && this.koCine.kind === 'star') ||
+                     (pctAvant >= REGLES.degatsKoFort);
+        if (fort && (this.__memeKO || 0) < REGLES.maxKoFort && Math.random() < REGLES.chanceKoFort) {
+          this.__memeKO = (this.__memeKO || 0) + 1;
+          dis(this, tire(KO_FORT, this.__memeVus || []), killer || f, (killer && killer.color) || '#ff6b2c');
         }
       } catch (e) {}
       return r;
     };
   }
 
-  /* --- la fin --- */
   if (typeof Match.prototype.finish === 'function') {
     const finOrig = Match.prototype.finish;
     Match.prototype.finish = function (winner) {
       const r = finOrig.apply(this, arguments);
       try {
+        /* la fin passe toujours : on lève le silence et le plafond */
         this.__memeRepos = 0;
-        pose(this, winner ? tire(FIN, this.__memeVus || []) : EGALITE[0],
-             winner ? (winner.color || '#ffd166') : '#9aa5b8');
+        this.__memeN = 0;
+        dis(this, winner ? tire(FIN, this.__memeVus || []) : EGALITE[0], winner,
+            winner ? (winner.color || '#ffd166') : '#9aa5b8');
       } catch (e) {}
       return r;
     };
   }
 
-  /* --- le dessin, juste avant les jauges --- */
   if (typeof Match.prototype.drawHud === 'function') {
     const hudOrig = Match.prototype.drawHud;
     Match.prototype.drawHud = function (ctx) {
@@ -43544,7 +44932,15 @@ const Visite = {
     };
   }
 
-  window.MEMES_PEI = { DEPART, KO, DERNIERE, FIN, EGALITE, REGLES };
+  /* On se tait en quittant le combat : une voix qui continue de
+     parler sur l'écran des résultats, c'est un bogue, pas une
+     ambiance. */
+  if (typeof UI !== 'undefined' && typeof UI.show === 'function') {
+    const showOrig = UI.show.bind(UI);
+    UI.show = function (id) { if (id !== 'game') Voix.tais(); return showOrig(id); };
+  }
+
+  window.MEMES_PEI = { DERNIERE, KO_FORT, FIN, EGALITE, REGLES, Voix, dis };
 })();
 
 
@@ -43654,6 +45050,662 @@ const Visite = {
 [data-titre] { position: relative; }
 `;
   document.head.appendChild(st);
+})();
+
+
+/* ===== 72-portee.js ===== */
+/* ============================================================
+   SMASH PÉI — LA ZONE MORTE AU CORPS À CORPS
+
+   Le joueur écrit : « quand les personnages sont collés les uns
+   contre les autres et qu'ils se tapent, j'ai l'impression que
+   certains coups ne sont pas pris. »
+
+   L'impression est juste, et la mesure la chiffre. Cinquante-quatre
+   combattants, neuf coups au sol chacun, douze distances, 5 832
+   essais :
+
+       distance     coups qui touchent
+         0 px            67 %
+         8 px            79 %
+        16 px            83 %
+        40 px            90 %   ← le maximum
+        70 px            79 %
+       110 px            48 %
+
+   La courbe est bonne au-delà de quarante pixels : plus on s'éloigne,
+   moins on touche, c'est normal. Mais EN DESSOUS elle redescend, et
+   c'est absurde : être collé à quelqu'un devrait être la position la
+   plus sûre pour le toucher, pas la moins sûre. Vingt-trois points
+   de perte entre la bonne distance et le corps à corps.
+
+   La cause est géométrique. Chaque boîte de coup est posée à un
+   décalage fixe DEVANT le combattant — un coup de poing est une
+   boîte à trente pixels du buste, un smash haut une boîte au-dessus
+   de la tête. Entre le corps et cette boîte, il n'y a rien. Un
+   adversaire qui se tient DANS ce trou n'est touché par rien.
+
+   Les pires cas mesurés :
+
+     · SMASH HAUT : 35 % seulement, et zéro contre un adversaire au
+       sol. Sa boîte s'arrête onze pixels au-dessus du crâne de la
+       cible : elle ne peut littéralement jamais la rencontrer. Un
+       smash haut qui ne touche pas quelqu'un collé à soi, ce n'est
+       pas un choix de conception, c'est un trou.
+     · SPÉCIAL LATÉRAL : 53 %.
+     · ATTAQUE HAUTE : 54 %.
+
+   LA CORRECTION. Dans Smash, une boîte de coup n'est pas un
+   rectangle posé dans le vide : c'est une chaîne de sphères tracée
+   LE LONG DU MEMBRE, depuis l'épaule jusqu'au poing. Il n'y a donc
+   jamais de trou entre le corps et le coup. On reproduit exactement
+   cela : chaque boîte est étirée VERS L'INTÉRIEUR jusqu'à recouvrir
+   le buste de celui qui frappe.
+
+   Ce que cette règle ne fait PAS, et c'est le point important :
+
+     · elle n'allonge JAMAIS la portée vers l'extérieur — le bord
+       lointain de chaque boîte ne bouge pas d'un pixel, donc
+       l'espacement, les punitions et l'équilibre des personnages
+       restent exactement ce qu'ils étaient ;
+     · elle ne permet pas de frapper derrière soi : l'étirement
+       s'arrête au centre du corps ;
+     · elle ne transforme pas un coup À DISTANCE en coup de corps.
+       Au-delà de quatre-vingts pixels de trou, on considère que le
+       vide est voulu — c'est la signature d'une arme longue — et on
+       n'y touche pas.
+   ============================================================ */
+(function portee() {
+  if (typeof Fighter === 'undefined' || !Fighter.prototype || !Fighter.prototype.activeHits) return;
+
+  /* Jusqu'où on accepte d'étirer une boîte vers le corps. Les trous
+     mesurés font au pire une quarantaine de pixels ; au-delà de ces
+     valeurs, le vide est une intention de conception. */
+  const MAX_H = 80;
+  const MAX_V = 95;
+
+  const orig = Fighter.prototype.activeHits;
+  Fighter.prototype.activeHits = function () {
+    const hits = orig.apply(this, arguments);
+    if (!hits || !hits.length) return hits;
+
+    /* le point d'ancrage : le milieu du buste, c'est-à-dire l'épaule
+       d'où part réellement le coup */
+    const cx = this.x;
+    const cy = this.y - this.h * 0.5;
+
+    for (const h of hits) {
+      const b = h && h.box;
+      if (!b) continue;
+
+      /* --- horizontalement --- */
+      if (b.x > cx) {                        // la boîte est entièrement devant
+        const d = Math.min(b.x - cx, MAX_H);
+        b.x -= d; b.w += d;
+      } else if (b.x + b.w < cx) {           // entièrement derrière (coups à revers)
+        const d = Math.min(cx - (b.x + b.w), MAX_H);
+        b.w += d;
+      }
+
+      /* --- verticalement ---
+         C'est cette moitié-là qui répare le smash haut : sa boîte
+         flottait au-dessus du crâne sans jamais redescendre au
+         niveau des épaules. */
+      if (b.y > cy) {                        // entièrement sous le buste
+        const d = Math.min(b.y - cy, MAX_V);
+        b.y -= d; b.h += d;
+      } else if (b.y + b.h < cy) {           // entièrement au-dessus
+        const d = Math.min(cy - (b.y + b.h), MAX_V);
+        b.h += d;
+      }
+    }
+    return hits;
+  };
+
+  window.PORTEE_INTERNE = { MAX_H, MAX_V };
+})();
+
+/* ============================================================
+   SMASH PÉI — LE PROJECTILE QUI PART DÉJÀ TROP LOIN
+
+   Même défaut, autre mécanique. Un spécial à projectile fait naître
+   sa boule DEVANT le lanceur — une soixantaine de pixels — puis
+   l'envoie encore plus loin. Un adversaire collé au lanceur se
+   trouve donc DERRIÈRE le point de départ : la boule s'éloigne de
+   lui sans jamais l'avoir croisé.
+
+   La mesure le confirme : le spécial neutre échoue 136 fois au corps
+   à corps, le spécial latéral 104 fois, alors que tous les coups
+   normaux sont maintenant à zéro échec.
+
+   La correction reprend l'idée de la « bouche du canon » : pendant
+   ses trois premières images, le projectile est considéré comme
+   occupant tout le trajet qui le sépare de son lanceur. Passé ces
+   trois images, il redevient une simple boule. On ne change donc ni
+   sa vitesse, ni sa portée, ni ses dégâts — seulement le fait qu'il
+   ne peut plus naître de l'autre côté de sa cible.
+   ============================================================ */
+(function bouche() {
+  if (typeof Projectile === 'undefined' || !Projectile.prototype) return;
+
+  const IMAGES = 3;          // la durée de la bouche du canon
+  const orig = Projectile.prototype.rect;
+
+  Projectile.prototype.rect = function () {
+    const r = orig.apply(this, arguments);
+    const o = this.owner;
+    if (!o || this.age > IMAGES || this.reflT) return r;
+
+    /* on relie la boule au buste de son lanceur */
+    const ox = o.x, oy = o.y - o.h * 0.5;
+    const x0 = Math.min(r.x, ox), x1 = Math.max(r.x + r.w, ox);
+    const y0 = Math.min(r.y, oy), y1 = Math.max(r.y + r.h, oy);
+    /* garde-fou : si la boule est déjà très loin, ce n'est plus une
+       bouche de canon, c'est un tir — on n'y touche pas */
+    if (x1 - x0 > 190 || y1 - y0 > 190) return r;
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+  };
+})();
+
+
+/* ===== 73-contenu-plus.js ===== */
+/* ============================================================
+   SMASH PÉI — DU CONTENU AUTOUR DES NEUF NOUVEAUX
+
+   Neuf combattants sont arrivés avec les communautés de l'île, et
+   trois arènes avec eux. Il leur fallait de quoi vivre dans le reste
+   du jeu : des danses, des pièces de vestiaire, des défis et des
+   trophées à leur nom. Sans cela, ils seraient neuf noms de plus
+   dans une grille — pas des personnages qu'on apprend.
+
+   Tout ce fichier suit la même règle que le casting : on célèbre des
+   PRATIQUES, pas des apparences. Les pièces ajoutées sont des
+   instruments, des tissus, des outils et des lumières de fête —
+   rien qui relève du costume rituel ou du signe religieux, qui n'ont
+   pas leur place dans un vestiaire de jeu de combat.
+   ============================================================ */
+
+/* ============================================================
+   1) SIX DANSES DE PLUS
+   ============================================================ */
+(function dansesPlus() {
+  if (typeof window.DANSES_PAS !== 'object' || typeof newPose !== 'function') return;
+  const PAS = window.DANSES_PAS;
+
+  /* LA DANSE DU LION — la tête claque, le corps rebondit sur deux
+     appuis. C'est un pas à deux ; ici c'est le devant du costume. */
+  PAS.lion = function (t) {
+    const u = (t % 34) / 34;
+    const bond = Math.max(0, Math.sin(u * Math.PI * 2));
+    const claque = u > 0.55 && u < 0.72 ? 1 : 0;
+    return newPose({
+      hipY: -bond * 18, sy: 1 + bond * 0.05, sx: 1 - bond * 0.03,
+      torso: -8 - claque * 10, head: -12 - claque * 14,
+      shL: -128 - bond * 30, elL: 26 - claque * 18,
+      shR: 128 + bond * 30, elR: 26 - claque * 18,
+      hpL: 18 + bond * 22, knL: 26 + bond * 34,
+      hpR: -18 + bond * 22, knR: 26 + bond * 34,
+      mouth: claque ? 1 : 0.4, eye: 1.3
+    });
+  };
+
+  /* LA CADENCE MBIWI — les avant-bras frappent l'un contre l'autre,
+     très vite, et les épaules suivent. Rien d'autre ne bouge : c'est
+     un pas de poignets. */
+  PAS.mbiwi = function (t) {
+    const c = Math.sin(t * 0.44);
+    const h = Math.sin(t * 0.22);
+    return newPose({
+      hipX: h * 4, hipY: -Math.abs(h) * 3, torso: h * 4, head: -6 - h * 3,
+      shL: -54 + c * 26, elL: 92 - c * 24,
+      shR: 54 + c * 26, elR: 92 + c * 24,
+      hpL: 12, knL: 20 + Math.abs(h) * 8, hpR: -12, knR: 20 + Math.abs(h) * 8,
+      lean: h * 3, mouth: 0.8, eye: 1.1
+    });
+  };
+
+  /* LE KABAR — les deux mains frappent devant soi, sur le temps.
+     C'est la danse la plus simple du lot, et la plus juste : dans un
+     kabar, tout le monde frappe. */
+  PAS.kabar = function (t) {
+    const b = (t % 30) / 30;
+    const f = b < 0.28 ? 1 - b / 0.28 : 0;
+    return newPose({
+      hipY: -3 + f * 5, torso: -2 - f * 8, head: -8 - f * 6,
+      shL: -78 - f * 34, elL: 74 - f * 30,
+      shR: 78 + f * 34, elR: 74 - f * 30,
+      hpL: 14, knL: 22 + f * 10, hpR: -14, knR: 22 + f * 10,
+      lean: Math.sin(t * 0.1) * 4, mouth: f > 0.5 ? 1 : 0.5, eye: 1.15
+    });
+  };
+
+  /* LA PHOTO SOUVENIR — bras tendu, sourire, et il rate le cadrage.
+     C'est la seule danse comique du jeu, et elle est affectueuse. */
+  PAS.selfie = function (t) {
+    const u = (t % 90) / 90;
+    const pose = u < 0.62 ? 1 : 0;
+    const clic = (u > 0.5 && u < 0.56) ? 1 : 0;
+    const s = Math.sin(t * 0.14);
+    return newPose({
+      torso: -4 + s * 3, head: -14 - clic * 6, hipY: -2,
+      shL: -136 - pose * 14, elL: 60 - pose * 20,
+      shR: 40 + s * 12, elR: 66,
+      hpL: 12, knL: 18, hpR: -12, knR: 18,
+      lean: 4 + s * 2, mouth: 1, eye: clic ? 0.2 : 1.3
+    });
+  };
+
+  /* LE ZOIZO — les bras en ailes, un pas sur place, la tête qui
+     pique. Le paille-en-queue au-dessus du récif. */
+  PAS.zoizo = function (t) {
+    const a = Math.sin(t * 0.13);
+    const p = Math.sin(t * 0.26);
+    return newPose({
+      hipY: -4 - a * 5, sy: 1 + a * 0.02,
+      torso: -10, head: -14 + p * 6,
+      shL: -150 - a * 26, elL: 6, shR: 150 + a * 26, elR: 6,
+      hpL: 8, knL: 12, hpR: -8, knR: 12,
+      wing: a * 26, lean: p * 3, mouth: 0.6, eye: 1.1
+    });
+  };
+
+  /* LE BALANCEMENT DU PORTEUR — lent, ample, très droit. On ne fête
+     pas : on tient. C'est le contraire d'une danse de victoire, et
+     c'est justement ce qui la rend belle après un combat. */
+  PAS.porteur = function (t) {
+    const s = Math.sin(t * 0.055);
+    return newPose({
+      hipX: s * 6, hipY: 4 + Math.abs(s) * 3, torso: 2 - s * 3, head: -4,
+      shL: -104 + s * 8, elL: 116, shR: 104 + s * 8, elR: 116,
+      hpL: 18, knL: 24, hpR: -18, knR: 24,
+      lean: s * 4, mouth: 0.3, eye: 0.85
+    });
+  };
+
+  /* --- la déclaration au vestiaire --- */
+  const LISTE = [
+    { id: 'd_kabar',   pas: 'kabar',   lvl: 6,  fr: 'Frappé kabar',   en: 'Kabar clap',   cr: 'Frapé kabar',  ic: '👏' },
+    { id: 'd_lion',    pas: 'lion',    lvl: 10, fr: 'Danse du lion',  en: 'Lion dance',   cr: 'Dans lo lion', ic: '🦁' },
+    { id: 'd_selfie',  pas: 'selfie',  lvl: 14, fr: 'Photo souvenir', en: 'Souvenir pic', cr: 'Foto souvenir', ic: '📸' },
+    { id: 'd_mbiwi',   pas: 'mbiwi',   lvl: 19, fr: 'Cadence mbiwi',  en: 'Mbiwi cadence', cr: 'Kadans mbiwi', ic: '🎋' },
+    { id: 'd_zoizo',   pas: 'zoizo',   lvl: 24, fr: 'Vol du zoizo',   en: 'Bird flight',  cr: 'Vol zoizo',    ic: '🕊️' },
+    { id: 'd_porteur', pas: 'porteur', lvl: 40, fr: 'Le porteur',     en: 'The bearer',   cr: 'Lo portèr',    ic: '🕯️' }
+  ];
+
+  if (typeof COSMETICS !== 'undefined' && !COSMETICS.__dansesPlus) {
+    COSMETICS.__dansesPlus = true;
+    for (const d of LISTE) {
+      COSMETICS.push({ id: d.id, slot: 'dance', lvl: d.lvl, fr: d.fr, en: d.en, cr: d.cr, __x: true,
+                       apply: f => { f.danse = d.pas; } });
+      if (typeof COS_ICON !== 'undefined') COS_ICON[d.id] = d.ic;
+      if (window.DANSES_ID) window.DANSES_ID[d.id] = d.pas;
+    }
+  }
+})();
+
+/* ============================================================
+   2) DIX PIÈCES DE VESTIAIRE
+
+   Des instruments, des tissus, des outils. Chaque pièce a son
+   dessin : une entrée de liste sans forme à l'écran ne vaut rien.
+   ============================================================ */
+(function piecesPlus() {
+  if (typeof COSMETICS === 'undefined') return;
+
+  /* --- 2a) les pièces de tête --- */
+  if (typeof COS_TETE === 'function') {
+    const orig = COS_TETE;
+    window.COS_TETE = function (ctx, r, f, P, pose) {
+      switch (f.hatX) {
+
+        /* MADRAS — le foulard noué, à carreaux. Le tissu le plus
+           reconnaissable de l'océan Indien créole. */
+        case 'madras': {
+          ctx.save();
+          ctx.beginPath();
+          ctx.ellipse(0, -r * 0.66, r * 1.04, r * 0.7, 0, Math.PI, 0);
+          ctx.fillStyle = '#d94b3c'; ctx.fill();
+          ctx.clip();
+          ctx.strokeStyle = 'rgba(255,225,120,.85)'; ctx.lineWidth = Math.max(1.4, r * 0.09);
+          for (let i = -3; i <= 3; i++) {
+            ctx.beginPath(); ctx.moveTo(i * r * 0.34, -r * 1.5); ctx.lineTo(i * r * 0.34, r * 0.2); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(-r * 1.4, -r * 0.72 + i * r * 0.2); ctx.lineTo(r * 1.4, -r * 0.72 + i * r * 0.2); ctx.stroke();
+          }
+          ctx.restore();
+          /* le nœud sur le côté */
+          ctx.fillStyle = '#b83b2e';
+          ctx.beginPath(); ctx.ellipse(r * 0.86, -r * 0.82, r * 0.3, r * 0.2, 0.5, 0, Math.PI * 2); ctx.fill();
+          ctx.beginPath(); ctx.ellipse(r * 1.06, -r * 0.62, r * 0.22, r * 0.14, 1.1, 0, Math.PI * 2); ctx.fill();
+          return;
+        }
+
+        /* TÊTE DE LION — celle du costume de Nouvel An, portée
+           relevée sur le front comme le font les danseurs entre deux
+           passages. */
+        case 'lion': {
+          ctx.fillStyle = '#e0483c';
+          ctx.beginPath(); ctx.ellipse(0, -r * 1.02, r * 1.06, r * 0.66, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#f5c542';
+          ctx.beginPath(); ctx.ellipse(0, -r * 1.2, r * 0.68, r * 0.34, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#1f9d55';
+          ctx.beginPath(); ctx.ellipse(0, -r * 0.72, r * 0.6, r * 0.16, 0, 0, Math.PI * 2); ctx.fill();
+          /* les yeux du masque, bien au-dessus des vrais */
+          for (const s of [-1, 1]) {
+            ctx.fillStyle = '#fff';
+            ctx.beginPath(); ctx.arc(s * r * 0.42, -r * 1.06, r * 0.2, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#160c08';
+            ctx.beginPath(); ctx.arc(s * r * 0.42, -r * 1.06, r * 0.1, 0, Math.PI * 2); ctx.fill();
+          }
+          /* la crinière frisée */
+          ctx.strokeStyle = '#f5c542'; ctx.lineWidth = Math.max(1.6, r * 0.11);
+          for (let i = 0; i < 9; i++) {
+            const a = Math.PI + i * (Math.PI / 8);
+            ctx.beginPath();
+            ctx.arc(Math.cos(a) * r * 1.0, -r * 1.02 + Math.sin(a) * r * 0.6, r * 0.16, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          return;
+        }
+
+        /* BONNET DE SOMMET — celui qu'on met à quatre heures du matin
+           avant de monter au Piton des Neiges. */
+        case 'sommet': {
+          ctx.fillStyle = '#3d6fb4';
+          ctx.beginPath();
+          ctx.ellipse(0, -r * 0.7, r * 1.0, r * 0.78, 0, Math.PI, 0);
+          ctx.fill();
+          ctx.fillStyle = '#e8f0ff';
+          ctx.fillRect(-r * 1.02, -r * 0.78, r * 2.04, r * 0.3);
+          ctx.fillStyle = '#f26d3d';
+          ctx.beginPath(); ctx.arc(0, -r * 1.5, r * 0.24, 0, Math.PI * 2); ctx.fill();
+          return;
+        }
+
+        /* LANTERNE — posée en équilibre sur la tête. C'est une
+           blague, et elle éclaire vraiment. */
+        case 'lanterne': {
+          ctx.fillStyle = 'rgba(255,120,70,.28)';
+          ctx.beginPath(); ctx.arc(0, -r * 1.24, r * 1.5, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = '#ff4b3e';
+          ctx.beginPath(); ctx.ellipse(0, -r * 1.24, r * 0.52, r * 0.44, 0, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = '#ffc93c'; ctx.lineWidth = Math.max(1.2, r * 0.07);
+          for (let i = -1; i <= 1; i++) {
+            ctx.beginPath();
+            ctx.ellipse(i * r * 0.2, -r * 1.24, r * 0.16, r * 0.44, 0, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.fillStyle = '#ffc93c';
+          ctx.fillRect(-r * 0.2, -r * 0.84, r * 0.4, r * 0.1);
+          ctx.strokeStyle = '#ffe08a'; ctx.lineWidth = Math.max(1, r * 0.06);
+          ctx.beginPath(); ctx.moveTo(0, -r * 0.74); ctx.lineTo(0, -r * 0.5); ctx.stroke();
+          return;
+        }
+      }
+      return orig(ctx, r, f, P, pose);
+    };
+  }
+
+  /* --- 2b) le visage --- */
+  if (typeof COS_VISAGE === 'function') {
+    const orig = COS_VISAGE;
+    window.COS_VISAGE = function (ctx, r, f, P) {
+      switch (f.faceX) {
+
+        /* TRAITS DE KABAR — trois traits de couleur sur la pommette,
+           comme on s'en fait avant de monter jouer. */
+        case 'traits': {
+          for (const s of [-1, 1]) {
+            for (let i = 0; i < 3; i++) {
+              ctx.fillStyle = ['#f2b134', '#e0483c', '#4aa3c8'][i];
+              ctx.save();
+              ctx.translate(s * r * 0.56, r * 0.06 + i * r * 0.15);
+              ctx.rotate(s * 0.3);
+              ctx.fillRect(-r * 0.2, -r * 0.045, r * 0.4, r * 0.09);
+              ctx.restore();
+            }
+          }
+          return;
+        }
+
+        /* BARBE DES HAUTS — blanche, courte, celle des vieux
+           distillateurs de Petite France. */
+        case 'barbe': {
+          ctx.fillStyle = 'rgba(238,242,248,.94)';
+          ctx.beginPath();
+          ctx.moveTo(-r * 0.62, r * 0.06);
+          ctx.quadraticCurveTo(-r * 0.5, r * 0.9, 0, r * 0.94);
+          ctx.quadraticCurveTo(r * 0.5, r * 0.9, r * 0.62, r * 0.06);
+          ctx.quadraticCurveTo(0, r * 0.36, -r * 0.62, r * 0.06);
+          ctx.closePath(); ctx.fill();
+          ctx.fillStyle = 'rgba(210,218,228,.9)';
+          ctx.beginPath(); ctx.ellipse(0, r * 0.06, r * 0.42, r * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+          return;
+        }
+      }
+      return orig(ctx, r, f, P);
+    };
+  }
+
+  /* --- 2c) le dos ---
+     La signature est celle du moteur : le repère est le segment
+     tête-bassin, et `gab` porte l'échelle du personnage. On la
+     respecte au caractère près, sinon la pièce se pose de travers
+     sur les grands gabarits. */
+  if (typeof COS_DOS === 'function') {
+    const orig = COS_DOS;
+    window.COS_DOS = function (ctx, hx, hy, cx, cy, pose, P, kind, gab) {
+      if (kind !== 'bambous' && kind !== 'valiha') return orig(ctx, hx, hy, cx, cy, pose, P, kind, gab);
+      const midX = (hx + cx) / 2, midY = (hy + cy) / 2;
+      const k = gab || 1;
+      ctx.save();
+      ctx.translate(midX - 22, midY);
+      ctx.scale(k, k);
+      ctx.rotate(rad(pose.torso * 0.4));
+
+      if (kind === 'bambous') {
+        /* LES DEUX BAMBOUS glisses dans le dos, en croix */
+        for (const s2 of [-1, 1]) {
+          ctx.save();
+          ctx.rotate(s2 * 0.36);
+          ctx.fillStyle = '#c8b06a';
+          ctx.fillRect(-4, -40, 8, 84);
+          ctx.fillStyle = 'rgba(90,70,30,.6)';
+          for (let i = 0; i < 4; i++) ctx.fillRect(-4, -32 + i * 21, 8, 3);
+          ctx.fillStyle = 'rgba(255,255,255,.22)';
+          ctx.fillRect(-4, -40, 3, 84);
+          ctx.restore();
+        }
+      } else {
+        /* LA CITHARE portee en bandouliere */
+        ctx.save();
+        ctx.rotate(-0.42);
+        ctx.fillStyle = '#c8964a';
+        ctx.beginPath(); ctx.ellipse(0, 0, 12, 48, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(60,40,16,.55)';
+        ctx.beginPath(); ctx.ellipse(0, 0, 8, 42, 0, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = 'rgba(240,232,200,.9)'; ctx.lineWidth = 1.1;
+        for (let i = -3; i <= 3; i++) {
+          ctx.beginPath(); ctx.moveTo(i * 2.6, -46); ctx.lineTo(i * 2.6, 46); ctx.stroke();
+        }
+        ctx.fillStyle = '#8a5a2a';
+        ctx.fillRect(-13, -50, 26, 6); ctx.fillRect(-13, 44, 26, 6);
+        ctx.restore();
+      }
+      ctx.restore();
+    };
+  }
+
+  /* --- 2d) les auras ---
+     Une aura n'est pas un dessin : c'est un emetteur de particules.
+     La signature du moteur le dit — pas de contexte, seulement le
+     combattant et le point ou emettre. */
+  if (typeof COS_AURA === 'function') {
+    const orig = COS_AURA;
+    window.COS_AURA = function (f, kind, px, py) {
+      if (kind === 'lanternes') {
+        /* LES LANTERNES : de petites lueurs chaudes qui tournent
+           lentement, et ne montent presque pas. */
+        const a = (f.M ? f.M.frame : 0) * 0.05 + f.id;
+        for (let i = 0; i < 2; i++) {
+          const b = a + i * Math.PI;
+          FX.spark(px + Math.cos(b) * 44, py + Math.sin(b) * 18 - 10,
+                   Math.cos(b) * 0.3, -0.25, i ? '#ffc93c' : '#ff4b3e', 40, 4);
+        }
+        return;
+      }
+      if (kind === 'vapeur') {
+        /* LA VAPEUR D'ALAMBIC : elle monte droit et se dilate. */
+        FX.smoke(px + rnd(-12, 12), py - rnd(0, 26), 1.2, '#e8f2e4');
+        return;
+      }
+      return orig(f, kind, px, py);
+    };
+  }
+
+  /* --- 2e) la déclaration --- */
+  const nouveaux = [
+    { id: 'h_madras', slot: 'hat', lvl: 8, fr: 'Foulard madras', en: 'Madras headscarf', cr: 'Foular madras',
+      apply: f => { delete f.hat; delete f.cosTete; f.hatX = 'madras'; } },
+    { id: 'h_lion', slot: 'hat', lvl: 16, fr: 'Tête de lion', en: 'Lion head', cr: 'Tèt lo lion',
+      apply: f => { delete f.hat; delete f.cosTete; f.hatX = 'lion'; } },
+    { id: 'h_sommet', slot: 'hat', lvl: 22, fr: 'Bonnet du sommet', en: 'Summit beanie', cr: 'Bonè somé',
+      apply: f => { delete f.hat; delete f.cosTete; f.hatX = 'sommet'; } },
+    { id: 'h_lanterne', slot: 'hat', lvl: 35, fr: 'Lanterne en équilibre', en: 'Balanced lantern', cr: 'Lantèrn an ékilib',
+      apply: f => { delete f.hat; delete f.cosTete; f.hatX = 'lanterne'; } },
+
+    { id: 'f_traits', slot: 'face', lvl: 12, fr: 'Traits de kabar', en: 'Kabar stripes', cr: 'Tré kabar',
+      apply: f => { delete f.face; delete f.shades; f.faceX = 'traits'; } },
+    { id: 'f_barbe', slot: 'face', lvl: 27, fr: 'Barbe des Hauts', en: 'Highland beard', cr: 'Barb dé Ho',
+      apply: f => { delete f.face; delete f.shades; f.faceX = 'barbe'; } },
+
+    { id: 'b_bambous', slot: 'back', lvl: 11, fr: 'Bambous mbiwi', en: 'Mbiwi bamboo', cr: 'Banbou mbiwi',
+      apply: f => { delete f.cape; delete f.wings; delete f.back; f.backX = 'bambous'; } },
+    { id: 'b_valiha', slot: 'back', lvl: 25, fr: 'Valiha en bandoulière', en: 'Slung valiha', cr: 'Valiha an bandoulyèr',
+      apply: f => { delete f.cape; delete f.wings; delete f.back; f.backX = 'valiha'; } },
+
+    { id: 'a_lanternes', slot: 'aura', lvl: 20, fr: 'Ronde de lanternes', en: 'Lantern circle', cr: 'Rond lantèrn',
+      apply: f => { f.aura = 'lanternes'; } },
+    { id: 'a_vapeur', slot: 'aura', lvl: 30, fr: 'Vapeur d\'alambic', en: 'Still steam', cr: 'Vapèr alanbik',
+      apply: f => { f.aura = 'vapeur'; } },
+
+    { id: 's_cuivre', slot: 'skin', lvl: 15, fr: 'Cuivre d\'alambic', en: 'Still copper', cr: 'Kuiv alanbik',
+      hue: 28, light: 0.12 },
+    { id: 's_madras', slot: 'skin', lvl: 33, fr: 'Rouge madras', en: 'Madras red', cr: 'Rouj madras',
+      hue: 4, light: 0.08 }
+  ];
+  if (!COSMETICS.__contenuPlus) {
+    COSMETICS.__contenuPlus = true;
+    for (const c of nouveaux) { c.__x = true; COSMETICS.push(c); }
+    if (typeof COS_ICON !== 'undefined') Object.assign(COS_ICON, {
+      h_madras: '🧣', h_lion: '🦁', h_sommet: '🧢', h_lanterne: '🏮',
+      f_traits: '🎨', f_barbe: '🧔',
+      b_bambous: '🎋', b_valiha: '🪕',
+      a_lanternes: '🏮', a_vapeur: '💨',
+      s_cuivre: '🟧', s_madras: '🟥'
+    });
+  }
+})();
+
+/* ============================================================
+   3) DÉFIS ET TROPHÉES
+
+   Les défis sont des compteurs qui montent ; les trophées sont des
+   médailles qu'on gagne. On ajoute des deux, en s'appuyant sur les
+   statistiques qui existent déjà — inventer un compteur qui ne se
+   remplit jamais serait pire que ne rien ajouter.
+   ============================================================ */
+(function defisPlus() {
+  if (typeof ACHV !== 'undefined' && !ACHV.__plus) {
+    ACHV.__plus = true;
+    ACHV.push(
+      { id: 'm120', ic: '🏮', xp: 700, goal: 120, stat: 'matches',
+        nFR: 'MÉMOIRE DU KABAR', nCR: 'MÉMWAR KABAR', nEN: 'KABAR MEMORY',
+        dFR: 'Termine 120 combats', dEN: 'Finish 120 matches' },
+      { id: 'w60', ic: '🦁', xp: 720, goal: 60, stat: 'wins',
+        nFR: 'RÉVEIL DU LION', nCR: 'RÉVÈY LO LION', nEN: 'LION AWAKENED',
+        dFR: 'Gagne 60 combats', dEN: 'Win 60 matches' },
+      { id: 'k800', ic: '🌪️', xp: 900, goal: 800, stat: 'kos',
+        nFR: 'BOURRASQUE', nCR: 'BOURASK', nEN: 'GALE',
+        dFR: 'Réalise 800 KO', dEN: 'Score 800 KOs' },
+      { id: 'd60k', ic: '⛰️', xp: 800, goal: 60000, stat: 'dmg',
+        nFR: 'TOIT DE L\'ÎLE', nCR: 'TWA LÉ LÎL', nEN: 'ROOF OF THE ISLAND',
+        dFR: 'Inflige 60 000 % de dégâts', dEN: 'Deal 60,000% damage' },
+      { id: 'star30', ic: '🌠', xp: 520, goal: 30, stat: 'starKos',
+        nFR: 'PLUIE D\'ÉTOILES', nCR: 'LAPLI ZÉTWAL', nEN: 'STAR SHOWER',
+        dFR: 'Envoie 30 adversaires dans les étoiles', dEN: 'Star-KO 30 opponents' },
+      { id: 'sup50', ic: '🎇', xp: 620, goal: 50, stat: 'supers',
+        nFR: 'GRAND SOIR', nCR: 'GRAN SWAR', nEN: 'BIG NIGHT',
+        dFR: 'Déclenche 50 Super', dEN: 'Land 50 Supers' },
+      { id: 'par40', ic: '🛡️', xp: 560, goal: 40, stat: 'parries',
+        nFR: 'MAIN SÛRE', nCR: 'MIN SIR', nEN: 'STEADY HAND',
+        dFR: 'Réussis 40 parades parfaites', dEN: 'Land 40 perfect parries' },
+      { id: 'cb12', ic: '🎋', xp: 620, goal: 12, stat: 'bestCombo',
+        nFR: 'CADENCE MBIWI', nCR: 'KADANS MBIWI', nEN: 'MBIWI CADENCE',
+        dFR: 'Réussis un combo de 12 coups', dEN: 'Land a 12-hit combo' }
+    );
+  }
+
+  if (typeof TROPHIES !== 'undefined' && !TROPHIES.__plus) {
+    TROPHIES.__plus = true;
+    TROPHIES.push(
+      { id: 'ar_communautes', rarity: 'or', ic: '🤝', xp: 420,
+        cond: c => (c.S.chars || []).length >= 30,
+        nFR: 'TOUT LE MONDE À TABLE', nCR: 'TOUT DEMOUN ATAB', nEN: 'EVERYONE AT THE TABLE',
+        dFR: 'Gagne au moins un combat avec 30 combattants différents.',
+        dCR: 'Gagn omwin inn batay ek 30 gèryé diféran.',
+        dEN: 'Win at least one match with 30 different fighters.',
+        sFR: 'À La Réunion, personne ne mange seul. La table s\'agrandit, c\'est tout.',
+        sCR: 'Là La Rényon, pèrsonn i manz pa tousèl. La tab i grandi, sa mèm.',
+        sEN: 'On the island nobody eats alone. The table just gets longer.' },
+
+      { id: 'ar_lion', rarity: 'argent', ic: '🦁', xp: 240,
+        cond: c => c.S.wins >= 25,
+        nFR: 'LE LION EST RÉVEILLÉ', nCR: 'LO LION LA RÉVÈY', nEN: 'THE LION IS AWAKE',
+        dFR: 'Remporte 25 combats.', dCR: 'Gagn 25 batay.', dEN: 'Win 25 matches.',
+        sFR: 'Le lion de Nouvel An dort onze mois. Le douzième, il traverse toute la rue.',
+        sCR: 'Lo lion Nouvèl An i dor onz moi. Lo douzyèm, li travèrs tout la ri.',
+        sEN: 'The New Year lion sleeps eleven months. On the twelfth it walks the whole street.' },
+
+      { id: 'ar_sommet', rarity: 'or', ic: '⛰️', xp: 400,
+        cond: c => (c.S.stages || []).length >= 24,
+        nFR: 'TOUS LES SENTIERS', nCR: 'TOUT LO SANTYÉ', nEN: 'EVERY TRAIL',
+        dFR: 'Combats au moins une fois sur 24 arènes différentes.',
+        dCR: 'Bat toi omwin inn kou dsi 24 arèn diféran.',
+        dEN: 'Fight at least once on 24 different arenas.',
+        sFR: 'On croit connaître l\'île parce qu\'on l\'a traversée. Il faut l\'avoir montée.',
+        sCR: 'Ni krwa ni konné lîl pars ni la travèrs. Fo lavoir monté.',
+        sEN: 'You think you know the island because you crossed it. You have to climb it.' },
+
+      { id: 'ar_vapeur', rarity: 'argent', ic: '💨', xp: 220,
+        cond: c => c.S.airKos >= 45,
+        nFR: 'MONTÉE DE VAPEUR', nCR: 'MONTÉ VAPÈR', nEN: 'STEAM RISE',
+        dFR: 'Réalise 45 KO en l\'air.', dCR: 'Fé 45 KO an lèr.', dEN: 'Score 45 aerial KOs.',
+        sFR: 'Quarante kilos de feuilles pour un flacon. Quarante-cinq envolées pour une médaille.',
+        sCR: 'Karant kilo fèy pou inn flakon. Karant-sink anvolé pou inn méday.',
+        sEN: 'Forty kilos of leaves for one flask. Forty-five launches for one medal.' },
+
+      { id: 'ar_danseur', rarity: 'or', ic: '💃', xp: 380,
+        cond: c => c.level >= 24,
+        nFR: 'TOUTES LES DANSES', nCR: 'TOUT LO DANS', nEN: 'ALL THE DANCES',
+        dFR: 'Atteins le niveau 24 : la moitié des danses du jeu t\'appartient.',
+        dCR: 'Ariv nivo 24 : la moityé lo dans lé pou ou.',
+        dEN: 'Reach level 24: half the game\'s dances are yours.',
+        sFR: 'On ne danse pas pour gagner. On danse parce que la musique n\'est pas finie.',
+        sCR: 'Ni dans pa pou gagné. Ni dans pars la mizik lé pa fini.',
+        sEN: 'You do not dance to win. You dance because the music has not stopped.' },
+
+      { id: 'ar_zarboutan', rarity: 'legendaire', ic: '🕯️', xp: 800,
+        cond: c => c.S.wins >= 100 && c.level >= 34,
+        nFR: 'ZARBOUTAN', nCR: 'ZARBOUTAN', nEN: 'CORNERSTONE',
+        dFR: 'Remporte 100 combats et atteins le niveau 34.',
+        dCR: 'Gagn 100 batay ek ariv nivo 34.',
+        dEN: 'Win 100 matches and reach level 34.',
+        sFR: 'Un zarboutan, c\'est le pilier qui tient la case. On ne le voit pas, mais tout repose dessus.',
+        sCR: 'In zarboutan, sé lo pilyé ki tienbo la kaz. Ni voi pa ali, mé tout lé dsi.',
+        sEN: 'A zarboutan is the post that holds up the house. You never see it, but everything rests on it.',
+        reward: { cosmetic: 'd_porteur' } }
+    );
+  }
 })();
 
 </script>
